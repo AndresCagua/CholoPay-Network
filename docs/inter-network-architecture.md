@@ -39,3 +39,13 @@ POST /internal/v1/directory/resolve
 ```
 
 A successful response emits a versioned `DIRECTORY_KEY_RESOLVED` evidence envelope. Missing or suspended keys are rejected, and the database uniqueness constraint prevents two active interpretations of the same key inside one network. This is a deterministic simulation, not a connection to a real national directory.
+
+## Inter-network message envelope
+
+Cross-domain coordination is persisted through:
+
+```text
+POST /internal/v1/inter-network/messages
+```
+
+The envelope carries sender and destination network IDs, schema and message type, correlation/causation IDs, an idempotency key, a SHA-256 payload hash, JSON payload, and UTC creation time. The receiver validates that both networks are active and distinct. Repeating an identical envelope returns the accepted record without a second effect; reusing the idempotency key with a different payload or route is rejected. This is an at-least-once coordination boundary, not a settlement result and not an ISO 20022 message.
