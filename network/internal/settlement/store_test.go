@@ -31,7 +31,7 @@ func testStore(t *testing.T) (*sql.DB, *Store) {
 	if err := Migrate(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, "TRUNCATE settlement_entry, settlement_journal, settlement_account"); err != nil {
+	if _, err := db.ExecContext(ctx, "TRUNCATE settlement_delivery, settlement_entry, settlement_journal, settlement_account, transfer_instruction"); err != nil {
 		t.Fatal(err)
 	}
 	return db, NewStore(db)

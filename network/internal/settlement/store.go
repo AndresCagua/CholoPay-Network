@@ -118,6 +118,9 @@ func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID 
 	if _, err = tx.ExecContext(ctx, `INSERT INTO settlement_entry(entry_id,journal_id,participant_id,amount_minor,direction,currency) VALUES ($1,$2,$3,$4,'DEBIT','USD'),($5,$2,$6,$4,'CREDIT','USD')`, uuid.New(), journalID, sourceID, amountMinor, uuid.New(), destinationID); err != nil {
 		return Journal{}, err
 	}
+	if _, err = tx.ExecContext(ctx, `UPDATE transfer_instruction SET state='SETTLED',updated_at=CURRENT_TIMESTAMP WHERE transfer_id=$1 AND state IN ('READY_FOR_SETTLEMENT','FUNDS_RESERVED')`, transferID); err != nil {
+		return Journal{}, err
+	}
 	result := Journal{JournalID: journalID, TransferID: transferID, IdempotencyKey: idempotencyKey, RequestHash: requestHash, SourceParticipantID: sourceID, DestinationParticipantID: destinationID, AmountMinor: amountMinor, Currency: "USD", CorrelationID: correlationID, Entries: []Entry{{sourceID, amountMinor, Debit, "USD"}, {destinationID, amountMinor, Credit, "USD"}}}
 	if err = tx.Commit(); err != nil {
 		return Journal{}, err
