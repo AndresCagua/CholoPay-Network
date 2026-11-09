@@ -1,0 +1,73 @@
+openapi: 3.1.0
+info:
+  title: CholoNet Network API
+  version: 0.1.0
+  description: Simulated participant, CholoKey, transfer, and settlement coordination API.
+servers:
+  - url: http://localhost:8080
+security:
+  - serviceBearer: []
+paths:
+  /health/live:
+    get:
+      security: []
+      responses:
+        '200': {description: Process is alive}
+  /health/ready:
+    get:
+      security: []
+      responses:
+        '200': {description: Dependencies are ready}
+        '503': {description: Dependencies are unavailable}
+  /v1/participants:
+    post:
+      summary: Register a simulated participant
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Participant'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/keys/resolve:
+    get:
+      parameters: [{name: key, in: query, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: Minimal destination reference}
+        '404': {description: Not found or intentionally minimized}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /v1/transfers:
+    post:
+      parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 16}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TransferRequest'}}}}
+      responses:
+        '202': {description: Accepted for processing}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {description: Validation failed}
+  /v1/transfers/{id}:
+    get:
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {'200': {description: Transfer status, content: {application/json: {schema: {$ref: '#/components/schemas/Transfer'}}}}}
+components:
+  securitySchemes:
+    serviceBearer: {type: http, scheme: bearer}
+  schemas:
+    TransferRequest:
+      type: object
+      required: [amount_minor, currency, source_participant_id, destination_key]
+      properties:
+        amount_minor: {type: integer, minimum: 1, format: int64}
+        currency: {type: string, const: USD}
+        source_participant_id: {type: string, format: uuid}
+        destination_key: {type: string}
+        correlation_id: {type: string, format: uuid}
+    Transfer:
+      allOf:
+        - $ref: '#/components/schemas/TransferRequest'
+        - type: object
+          required: [id, state, created_at]
+          properties:
+            id: {type: string, format: uuid}
+            state: {type: string, enum: [CREATED, VALIDATING, FUNDS_RESERVED, READY_FOR_SETTLEMENT, SETTLED, CREDIT_PENDING, COMPLETED, REJECTED, EXPIRED, UNKNOWN_PENDING_RECONCILIATION, MANUAL_REVIEW]}
+            created_at: {type: string, format: date-time}
+            settled_at: {type: string, format: date-time, nullable: true}
+    Problem: {type: object, required: [type, title, status], properties: {type: {type: string, format: uri}, title: {type: string}, status: {type: integer}, detail: {type: string}, trace_id: {type: string}}}
+  responses:
+    Conflict: {description: Conflict, content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}}
+    RateLimited: {description: Too many requests, headers: {Retry-After: {schema: {type: integer}}}}

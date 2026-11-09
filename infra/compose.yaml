@@ -1,0 +1,74 @@
+name: ${COMPOSE_PROJECT_NAME:-cholopay_phase0}
+
+services:
+  network-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cholopay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+      POSTGRES_DB: ${NETWORK_DB_NAME:-cholopay_network}
+    ports: ["127.0.0.1:${NETWORK_DB_HOST_PORT:-15432}:5432"]
+    volumes: [network-db-data:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
+
+  costa-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cholopay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+      POSTGRES_DB: ${COSTA_DB_NAME:-cholopay_costa}
+    ports: ["127.0.0.1:${COSTA_DB_HOST_PORT:-15433}:5432"]
+    volumes: [costa-db-data:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
+
+  sierra-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cholopay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+      POSTGRES_DB: ${SIERRA_DB_NAME:-cholopay_sierra}
+    ports: ["127.0.0.1:${SIERRA_DB_HOST_PORT:-15434}:5432"]
+    volumes: [sierra-db-data:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
+
+  oriente-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cholopay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+      POSTGRES_DB: ${ORIENTE_DB_NAME:-cholopay_oriente}
+    ports: ["127.0.0.1:${ORIENTE_DB_HOST_PORT:-15435}:5432"]
+    volumes: [oriente-db-data:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
+
+  redis:
+    image: redis:8-alpine
+    profiles: [cache]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports: ["127.0.0.1:${REDIS_HOST_PORT:-16379}:6379"]
+    volumes: [redis-data:/data]
+    healthcheck: {test: [CMD, redis-cli, ping], interval: 5s, timeout: 3s, retries: 10}
+
+  kafka:
+    image: apache/kafka:4.0.0
+    profiles: [events]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:${KAFKA_HOST_PORT:-19092}
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    ports: ["127.0.0.1:${KAFKA_HOST_PORT:-19092}:9092"]
+
+volumes:
+  network-db-data:
+  costa-db-data:
+  sierra-db-data:
+  oriente-db-data:
+  redis-data:

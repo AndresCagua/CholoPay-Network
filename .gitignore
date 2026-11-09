@@ -1,0 +1,9 @@
+# Local overrides and runtime data
+infra/config.env
+infra/.env
+*.log
+
+# Tool and build output
+.DS_Store
+node_modules/
+.venv/

@@ -1,0 +1,13 @@
+name: phase-0-structural-checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  structural:
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run local FOSS checks
+        run: ./ci/phase-0.sh

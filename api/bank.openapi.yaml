@@ -1,0 +1,30 @@
+openapi: 3.1.0
+info: {title: CholoPay Bank Core API, version: 0.1.0, description: Synthetic participant bank API; each bank is independently deployed.}
+servers: [{url: http://localhost:8081}]
+security: [{bearerAuth: []}]
+paths:
+  /health/live: {get: {security: [], responses: {'200': {description: Alive}}}}
+  /health/ready: {get: {security: [], responses: {'200': {description: Ready}, '503': {description: Not ready}}}}
+  /v1/customers:
+    post:
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CustomerCreate'}}}}
+      responses: {'201': {description: Created}, '422': {description: Invalid synthetic data}}
+  /v1/accounts:
+    get: {responses: {'200': {description: Accounts owned by authenticated customer}}}
+  /v1/transfers/internal:
+    post:
+      parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TransferInput'}}}}
+      responses: {'202': {description: Accepted}, '409': {description: Idempotency conflict}, '422': {description: Rejected}}
+  /v1/transfers/interbank:
+    post:
+      parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TransferInput'}}}}
+      responses: {'202': {description: Accepted; not proof of settlement}, '409': {description: Conflict}}
+  /v1/keys:
+    post: {responses: {'201': {description: Registration requested}, '409': {description: Key already active}}}
+components:
+  securitySchemes: {bearerAuth: {type: http, scheme: bearer}}
+  schemas:
+    CustomerCreate: {type: object, required: [synthetic_reference], properties: {synthetic_reference: {type: string}}}
+    TransferInput: {type: object, required: [source_account_id, amount_minor, currency], properties: {source_account_id: {type: string, format: uuid}, destination_account_ref: {type: string}, amount_minor: {type: integer, format: int64, minimum: 1}, currency: {type: string, const: USD}, correlation_id: {type: string, format: uuid}}}
