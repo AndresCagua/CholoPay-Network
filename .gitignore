@@ -7,3 +7,4 @@ infra/.env
 .DS_Store
 node_modules/
 .venv/
+bank-core/target/
