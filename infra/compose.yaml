@@ -54,6 +54,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
       PARTICIPANT_ID: COSTA
       SERVER_PORT: 8080
+      NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
     expose: ["8080"]
     depends_on:
       costa-db: {condition: service_healthy}
@@ -68,6 +69,7 @@ services:
       DB_USER: ${POSTGRES_USER:-cholopay}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
       PARTICIPANT_ID: COSTA
+      NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
     depends_on:
       costa-db: {condition: service_healthy}
     command: ["mvn", "-q", "-Pintegration", "test"]
