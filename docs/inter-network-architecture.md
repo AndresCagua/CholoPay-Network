@@ -49,3 +49,13 @@ POST /internal/v1/inter-network/messages
 ```
 
 The envelope carries sender and destination network IDs, schema and message type, correlation/causation IDs, an idempotency key, a SHA-256 payload hash, JSON payload, and UTC creation time. The receiver validates that both networks are active and distinct. Repeating an identical envelope returns the accepted record without a second effect; reusing the idempotency key with a different payload or route is rejected. This is an at-least-once coordination boundary, not a settlement result and not an ISO 20022 message.
+
+## End-to-end intake
+
+The composed internal entrypoint is:
+
+```text
+POST /internal/v1/inter-network/transfers
+```
+
+It resolves participant ownership before persisting the transfer instruction. For `INTRA_NETWORK`, only the instruction is created. For `INTER_NETWORK`, it also persists one `TRANSFER_REQUESTED` message using the transfer ID as the stable message ID. Replays return the existing instruction and message; neither path settles funds. The central settlement endpoint remains the only place that can produce `SETTLED`.

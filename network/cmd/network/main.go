@@ -11,6 +11,7 @@ import (
 	"github.com/cholopay/network/internal/directory"
 	"github.com/cholopay/network/internal/instruction"
 	"github.com/cholopay/network/internal/message"
+	"github.com/cholopay/network/internal/orchestration"
 	"github.com/cholopay/network/internal/routing"
 	"github.com/cholopay/network/internal/settlement"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -69,6 +70,7 @@ func main() {
 		os.Exit(1)
 	}
 	message.NewHandler(messageStore).Register(mux)
+	orchestration.NewHandler(orchestration.NewService(instruction.NewStore(db), routingStore, messageStore)).Register(mux)
 	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(healthResponse{Status: "UP"})
