@@ -1,0 +1,7 @@
+/workspace/src/main/java/com/cholopay/bankcore/BankCoreApplication.java
+/workspace/src/main/java/com/cholopay/bankcore/api/TransferController.java
+/workspace/src/main/java/com/cholopay/bankcore/domain/Account.java
+/workspace/src/main/java/com/cholopay/bankcore/domain/Journal.java
+/workspace/src/main/java/com/cholopay/bankcore/domain/LedgerEntry.java
+/workspace/src/main/java/com/cholopay/bankcore/domain/Money.java
+/workspace/src/main/java/com/cholopay/bankcore/service/InternalTransferService.java
