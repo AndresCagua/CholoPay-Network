@@ -78,14 +78,21 @@ services:
       target: runtime
     environment:
       SERVER_PORT: 8080
+      NETWORK_DB_URL: postgres://${POSTGRES_USER:-cholopay}:${POSTGRES_PASSWORD:-cholopay_local_only}@network-db:5432/${NETWORK_DB_NAME:-cholopay_network}?sslmode=disable
     expose: ["8080"]
-    networks: [internal_services]
+    depends_on:
+      network-db: {condition: service_healthy}
+    networks: [internal_services, default]
 
   network-test:
     build:
       context: ../network
       target: test
     profiles: [network-test]
+    environment:
+      NETWORK_DB_URL: postgres://${POSTGRES_USER:-cholopay}:${POSTGRES_PASSWORD:-cholopay_local_only}@network-db:5432/${NETWORK_DB_NAME:-cholopay_network}?sslmode=disable
+    depends_on:
+      network-db: {condition: service_healthy}
     command: ["go", "test", "./..."]
 
   kafka:
