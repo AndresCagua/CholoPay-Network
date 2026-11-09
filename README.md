@@ -40,6 +40,9 @@ The three bank instances have separate PostgreSQL databases, credentials, keys, 
 - [FOSS inventory](sbom/dependencies.spdx.json)
 - [Phase 0 backlog](backlog/phase-0.md)
 - [Phase 1 bank-core](bank-core/README.md)
+- [Interbank state machine](docs/interbank-state-machine.md)
+- [Phase 2 network skeleton](network/README.md)
+- [Phase 2 backlog](backlog/phase-2.md)
 
 ## License
 

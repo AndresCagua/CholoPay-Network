@@ -658,3 +658,48 @@ El panel de autoridad **simulada** debe representar la función de operación y 
 - [Banco Central do Brasil — Cómo realizar un Pix](https://www.bcb.gov.br/meubc/faqs/p/como-fazer-um-pix): clave, datos bancarios, QR y canales.
 - [Banco Central do Brasil — Requisitos mínimos de experiencia Pix](https://www.bcb.gov.br/content/estabilidadefinanceira/pix/Regulamento_Pix/IV_RequisitosMinimosparaExperienciadoUsuario.pdf): experiencia de claves y confirmaciones.
 
+## 28. Decisión de ingress HTTP, proxy local y acceso externo opcional
+
+### 28.1 Traefik
+
+CholoPay podrá incorporar **Traefik OSS** como entrypoint HTTP único cuando existan múltiples portales web, la consola del operador y el gateway público. Traefik será responsable del enrutamiento por hostname, middlewares compartidos, headers defensivos, compresión y terminación TLS cuando corresponda.
+
+La adopción será posterior a la Fase 1 y no forma parte del núcleo financiero. Durante las fases 0 y 1, los servicios se comunican exclusivamente dentro de redes Docker privadas y el Compose predeterminado no publica puertos del host. Cuando una fase posterior publique Traefik en el host, se deberá verificar la disponibilidad de cada puerto antes de iniciar los contenedores.
+
+El enrutamiento futuro seguirá este modelo conceptual:
+
+```text
+Traefik
+├── costa.localhost   → Banco Costa Web
+├── sierra.localhost  → Banco Sierra Web
+├── oriente.localhost → Banco Oriente Web
+├── operator.localhost → Consola del operador
+├── api.localhost     → Gateway sandbox
+└── network.internal  → CholoNet (solo red interna)
+```
+
+Traefik no será fuente de verdad financiera, no accederá directamente a bases de datos y no reemplazará la autorización de cada servicio. La configuración deberá mantener `exposedByDefault=false`, redes explícitas, health checks, límites de recursos y secretos fuera del repositorio.
+
+### 28.2 Cloudflare Tunnel
+
+Cloudflare Tunnel mediante `cloudflared` será únicamente una **integración opcional para demos, pruebas externas temporales o webhooks controlados**. No será requisito para compilar, probar, ejecutar o desplegar localmente CholoPay y no será parte del flujo financiero principal.
+
+El flujo opcional será:
+
+```text
+Cloudflare Edge → cloudflared → Traefik → servicio autorizado
+```
+
+Se distinguen estas modalidades:
+
+- **Quick Tunnel:** URL temporal y cambiante, solamente para pruebas breves; no es configuración de producción.
+- **Named Tunnel:** hostname estable y token montado como secreto; requiere una cuenta y conectividad con Cloudflare.
+
+No versionar tokens, no iniciar `cloudflared` por defecto, no exponer bases de datos y no presentar Cloudflare como dependencia FOSS o como requisito de autoalojamiento. El sistema debe conservar un adaptador local FOSS y funcionar completamente sin Cloudflare.
+
+### 28.3 Razón de la decisión
+
+Traefik es apropiado para CholoPay porque resuelve el problema local de múltiples servicios HTTP mediante software libre y autoalojable. Cloudflare resuelve un problema diferente: publicar temporalmente un entorno privado hacia Internet sin administrar directamente NAT, firewall o certificados públicos. Por introducir un proveedor externo, Cloudflare queda fuera del núcleo y solo puede habilitarse explícitamente mediante un profile separado.
+
+No copiar automáticamente arquitecturas de otros proyectos: el uso de Traefik y Cloudflare en FerrePlus responde a sus múltiples portales, APIs y necesidades de demos externas; CholoPay adoptará cada componente solo cuando exista una necesidad propia verificable.
+

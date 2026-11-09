@@ -72,6 +72,22 @@ services:
       costa-db: {condition: service_healthy}
     command: ["mvn", "-q", "-Pintegration", "test"]
 
+  network:
+    build:
+      context: ../network
+      target: runtime
+    environment:
+      SERVER_PORT: 8080
+    expose: ["8080"]
+    networks: [internal_services]
+
+  network-test:
+    build:
+      context: ../network
+      target: test
+    profiles: [network-test]
+    command: ["go", "test", "./..."]
+
   kafka:
     image: apache/kafka:4.0.0
     profiles: [events]
@@ -87,6 +103,10 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+networks:
+  internal_services:
+    internal: true
 
 volumes:
   network-db-data:
