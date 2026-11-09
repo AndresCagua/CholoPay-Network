@@ -31,4 +31,6 @@ The service is reachable only by other Compose services at `http://bank-core:808
 - Reusing an idempotency key with the same amount returns the original transaction; a different amount is rejected.
 - A successful internal transfer is not an interbank settlement.
 
-The PostgreSQL migration is under `src/main/resources/db/migration`. The next implementation slice replaces the in-memory service repository with transactional JDBC persistence and public error mapping before claiming production-like behavior.
+The PostgreSQL migrations are under `src/main/resources/db/migration`. The internal receiver adapter is exposed at `POST /internal/v1/receiver-credits`; it applies a synthetic network clearing credit to a customer account in one local transaction and replays the same delivery without a second journal. It does not prove central settlement or replace the network acknowledgement protocol.
+
+The next implementation slice adds authenticated bank-to-network adapter transport and public error mapping before claiming production-like behavior.

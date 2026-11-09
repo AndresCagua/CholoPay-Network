@@ -36,7 +36,7 @@ public class JdbcInternalTransferService {
         List<UUID> ordered = sourceId.toString().compareTo(destinationId.toString()) < 0
                 ? List.of(sourceId, destinationId) : List.of(destinationId, sourceId);
         jdbc.query("SELECT id FROM ledger_account WHERE id IN (?, ?) ORDER BY id FOR UPDATE",
-                rs -> rs.getObject("id", UUID.class), ordered.get(0), ordered.get(1));
+                (org.springframework.jdbc.core.RowMapper<UUID>) (rs, row) -> rs.getObject("id", UUID.class), ordered.get(0), ordered.get(1));
         Balance source = balance(sourceId);
         Balance destination = balance(destinationId);
         if (source == null || destination == null) throw new IllegalArgumentException("account not found");
