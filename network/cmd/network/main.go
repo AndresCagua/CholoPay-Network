@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/cholopay/network/internal/directory"
 	"github.com/cholopay/network/internal/instruction"
 	"github.com/cholopay/network/internal/routing"
 	"github.com/cholopay/network/internal/settlement"
@@ -55,6 +56,12 @@ func main() {
 	settlement.NewHandler(settlementStore).Register(mux)
 	settlement.NewReconciliationHandler(settlementStore).Register(mux)
 	routing.NewHandler(routingStore).Register(mux)
+	directoryStore := directory.NewStore(db)
+	if err := directoryStore.Migrate(ctx); err != nil {
+		slog.Error("migrate directory database", "error", err)
+		os.Exit(1)
+	}
+	directory.NewHandler(directoryStore).Register(mux)
 	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(healthResponse{Status: "UP"})
