@@ -703,3 +703,63 @@ Traefik es apropiado para CholoPay porque resuelve el problema local de múltipl
 
 No copiar automáticamente arquitecturas de otros proyectos: el uso de Traefik y Cloudflare en FerrePlus responde a sus múltiples portales, APIs y necesidades de demos externas; CholoPay adoptará cada componente solo cuando exista una necesidad propia verificable.
 
+## 29. CholoPay Inter-Network: interoperabilidad entre redes simuladas
+
+### 29.1 Decisión de producto y alcance
+
+CholoPay ampliará el modelo de tres instituciones a dos **redes de pago simuladas e independientes** conectadas por CholoNet Inter-Network:
+
+```text
+                         CholoNet Inter-Network
+                                  │
+                 ┌────────────────┴────────────────┐
+                 │                                 │
+        CholoPay Banking Network          CholoPay Fintech Network
+                 │                                 │
+       Costa · Sierra · Oriente             Wallet A · Wallet B
+                 │                                 │
+                 └────────────────┬────────────────┘
+                                  │
+                    Liquidación central simulada
+```
+
+La red bancaria y la red fintech son dominios operativos separados. Cada una mantiene sus propios participantes, directorio distribuido simulado, credenciales, políticas de acceso, mensajes y proyecciones. CholoNet Inter-Network enruta instrucciones entre dominios y coordina la liquidación central simulada; no se convierte en una cuenta minorista ni escribe en los ledgers internos de los participantes.
+
+Se implementarán y probarán:
+
+- transferencias dentro de una misma red;
+- transferencias entre redes distintas;
+- resolución de CholoKeys mediante directorios distribuidos simulados;
+- selección de ruta y red destino;
+- conciliación por red y entre redes;
+- supervisión agregada por dominio;
+- estados de entrega y liquidación diferenciados.
+
+Las wallets fintech son participantes simulados del segundo dominio; no implican que una wallet real sea banco, entidad regulada o participante autorizado.
+
+### 29.2 Relación con el SIP ecuatoriano
+
+Esta ampliación se inspira conceptualmente en documentación pública del Banco Central del Ecuador, sin afirmar conformidad, certificación, autorización ni interoperabilidad real. La normativa pública describe el **Sistema Integrador de Pagos (SIP)** como infraestructura administrada por el BCE que gestiona operaciones de llaves, procesa y compensa transferencias inter-redes y remite información para la liquidación. También distingue el SIP de la **Red de Pagos Instantáneos (RPI)** y contempla directorios distribuidos y un Sistema Central de Llaves.
+
+CholoPay utilizará esas ideas como referencia de arquitectura: redes participantes, directorios, enrutamiento inter-redes, trazabilidad, compensación/liquidación y supervisión. No copiará interfaces, endpoints, certificados, mensajes, reglas operativas ni nombres normativos como si fueran una implementación oficial.
+
+La fuente pública consultada para esta decisión es la **Codificación JPRM-2025-006-M**, especialmente las definiciones de directorios distribuidos, Sistema Central de Llaves, SIP y RPI, junto con la **Resolución Administrativa BCE-GG-008-2025**, que describe etapas, responsables e hitos de implementación de la interoperabilidad. Estas fuentes pueden cambiar; cada ADR deberá registrar versión y fecha consultadas.
+
+### 29.3 Mensajería y ISO 20022
+
+El BCE público consultado no constituye por sí solo una especificación para afirmar que el SIP utilice ISO 20022. Por lo tanto, CholoPay no declarará compatibilidad ISO 20022 en esta fase. Los eventos propios mantendrán `schema_version`, `message_type`, `correlation_id`, `causation_id`, `idempotency_key` y timestamps UTC. Una futura traducción a perfiles ISO 20022 solo se incorporará mediante ADR, fuente normativa concreta, validadores y pruebas de contrato.
+
+### 29.4 No objetivos y orden incremental
+
+- No conectarse al SIP, RPI, BCE ni redes reales.
+- No presentar CholoPay como infraestructura nacional, entidad financiera o sistema aprobado.
+- No inventar estándares técnicos oficiales que no estén publicados.
+- No implementar dos ledgers centrales: cada red conserva su dominio y CholoNet conserva la liquidación inter-redes.
+- Primero se implementarán el registro de dominios/participantes y el selector de rutas; después directorios distribuidos, mensajes inter-redes, liquidación y pruebas de fallos.
+
+### Fuentes de referencia de la ampliación
+
+- [BCE — Codificación JPRM-2025-006-M](https://www.bce.fin.ec/storage/JPRM/resoluciones/CODIFICACION-JPRM-2025-006-M.pdf)
+- [BCE — Resolución Administrativa BCE-GG-008-2025](https://www.bce.fin.ec/storage/BCE/resoluciones/BCE-GG-008-2025.pdf)
+- [BCE — Administración y operación del sistema de pagos](https://www.bce.fin.ec/servicios-y-tramites/administracion-y-operacion-para-el-sistema-de-pagos-del-banco-central-del-ecuador/)
+
