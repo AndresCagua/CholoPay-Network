@@ -14,6 +14,9 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS settlement_entry_journal ON settlement_entry(journal_id)`,
 		`CREATE TABLE IF NOT EXISTS settlement_delivery (delivery_id UUID PRIMARY KEY, transfer_id UUID NOT NULL UNIQUE REFERENCES settlement_journal(transfer_id), receiver_participant_id UUID NOT NULL REFERENCES settlement_account(participant_id), state VARCHAR(16) NOT NULL CHECK (state IN ('PENDING','APPLIED')), attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0), last_event_id UUID, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, applied_at TIMESTAMPTZ)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS settlement_delivery_event ON settlement_delivery(last_event_id) WHERE last_event_id IS NOT NULL`,
+		`CREATE TABLE IF NOT EXISTS reconciliation_run (run_id UUID PRIMARY KEY, started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, completed_at TIMESTAMPTZ, difference_count INTEGER NOT NULL DEFAULT 0 CHECK (difference_count >= 0))`,
+		`CREATE TABLE IF NOT EXISTS reconciliation_difference (difference_id UUID PRIMARY KEY, run_id UUID NOT NULL REFERENCES reconciliation_run(run_id), transfer_id UUID, delivery_id UUID, code VARCHAR(64) NOT NULL, detail TEXT NOT NULL, observed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+		`CREATE INDEX IF NOT EXISTS reconciliation_difference_run ON reconciliation_difference(run_id)`,
 	}
 	for _, statement := range statements {
 		if _, err := db.ExecContext(ctx, statement); err != nil {

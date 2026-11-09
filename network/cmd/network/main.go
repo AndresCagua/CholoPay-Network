@@ -45,7 +45,9 @@ func main() {
 
 	mux := http.NewServeMux()
 	instruction.NewHandler(instruction.NewStore(db)).Register(mux)
-	settlement.NewHandler(settlement.NewStore(db)).Register(mux)
+	settlementStore := settlement.NewStore(db)
+	settlement.NewHandler(settlementStore).Register(mux)
+	settlement.NewReconciliationHandler(settlementStore).Register(mux)
 	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(healthResponse{Status: "UP"})
