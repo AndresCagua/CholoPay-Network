@@ -7,7 +7,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-cholopay}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
       POSTGRES_DB: ${NETWORK_DB_NAME:-cholopay_network}
-    ports: ["127.0.0.1:${NETWORK_DB_HOST_PORT:-15432}:5432"]
     volumes: [network-db-data:/var/lib/postgresql/data]
     healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
 
@@ -17,7 +16,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-cholopay}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
       POSTGRES_DB: ${COSTA_DB_NAME:-cholopay_costa}
-    ports: ["127.0.0.1:${COSTA_DB_HOST_PORT:-15433}:5432"]
     volumes: [costa-db-data:/var/lib/postgresql/data]
     healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
 
@@ -27,7 +25,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-cholopay}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
       POSTGRES_DB: ${SIERRA_DB_NAME:-cholopay_sierra}
-    ports: ["127.0.0.1:${SIERRA_DB_HOST_PORT:-15434}:5432"]
     volumes: [sierra-db-data:/var/lib/postgresql/data]
     healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
 
@@ -37,7 +34,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-cholopay}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
       POSTGRES_DB: ${ORIENTE_DB_NAME:-cholopay_oriente}
-    ports: ["127.0.0.1:${ORIENTE_DB_HOST_PORT:-15435}:5432"]
     volumes: [oriente-db-data:/var/lib/postgresql/data]
     healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
 
@@ -45,9 +41,36 @@ services:
     image: redis:8-alpine
     profiles: [cache]
     command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
-    ports: ["127.0.0.1:${REDIS_HOST_PORT:-16379}:6379"]
     volumes: [redis-data:/data]
     healthcheck: {test: [CMD, redis-cli, ping], interval: 5s, timeout: 3s, retries: 10}
+
+  bank-core:
+    build:
+      context: ../bank-core
+      target: runtime
+    environment:
+      DB_URL: jdbc:postgresql://costa-db:5432/${COSTA_DB_NAME:-cholopay_costa}
+      DB_USER: ${POSTGRES_USER:-cholopay}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+      PARTICIPANT_ID: COSTA
+      SERVER_PORT: 8080
+    expose: ["8080"]
+    depends_on:
+      costa-db: {condition: service_healthy}
+
+  bank-core-test:
+    build:
+      context: ../bank-core
+      target: test
+    profiles: [test]
+    environment:
+      DB_URL: jdbc:postgresql://costa-db:5432/${COSTA_DB_NAME:-cholopay_costa}
+      DB_USER: ${POSTGRES_USER:-cholopay}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+      PARTICIPANT_ID: COSTA
+    depends_on:
+      costa-db: {condition: service_healthy}
+    command: ["mvn", "-q", "-Pintegration", "test"]
 
   kafka:
     image: apache/kafka:4.0.0
@@ -64,7 +87,6 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-    ports: ["127.0.0.1:${KAFKA_HOST_PORT:-19092}:9092"]
 
 volumes:
   network-db-data:

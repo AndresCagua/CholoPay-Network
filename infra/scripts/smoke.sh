@@ -8,10 +8,7 @@ for service in "${services[@]}"; do
   ready=0
   for attempt in $(seq 1 30); do
     status=$($COMPOSE ps --format '{{.Service}} {{.Health}}' "$service" 2>/dev/null || true)
-    if grep -q "$service healthy" <<<"$status"; then
-      ready=1
-      break
-    fi
+    if grep -q "$service healthy" <<<"$status"; then ready=1; break; fi
     sleep 1
   done
   if (( ! ready )); then
@@ -21,7 +18,6 @@ for service in "${services[@]}"; do
   echo "OK: $service is healthy"
 done
 
-# Verify each service owns its own database name and is reachable.
 declare -A expected_db=(
   [network-db]=cholopay_network
   [costa-db]=cholopay_costa
@@ -37,4 +33,4 @@ for service in "${services[@]}"; do
   echo "OK: $service owns database $db"
 done
 
-echo 'Smoke test passed: four independent PostgreSQL services are healthy.'
+echo 'Smoke test passed inside Docker: four isolated PostgreSQL services are healthy.'

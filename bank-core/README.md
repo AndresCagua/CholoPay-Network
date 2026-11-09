@@ -2,16 +2,25 @@
 
 Parametrized Spring Boot bank core for Banco Costa, Banco Sierra, and Banco Oriente. This first slice implements synthetic accounts, integer-cent balances, balanced immutable journals, reservations, and idempotent internal transfers. It does not implement interbank settlement.
 
-## Build
+## Docker-only build and test
 
-A Maven wrapper is not included yet. Use Maven 3.9+ with JDK 21, or run the project with an equivalent FOSS Maven container:
+The host needs Docker Engine and the Compose plugin only. Java, Maven, Gradle, and PostgreSQL are supplied by the project containers and must not be installed or invoked on the host.
+
+From the repository root:
 
 ```bash
-mvn test
-mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=8081
+docker compose --env-file infra/config.env.template -f infra/compose.yaml --profile test run --rm bank-core-test
 ```
 
-The default database is Banco Costa on the Phase 0 port `15433`; override `DB_URL`, `DB_USER`, `DB_PASSWORD`, `PARTICIPANT_ID`, and `SERVER_PORT` per bank instance. Do not use real credentials or identities.
+The test image is built from `bank-core/Dockerfile` using Maven and JDK 21 inside the container. The runtime image contains only the JRE and the packaged application.
+
+To run the service with the Costa database entirely inside Compose:
+
+```bash
+docker compose --env-file infra/config.env.template -f infra/compose.yaml up -d network-db costa-db bank-core
+```
+
+The service is reachable only by other Compose services at `http://bank-core:8080`; no host port is published by default. If a local development proxy is added later, its host port must be checked before binding.
 
 ## Financial behavior
 
@@ -22,4 +31,4 @@ The default database is Banco Costa on the Phase 0 port `15433`; override `DB_UR
 - Reusing an idempotency key with the same amount returns the original transaction; a different amount is rejected.
 - A successful internal transfer is not an interbank settlement.
 
-The PostgreSQL migration is under `src/main/resources/db/migration`. The next slice must replace the in-memory service repository with transactional persistence and public error mapping before claiming production-like behavior.
+The PostgreSQL migration is under `src/main/resources/db/migration`. The next implementation slice replaces the in-memory service repository with transactional JDBC persistence and public error mapping before claiming production-like behavior.

@@ -2,9 +2,25 @@
 
 CholoPay Network is an educational, fully simulated interoperable-payments ecosystem. It does not move real money, connect to Pix/SPI/DICT, represent a bank or public authority, or store real personal data.
 
-This repository currently contains Phase 0 architecture and local-environment specifications. User interfaces are intentionally out of scope until the vertical slice is approved.
+This repository contains Phase 0 architecture and the first Phase 1 bank-core slice. User interfaces are intentionally out of scope until the vertical slice is approved.
 
-## Repositories and boundaries
+## Docker-only rule
+
+The project is designed so a fresh checkout needs **Docker Engine and the Compose plugin only**. Do not install Java, Maven, Gradle, Node, Go, PostgreSQL, Redis, Kafka, Python, or database clients on the host to build, test, or run CholoPay. Build and test images contain their own toolchains.
+
+The default Compose stack binds no database, Redis, Kafka, or application port to the host. Services communicate on a private Docker network, so the normal workflow cannot collide with host ports:
+
+```bash
+docker compose --env-file infra/config.env.template -f infra/compose.yaml config
+docker compose --env-file infra/config.env.template -f infra/compose.yaml up -d network-db costa-db sierra-db oriente-db bank-core
+docker compose --env-file infra/config.env.template -f infra/compose.yaml --profile test run --rm bank-core-test
+./infra/scripts/smoke.sh
+docker compose --env-file infra/config.env.template -f infra/compose.yaml down
+```
+
+`make` is an optional convenience wrapper only; it is not a project prerequisite. Use `docker compose` directly for a Docker-only checkout. The image build is multi-stage and runs Maven inside `bank-core/Dockerfile`.
+
+## Boundaries
 
 - `cholopay-architecture`: this repository: ADRs, diagrams, contracts, threat model, runbooks, and backlog.
 - `cholopay-infra`: local FOSS environment; the first Compose layout is under `infra/` while repository separation is pending.
@@ -12,20 +28,6 @@ This repository currently contains Phase 0 architecture and local-environment sp
 - `cholopay-bank-core`: parametrized Java/Spring Boot bank core, deployed independently for Costa, Sierra, and Oriente (future repository).
 
 The three bank instances have separate PostgreSQL databases, credentials, keys, and ledgers. The network never writes directly to a bank database. Kafka is optional event transport; PostgreSQL ledgers remain the source of truth.
-
-## Phase 0 quick start
-
-Prerequisites: Linux, Git, Docker Engine or Podman, Compose plugin, GNU Make, and a free host-port range. Before starting containers, inspect availability:
-
-```bash
-./infra/scripts/check-ports.sh
-make config
-make up
-make smoke
-make down
-```
-
-`check-ports.sh` is mandatory before `make up`; it checks the configured host ports and fails without starting services when one is occupied. The default ports are documented in `infra/.env.example` and can be changed without editing Compose.
 
 ## Documentation
 
@@ -37,6 +39,7 @@ make down
 - [Testing strategy](docs/testing-strategy.md)
 - [FOSS inventory](sbom/dependencies.spdx.json)
 - [Phase 0 backlog](backlog/phase-0.md)
+- [Phase 1 bank-core](bank-core/README.md)
 
 ## License
 
