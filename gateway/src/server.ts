@@ -15,7 +15,7 @@ type PaymentIntent = {
 };
 type IdempotentResponse = { payload: string; status: number; body: Record<string, unknown> };
 type WebhookEndpoint = { id: string; url: string; secret: string; replayedSignatures: Set<string> };
-type WebhookDelivery = { endpointId: string; eventId: string; attempt: number; event: Record<string, unknown> };
+type WebhookDelivery = { endpointId: string; eventId: string; attempt: number; event: Record<string, unknown>; deadLettered?: boolean };
 const MAX_WEBHOOK_ATTEMPTS = 3;
 const MAX_DLQ_ENTRIES = 100;
 const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
@@ -220,6 +220,10 @@ export function createServer(): Server {
       }
       const deliveryKey = `${endpoint.id}:${eventId}`;
       const delivery = webhookDeliveries.get(deliveryKey) ?? { endpointId: endpoint.id, eventId, attempt: 0, event };
+      if (delivery.deadLettered) {
+        sendJson(response, 202, { status: 'dead_lettered', attempt: delivery.attempt, max_attempts: MAX_WEBHOOK_ATTEMPTS, dlq_size: deadLetterQueue.length });
+        return;
+      }
       delivery.attempt += 1;
       webhookDeliveries.set(deliveryKey, delivery);
       if (input.outcome === 'success') {
@@ -234,6 +238,7 @@ export function createServer(): Server {
         sendJson(response, 503, errorBody('dlq_full', 'Webhook dead-letter queue is full'));
         return;
       }
+      delivery.deadLettered = true;
       deadLetterQueue.push(delivery);
       sendJson(response, 202, { status: 'dead_lettered', attempt: delivery.attempt, max_attempts: MAX_WEBHOOK_ATTEMPTS, dlq_size: deadLetterQueue.length });
       return;

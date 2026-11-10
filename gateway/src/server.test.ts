@@ -208,5 +208,8 @@ test('progresses bounded synthetic retries and admits a final failure to the in-
     const dead = await request();
     assert.equal(dead.status, 202);
     assert.deepEqual(await dead.json(), { status: 'dead_lettered', attempt: 3, max_attempts: 3, dlq_size: 1 });
+    const replayedDeadLetter = await request();
+    assert.equal(replayedDeadLetter.status, 202);
+    assert.deepEqual(await replayedDeadLetter.json(), { status: 'dead_lettered', attempt: 3, max_attempts: 3, dlq_size: 1 });
   });
 });
