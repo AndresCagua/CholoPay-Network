@@ -9,8 +9,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("integration")
 @SpringBootTest
@@ -42,6 +48,64 @@ class JdbcInternalTransferIntegrationTest {
         assertEquals(750, balance(source));
         assertEquals(250, balance(destination));
         assertEquals(0, jdbc.queryForObject("SELECT COALESCE(SUM(CASE WHEN direction = 'CREDIT' THEN amount_minor ELSE -amount_minor END), 0) FROM journal_entry", Long.class));
+    }
+
+    @Test
+    void concurrentTransfersAgainstLimitedBalancePersistOnlyAffordableBalancedJournals() throws Exception {
+        int transferCount = 100;
+        int transferAmount = 100;
+        ExecutorService pool = Executors.newFixedThreadPool(16);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            var attempts = IntStream.range(0, transferCount)
+                    .mapToObj(index -> pool.submit(() -> {
+                        start.await();
+                        try {
+                            transfers.transfer(source, destination, transferAmount,
+                                    "concurrent-key-" + index, UUID.randomUUID());
+                            return true;
+                        } catch (IllegalStateException insufficientFunds) {
+                            return false;
+                        }
+                    }))
+                    .toList();
+            start.countDown();
+
+            long successful = 0;
+            for (Future<Boolean> attempt : attempts) {
+                if (attempt.get()) successful++;
+            }
+
+            assertEquals(10, successful);
+            assertEquals(0, balance(source));
+            assertEquals(1_000, balance(destination));
+            assertTrue(balance(source) >= 0);
+            assertEquals(10, jdbc.queryForObject("SELECT COUNT(*) FROM journal", Long.class));
+            assertEquals(10, jdbc.queryForObject("SELECT COUNT(DISTINCT transaction_id) FROM journal", Long.class));
+            assertEquals(10, jdbc.queryForObject("SELECT COUNT(DISTINCT idempotency_key) FROM journal", Long.class));
+            assertEquals(0, jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM (
+                        SELECT idempotency_key
+                        FROM journal
+                        GROUP BY idempotency_key
+                        HAVING COUNT(*) > 1
+                    ) duplicate_journals
+                    """, Long.class));
+            assertEquals(0, jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM (
+                        SELECT j.id
+                        FROM journal j
+                        JOIN journal_entry e ON e.journal_id = j.id
+                        GROUP BY j.id
+                        HAVING COUNT(*) <> 2
+                            OR COUNT(DISTINCT e.currency) <> 1
+                            OR MIN(e.currency) <> 'USD'
+                            OR SUM(CASE WHEN e.direction = 'DEBIT' THEN e.amount_minor ELSE -e.amount_minor END) <> 0
+                    ) unbalanced_journals
+                    """, Long.class));
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     private long balance(UUID accountId) {

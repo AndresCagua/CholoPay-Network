@@ -22,6 +22,7 @@ Fuente de verdad del primer slice financiero ejecutable. Lee hasta `## Log` ante
 - T5 (S1-S8): Ejecutar compilación/pruebas, registrar evidencia, exigir ejecución exclusiva de Docker y seleccionar la siguiente decisión de integración de red. Commit: pending.
 - T6 (S8): Eliminar requisitos de toolchains y puertos del host del flujo predeterminado; agregar compilación Docker multietapa y servicio de pruebas Compose. Commit: pending.
 - T7 (S1, S3, S5): Reemplazar el estado de transferencias en memoria por persistencia transaccional en PostgreSQL. Commit: pending.
+- T8 (S2, S3): Completar la aceptación JDBC concurrente contra PostgreSQL con saldo limitado, sin saldos negativos, sin journals duplicados y con todos los journals equilibrados. Ruta: siguiente slice. Commit: pendiente.
 
 La evidencia de ejecución exclusiva en contenedores y persistencia PostgreSQL se registra abajo antes del commit posterior.
 
@@ -39,3 +40,5 @@ L7. Luego la persona usuaria requirió que todo el trabajo del proyecto se ejecu
 L8. `docker compose ... config --quiet` passed for the default and test profiles. `./ci/phase-0.sh` passed using a Python validation container and Docker Compose; no host language runtime was used for project checks.
 L9. `docker compose --env-file infra/config.env.template -f infra/compose.yaml --profile test run --rm bank-core-test` pasó con código de salida 0. El perfil de pruebas Compose inició PostgreSQL dentro de Docker, aplicó las migraciones Flyway y superó la prueba de integración JDBC de persistencia, asientos equilibrados y replay idempotente.
 L10. Se agregaron proyecciones de cuentas Flyway V2 y hashes de solicitudes, `JdbcInternalTransferService` transaccional, cableado del controlador y una prueba de integración. La pila predeterminada no publica puertos del host; por lo tanto, no se requirió preflight de puertos en esta ejecución. El siguiente paso es exponer la API bancaria persistente únicamente mediante una ruta de red interna revisada explícitamente antes de la integración interbancaria.
+L11. Solicitud vigente: "dale continua con los specs, dime donde puedo ver todas las paginas ya para probar". Las cuatro páginas web se levantaron en Docker con puertos temporales 8081-8084; el siguiente slice técnico seleccionado es T8 porque la aceptación JDBC concurrente aún no está demostrada en la evidencia actual.
+L12. T8 implementado y verificado en Docker: 100 transferencias concurrentes de 100 centavos contra una cuenta de 1.000 centavos producen exactamente 10 éxitos, saldo disponible no negativo, 10 journals/transacciones/idempotency keys únicos y todos los journals equilibrados en USD. La prueba focalizada `JdbcInternalTransferIntegrationTest` pasó con código 0; `git diff --check` pasó.
