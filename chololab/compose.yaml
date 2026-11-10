@@ -1,0 +1,19 @@
+services:
+  synthetic-target:
+    image: python:3.12-alpine
+    command: ["python", "-m", "http.server", "8080", "--bind", "0.0.0.0"]
+    expose: ["8080"]
+
+  chololab-test:
+    build: .
+    profiles: [test]
+    command: ["python", "-m", "unittest", "discover", "-s", "tests", "-v"]
+  chololab:
+    build: .
+    environment:
+      TARGET_URL: ${TARGET_URL:-http://network:8080/health/live}
+      REQUESTS: ${REQUESTS:-100}
+      CONCURRENCY: ${CONCURRENCY:-4}
+      FAILURE_EVERY: ${FAILURE_EVERY:-0}
+    command: ["python", "runner.py"]
+    expose: ["8081"]
