@@ -37,6 +37,10 @@ restore() {
     oriente-db) db=cholopay_oriente ;;
     *) echo "unsupported restore service: $service" >&2; exit 2 ;;
   esac
+  case "$(basename "$1")" in
+    "$service"-*.sql) ;;
+    *) echo "backup file does not match RESTORE_SERVICE: $service" >&2; exit 2 ;;
+  esac
   "${COMPOSE[@]}" exec -T "$service" psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:-cholopay}" -d "$db" < "$1"
   printf 'RESTORE %s %s %s\n' "$service" "$db" "$1"
 }
