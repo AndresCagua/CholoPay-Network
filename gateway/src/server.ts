@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 
 export type Scope = 'payment:read' | 'payment:write' | 'webhook:write';
@@ -13,18 +14,25 @@ type PaymentIntent = {
   ledger_boundary: string;
 };
 type IdempotentResponse = { payload: string; status: number; body: Record<string, unknown> };
+type WebhookEndpoint = { id: string; url: string; secret: string; replayedSignatures: Set<string> };
+type WebhookDelivery = { endpointId: string; eventId: string; attempt: number; event: Record<string, unknown> };
+const MAX_WEBHOOK_ATTEMPTS = 3;
+const MAX_DLQ_ENTRIES = 100;
+const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
 
 const syntheticApiKeys = new Map<string, ReadonlySet<Scope>>([
   ['sk_sandbox_merchant_rw', new Set<Scope>(['payment:read', 'payment:write', 'webhook:write'])],
   ['sk_sandbox_merchant_ro', new Set<Scope>(['payment:read'])],
 ]);
 
-const placeholderRoutes: Array<{ method: string; pattern: RegExp; scope: Scope; route: string }> = [
+const placeholderRoutes: Array<{ method: string; pattern: RegExp; scope: Scope; route: string; authRequired?: boolean }> = [
   { method: 'POST', pattern: /^\/v1\/payment-intents$/, scope: 'payment:write', route: 'POST /v1/payment-intents' },
   { method: 'GET', pattern: /^\/v1\/payment-intents\/[^/]+$/, scope: 'payment:read', route: 'GET /v1/payment-intents/{id}' },
   { method: 'POST', pattern: /^\/v1\/payment-intents\/[^/]+\/confirm$/, scope: 'payment:write', route: 'POST /v1/payment-intents/{id}/confirm' },
   { method: 'POST', pattern: /^\/v1\/refunds$/, scope: 'payment:write', route: 'POST /v1/refunds' },
   { method: 'POST', pattern: /^\/v1\/webhook-endpoints$/, scope: 'webhook:write', route: 'POST /v1/webhook-endpoints' },
+  { method: 'POST', pattern: /^\/v1\/webhook-endpoints\/[^/]+\/events$/, scope: 'webhook:write', route: 'POST /v1/webhook-endpoints/{id}/events', authRequired: false },
+  { method: 'POST', pattern: /^\/v1\/webhook-endpoints\/[^/]+\/deliveries$/, scope: 'webhook:write', route: 'POST /v1/webhook-endpoints/{id}/deliveries' },
 ];
 
 function sendJson(response: ServerResponse, status: number, body: Record<string, unknown>): void {
@@ -60,23 +68,48 @@ function canonicalize(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function readJsonBody(request: IncomingMessage): Promise<unknown> {
+function readRawBody(request: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let content = '';
     request.setEncoding('utf8');
     request.on('data', (chunk: string) => { content += chunk; });
-    request.on('end', () => {
-      if (!content.trim()) return resolve({});
-      try { resolve(JSON.parse(content)); } catch { reject(new Error('invalid_json')); }
-    });
+    request.on('end', () => resolve(content));
     request.on('error', reject);
   });
+}
+
+async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+  const content = await readRawBody(request);
+  if (!content.trim()) return {};
+  try { return JSON.parse(content); } catch { throw new Error('invalid_json'); }
+}
+
+function webhookSignatureFrom(request: IncomingMessage): string | undefined {
+  const value = request.headers['webhook-signature'];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function verifyWebhookSignature(header: string | undefined, secret: string, rawBody: string): { timestamp: number; signature: string } | undefined {
+  const match = header?.match(/^t=(\d+),v1=([a-f0-9]{64})$/);
+  if (!match) return undefined;
+  const timestamp = Number(match[1]);
+  const signature = match[2];
+  if (!signature || !Number.isSafeInteger(timestamp) || Math.abs(Math.floor(Date.now() / 1000) - timestamp) > WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS) return undefined;
+  const expected = createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
+  const supplied = Buffer.from(signature, 'hex');
+  const expectedBytes = Buffer.from(expected, 'hex');
+  if (supplied.length !== expectedBytes.length || !timingSafeEqual(supplied, expectedBytes)) return undefined;
+  return { timestamp, signature };
 }
 
 export function createServer(): Server {
   const intents = new Map<string, PaymentIntent>();
   const idempotency = new Map<string, IdempotentResponse>();
   let nextIntentId = 1;
+  let nextWebhookEndpointId = 1;
+  const webhookEndpoints = new Map<string, WebhookEndpoint>();
+  const webhookDeliveries = new Map<string, WebhookDelivery>();
+  const deadLetterQueue: WebhookDelivery[] = [];
   const ledgerBoundary = 'This gateway never writes balances or any ledger.';
 
   return createHttpServer(async (request, response) => {
@@ -94,17 +127,21 @@ export function createServer(): Server {
       return;
     }
 
-    const authorization = authorize(request, route.scope);
-    if (authorization === 'missing') {
-      sendJson(response, 401, errorBody('unauthorized', 'A valid sandbox API key is required'));
-      return;
-    }
-    if (authorization === 'forbidden') {
-      sendJson(response, 403, errorBody('forbidden', `API key lacks scope ${route.scope}`));
-      return;
+    if (route.authRequired !== false) {
+      const authorization = authorize(request, route.scope);
+      if (authorization === 'missing') {
+        sendJson(response, 401, errorBody('unauthorized', 'A valid sandbox API key is required'));
+        return;
+      }
+      if (authorization === 'forbidden') {
+        sendJson(response, 403, errorBody('forbidden', `API key lacks scope ${route.scope}`));
+        return;
+      }
     }
 
     const segments = pathname.split('/');
+    const endpointId = segments[3] ?? '';
+    const endpoint = webhookEndpoints.get(endpointId);
     if (route.route === 'GET /v1/payment-intents/{id}') {
       const intent = intents.get(segments[3] ?? '');
       if (!intent) {
@@ -112,6 +149,93 @@ export function createServer(): Server {
         return;
       }
       sendJson(response, 200, intent);
+      return;
+    }
+
+    if (route.route === 'POST /v1/webhook-endpoints') {
+      let body: unknown;
+      try { body = await readJsonBody(request); } catch {
+        sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON'));
+        return;
+      }
+      const input = body as Record<string, unknown>;
+      if (!body || typeof body !== 'object' || Array.isArray(body) || typeof input.url !== 'string' || !/^https?:\/\/[^\s]+$/.test(input.url)) {
+        sendJson(response, 400, errorBody('invalid_request', 'url must be a valid synthetic HTTP(S) endpoint'));
+        return;
+      }
+      const id = `we_sandbox_${String(nextWebhookEndpointId).padStart(8, '0')}`;
+      const secret = `whsec_sandbox_${String(nextWebhookEndpointId++).padStart(8, '0')}`;
+      webhookEndpoints.set(id, { id, url: input.url, secret, replayedSignatures: new Set() });
+      sendJson(response, 201, { id, object: 'webhook_endpoint', url: input.url, status: 'enabled', secret, ledger_boundary: ledgerBoundary });
+      return;
+    }
+
+    if (route.route === 'POST /v1/webhook-endpoints/{id}/events') {
+      if (!endpoint) {
+        sendJson(response, 404, errorBody('not_found', 'Webhook endpoint not found'));
+        return;
+      }
+      const rawBody = await readRawBody(request);
+      const verified = verifyWebhookSignature(webhookSignatureFrom(request), endpoint.secret, rawBody);
+      if (!verified) {
+        sendJson(response, 401, errorBody('invalid_signature', 'Webhook signature is invalid or expired'));
+        return;
+      }
+      const replayKey = `${verified.timestamp}:${verified.signature}`;
+      if (endpoint.replayedSignatures.has(replayKey)) {
+        sendJson(response, 409, errorBody('replay_detected', 'Webhook signature was already accepted'));
+        return;
+      }
+      let body: unknown;
+      try { body = rawBody.trim() ? JSON.parse(rawBody) : {}; } catch {
+        sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON'));
+        return;
+      }
+      const eventId = body && typeof body === 'object' && !Array.isArray(body) && typeof (body as Record<string, unknown>).id === 'string' ? (body as Record<string, unknown>).id as string : undefined;
+      if (!eventId) {
+        sendJson(response, 400, errorBody('invalid_request', 'Webhook event id is required'));
+        return;
+      }
+      endpoint.replayedSignatures.add(replayKey);
+      sendJson(response, 202, { accepted: true, event_id: eventId, attempt: 1 });
+      return;
+    }
+
+    if (route.route === 'POST /v1/webhook-endpoints/{id}/deliveries') {
+      if (!endpoint) {
+        sendJson(response, 404, errorBody('not_found', 'Webhook endpoint not found'));
+        return;
+      }
+      let body: unknown;
+      try { body = await readJsonBody(request); } catch {
+        sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON'));
+        return;
+      }
+      const input = body as Record<string, unknown>;
+      const event = input.event as Record<string, unknown> | undefined;
+      const eventId = event && typeof event.id === 'string' ? event.id : undefined;
+      if (!event || Array.isArray(event) || !eventId || (input.outcome !== 'success' && input.outcome !== 'fail')) {
+        sendJson(response, 400, errorBody('invalid_request', 'event.id and outcome (success|fail) are required'));
+        return;
+      }
+      const deliveryKey = `${endpoint.id}:${eventId}`;
+      const delivery = webhookDeliveries.get(deliveryKey) ?? { endpointId: endpoint.id, eventId, attempt: 0, event };
+      delivery.attempt += 1;
+      webhookDeliveries.set(deliveryKey, delivery);
+      if (input.outcome === 'success') {
+        sendJson(response, 202, { status: 'delivered', attempt: delivery.attempt });
+        return;
+      }
+      if (delivery.attempt < MAX_WEBHOOK_ATTEMPTS) {
+        sendJson(response, 202, { status: 'retry_scheduled', attempt: delivery.attempt, max_attempts: MAX_WEBHOOK_ATTEMPTS });
+        return;
+      }
+      if (deadLetterQueue.length >= MAX_DLQ_ENTRIES) {
+        sendJson(response, 503, errorBody('dlq_full', 'Webhook dead-letter queue is full'));
+        return;
+      }
+      deadLetterQueue.push(delivery);
+      sendJson(response, 202, { status: 'dead_lettered', attempt: delivery.attempt, max_attempts: MAX_WEBHOOK_ATTEMPTS, dlq_size: deadLetterQueue.length });
       return;
     }
 

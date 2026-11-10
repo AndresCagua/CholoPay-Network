@@ -149,3 +149,64 @@ test('validates payment intent input and keeps read scope unchanged', async () =
     assert.equal(forbidden.status, 403);
   });
 });
+
+test('registers a synthetic webhook and accepts a valid timestamped HMAC signature once', async () => {
+  await withServer(async (baseUrl) => {
+    const registration = await fetch(`${baseUrl}/v1/webhook-endpoints`, {
+      method: 'POST',
+      headers: { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'http://sandbox.local/webhooks/orders' }),
+    });
+    assert.equal(registration.status, 201);
+    const endpoint = await registration.json() as { id: string; secret: string };
+    const payload = JSON.stringify({ id: 'evt_001', type: 'payment.succeeded' });
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = await import('node:crypto').then(({ createHmac }) => createHmac('sha256', endpoint.secret).update(`${timestamp}.${payload}`).digest('hex'));
+    const delivered = await fetch(`${baseUrl}/v1/webhook-endpoints/${endpoint.id}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Webhook-Signature': `t=${timestamp},v1=${signature}` },
+      body: payload,
+    });
+    assert.equal(delivered.status, 202);
+    assert.deepEqual(await delivered.json(), { accepted: true, event_id: 'evt_001', attempt: 1 });
+  });
+});
+
+test('rejects a replayed webhook signature', async () => {
+  await withServer(async (baseUrl) => {
+    const registration = await fetch(`${baseUrl}/v1/webhook-endpoints`, {
+      method: 'POST', headers: { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'http://sandbox.local/webhooks/replay' }),
+    });
+    const endpoint = await registration.json() as { id: string; secret: string };
+    const payload = JSON.stringify({ id: 'evt_replay', type: 'test' });
+    const timestamp = Math.floor(Date.now() / 1000);
+    const { createHmac } = await import('node:crypto');
+    const signature = createHmac('sha256', endpoint.secret).update(`${timestamp}.${payload}`).digest('hex');
+    const headers = { 'Content-Type': 'application/json', 'Webhook-Signature': `t=${timestamp},v1=${signature}` };
+    const first = await fetch(`${baseUrl}/v1/webhook-endpoints/${endpoint.id}/events`, { method: 'POST', headers, body: payload });
+    assert.equal(first.status, 202);
+    const replay = await fetch(`${baseUrl}/v1/webhook-endpoints/${endpoint.id}/events`, { method: 'POST', headers, body: payload });
+    assert.equal(replay.status, 409);
+    assert.deepEqual(await replay.json(), { error: 'replay_detected', message: 'Webhook signature was already accepted' });
+  });
+});
+
+test('progresses bounded synthetic retries and admits a final failure to the in-memory DLQ', async () => {
+  await withServer(async (baseUrl) => {
+    const registration = await fetch(`${baseUrl}/v1/webhook-endpoints`, {
+      method: 'POST', headers: { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'http://sandbox.local/webhooks/retries' }),
+    });
+    const endpoint = await registration.json() as { id: string };
+    const headers = { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Content-Type': 'application/json' };
+    const request = () => fetch(`${baseUrl}/v1/webhook-endpoints/${endpoint.id}/deliveries`, {
+      method: 'POST', headers, body: JSON.stringify({ event: { id: 'evt_retry', type: 'test' }, outcome: 'fail' }),
+    });
+    assert.deepEqual(await (await request()).json(), { status: 'retry_scheduled', attempt: 1, max_attempts: 3 });
+    assert.deepEqual(await (await request()).json(), { status: 'retry_scheduled', attempt: 2, max_attempts: 3 });
+    const dead = await request();
+    assert.equal(dead.status, 202);
+    assert.deepEqual(await dead.json(), { status: 'dead_lettered', attempt: 3, max_attempts: 3, dlq_size: 1 });
+  });
+});

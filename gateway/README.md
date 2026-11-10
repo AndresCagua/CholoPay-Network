@@ -33,7 +33,12 @@ Every create and confirm request requires an `Idempotency-Key`. Repeating the sa
 - `GET /v1/payment-intents/{id}` (`payment:read`) queries the current synthetic state.
 - `POST /v1/payment-intents/{id}/confirm` (`payment:write`) transitions `requires_confirmation` to `succeeded`.
 - `POST /v1/refunds` (`payment:write`) remains reserved and returns `501`.
-- `POST /v1/webhook-endpoints` (`webhook:write`) remains reserved and returns `501`.
+
+## Synthetic webhooks
+
+`POST /v1/webhook-endpoints` (`webhook:write`) registers an in-memory endpoint from a synthetic HTTP(S) URL and returns a sandbox-only `whsec_...` signing secret. No network delivery is performed. The returned secret signs the exact request body with HMAC-SHA256 using the format `${timestamp}.${raw_body}`; send it as `Webhook-Signature: t=<unix_seconds>,v1=<hex_digest>` to `POST /v1/webhook-endpoints/{id}/events`. Timestamps older than five minutes, malformed signatures, and mismatches return `401`; an already accepted timestamp/signature pair returns `409 replay_detected`.
+
+For local delivery simulation, `POST /v1/webhook-endpoints/{id}/deliveries` (`webhook:write`) accepts `{ "event": { "id": "..." }, "outcome": "success" | "fail" }`. Failures are bounded to three attempts: the first two return `retry_scheduled`, and the third is admitted to an in-memory dead-letter queue. The queue is capped at 100 entries and all state is process-local.
 
 `GET /health/live` is unauthenticated and returns `200`.
 
