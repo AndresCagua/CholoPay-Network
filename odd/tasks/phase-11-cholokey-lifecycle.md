@@ -39,3 +39,6 @@ Scope: suspensión determinista, resolución durante transición y portabilidad 
 
 L1. Usuario: "bueno continua con los specs"
 L2. Se continúa después de la gobernanza básica con el ciclo de vida de CholoKey requerido por la aceptación v1.1: suspensión determinista y portabilidad sintética.
+L3. Se añadió `Store.Port` con lock transaccional por clave, actualización atómica del propietario anterior, alta del propietario nuevo y tabla de idempotencia; se expuso `POST /internal/v1/directory/port`.
+L4. Evidencia Docker: suite completa de `network` PASS, incluyendo replay de portabilidad y resolución suspendida en origen / activa en destino; `gofmt` y `git diff --check` PASS.
+L5. Commit de implementación: `c0c51a7 20261109: agrega ciclo de vida de CholoKey`.
