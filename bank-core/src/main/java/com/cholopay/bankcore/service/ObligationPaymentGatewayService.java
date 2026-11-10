@@ -2,6 +2,7 @@ package com.cholopay.bankcore.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class ObligationPaymentGatewayService {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public ObligationPaymentGatewayService(
             @Value("${cholopay.participant-id:}") String participantId,
             @Value("${GATEWAY_URL:${BILLER_GATEWAY_URL:}}") String gatewayUrl,

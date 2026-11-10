@@ -1,5 +1,6 @@
 package com.cholopay.bankcore.security;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,7 @@ public class AdapterRequestAuthenticator {
     private final Clock clock;
     private final long maxSkewSeconds;
 
+    @Autowired
     public AdapterRequestAuthenticator(@Value("${NETWORK_ADAPTER_SECRET:}") String secret) { this(secret, Clock.systemUTC(), 300); }
     AdapterRequestAuthenticator(String secret, Clock clock, long maxSkewSeconds) { this.secret = secret; this.clock = clock; this.maxSkewSeconds = maxSkewSeconds; }
 

@@ -50,16 +50,27 @@ services:
     expose: ["8080"]
     networks: [internal_services, default]
 
+  transit:
+    build:
+      context: ../transit
+      target: runtime
+    environment:
+      PORT: 8082
+    expose: ["8082"]
+    networks: [internal_services, default]
+
   gateway:
     build:
       context: ../gateway
     environment:
       PORT: 8090
       BILLER_URL: http://utilities:8080
+      TRANSIT_URL: http://transit:8082
       INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:-local-test-only}
     expose: ["8090"]
     depends_on:
       utilities: {condition: service_started}
+      transit: {condition: service_started}
     networks: [internal_services, default]
 
   bank-core:
@@ -70,7 +81,7 @@ services:
       DB_URL: jdbc:postgresql://costa-db:5432/${COSTA_DB_NAME:-cholopay_costa}
       DB_USER: ${POSTGRES_USER:-cholopay}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
-      PARTICIPANT_ID: COSTA
+      PARTICIPANT_ID: BANCO_COSTA
       SERVER_PORT: 8080
       NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
       GATEWAY_URL: http://gateway:8090
@@ -90,7 +101,7 @@ services:
       DB_URL: jdbc:postgresql://costa-db:5432/${COSTA_DB_NAME:-cholopay_costa}
       DB_USER: ${POSTGRES_USER:-cholopay}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
-      PARTICIPANT_ID: COSTA
+      PARTICIPANT_ID: BANCO_COSTA
       NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
       GATEWAY_URL: http://gateway:8090
       GATEWAY_API_KEY: ${GATEWAY_API_KEY:-sk_sandbox_merchant_rw}
