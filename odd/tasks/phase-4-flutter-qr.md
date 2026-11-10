@@ -22,3 +22,4 @@ Source of truth for the next bounded implementation slice. Read through `## Log`
 L1. User authorized continuation after Phase 3 web panels and Docker verification.
 L2. Phase 4 is the next explicit phase in `spec.md`: Flutter wallet, CholoKey, static/dynamic QR, movements, confirmation, and verifiable mobile payment flow.
 L3. Defined `docs/phase-4-wallet-contract.md` with synthetic participant-scoped sessions, minimized CholoKey resolution, CholoPay-owned versioned QR payloads, idempotent confirmation, movement projections, and explicit settlement/delivery states.
+L4. Added the Docker-only Flutter wallet scaffold under `mobile/wallet`: typed local session/account/CholoKey/QR/transfer/movement fixtures, read-only wallet shell, account selection, widget tests, and explicit non-Pix-compatible scope. Docker widget tests pass. Commit: pending.

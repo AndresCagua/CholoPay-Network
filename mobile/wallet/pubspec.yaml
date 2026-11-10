@@ -1,0 +1,21 @@
+name: cholopay_wallet
+publish_to: "none"
+description: Minimal read-only CholoPay wallet scaffold with synthetic fixtures.
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
