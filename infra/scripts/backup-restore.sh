@@ -28,10 +28,17 @@ backup() {
 
 restore() {
   [[ $# -eq 1 && -s "$1" ]] || usage
-  local service
+  local service db
   service="${RESTORE_SERVICE:-network-db}"
-  "${COMPOSE[@]}" exec -T "$service" psql -U "${POSTGRES_USER:-cholopay}" -d cholopay_network < "$1"
-  printf 'RESTORE %s %s\n' "$service" "$1"
+  case "$service" in
+    network-db) db=cholopay_network ;;
+    costa-db) db=cholopay_costa ;;
+    sierra-db) db=cholopay_sierra ;;
+    oriente-db) db=cholopay_oriente ;;
+    *) echo "unsupported restore service: $service" >&2; exit 2 ;;
+  esac
+  "${COMPOSE[@]}" exec -T "$service" psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:-cholopay}" -d "$db" < "$1"
+  printf 'RESTORE %s %s %s\n' "$service" "$db" "$1"
 }
 
 case "${1:-}" in

@@ -69,7 +69,9 @@ class UtilitiesApiContractTests(unittest.TestCase):
         self.assertEqual(conflict["error"], "idempotency_key_reused_with_different_request")
 
     def test_settled_event_applies_invoice_once_and_replays(self):
-        payload = {"event_type": "payment.settled", "invoice_id": "invoice-elec-2025-001", "payment_intent_id": "pi_synthetic_001"}
+        intent_status, intent = self.request("POST", "/api/v1/payment-intents", {"invoice_id": "invoice-elec-2025-001", "amount": "42.50", "currency": "USD"}, {"Idempotency-Key": "settlement-intent-001"})
+        self.assertEqual(intent_status, 201)
+        payload = {"event_type": "payment.settled", "invoice_id": "invoice-elec-2025-001", "payment_intent_id": intent["id"]}
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         timestamp = "1700000000"
         signature = hmac.new(b"local-test-only", f"{timestamp}.{canonical}".encode(), hashlib.sha256).hexdigest()
@@ -84,6 +86,15 @@ class UtilitiesApiContractTests(unittest.TestCase):
         status, payment_status = self.request("GET", "/api/v1/invoices/invoice-elec-2025-001/payment-status")
         self.assertEqual(status, 200)
         self.assertEqual(payment_status["status"], "paid")
+
+    def test_settled_event_rejects_unbound_intent(self):
+        payload = {"event_type": "payment.settled", "invoice_id": "invoice-elec-2025-001", "payment_intent_id": "pi_unknown"}
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        timestamp = "1700000001"
+        signature = hmac.new(b"local-test-only", f"{timestamp}.{canonical}".encode(), hashlib.sha256).hexdigest()
+        status, body = self.request("POST", "/api/v1/internal/payment-events", payload, {"X-CholoPay-Event-Id": "evt-unbound", "X-CholoPay-Timestamp": timestamp, "X-CholoPay-Signature": signature})
+        self.assertEqual(status, 409)
+        self.assertEqual(body["error"], "payment_intent_not_bound_to_invoice")
 
     def test_settled_event_rejects_bad_signature(self):
         payload = {"event_type": "payment.settled", "invoice_id": "invoice-water-2025-001", "payment_intent_id": "pi_bad"}

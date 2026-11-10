@@ -82,8 +82,17 @@ func (s *Store) Register(ctx context.Context, entry Entry) error {
 	if kind == "BUSINESS" {
 		limit = 20
 	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	// Serialize registrations for the same account while retaining concurrency across accounts.
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, entry.AccountRef); err != nil {
+		return err
+	}
 	var count int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM directory_key WHERE account_ref=$1 AND status='ACTIVE'`, entry.AccountRef).Scan(&count); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM directory_key WHERE account_ref=$1 AND status='ACTIVE'`, entry.AccountRef).Scan(&count); err != nil {
 		return err
 	}
 	if count >= limit {
@@ -91,18 +100,17 @@ func (s *Store) Register(ctx context.Context, entry Entry) error {
 	}
 	if entry.KeyType != "RANDOM" {
 		var exists bool
-		if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM directory_key WHERE key_type=$1 AND key_value=$2 AND status='ACTIVE')`, entry.KeyType, entry.KeyValue).Scan(&exists); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM directory_key WHERE key_type=$1 AND key_value=$2 AND status='ACTIVE')`, entry.KeyType, entry.KeyValue).Scan(&exists); err != nil {
 			return err
 		}
 		if exists {
 			return ErrKeyConflict
 		}
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO directory_key(key_id,network_id,participant_id,key_type,key_value,account_ref,account_kind,status,version) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, entry.KeyID, entry.NetworkID, entry.ParticipantID, entry.KeyType, entry.KeyValue, entry.AccountRef, kind, entry.Status, entry.Version)
-	if err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key(key_id,network_id,participant_id,key_type,key_value,account_ref,account_kind,status,version) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, entry.KeyID, entry.NetworkID, entry.ParticipantID, entry.KeyType, entry.KeyValue, entry.AccountRef, kind, entry.Status, entry.Version); err != nil {
 		return err
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (s *Store) Resolve(ctx context.Context, networkID uuid.UUID, keyType, keyValue string, correlationID, causationID uuid.UUID, idempotencyKey string) (Resolution, error) {

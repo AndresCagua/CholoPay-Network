@@ -31,7 +31,7 @@ Backups are written under `.artifacts/backups/`, which is local evidence and mus
 RESTORE_SERVICE=network-db ./infra/scripts/backup-restore.sh restore .artifacts/backups/network-db-<timestamp>.sql
 ```
 
-Restore is destructive for the selected synthetic database. Run it only against disposable local volumes and verify the service health afterward.
+Restore is destructive for the selected synthetic database. `RESTORE_SERVICE` and the dump filename must refer to the same database: `network-db` → `cholopay_network`, `costa-db` → `cholopay_costa`, `sierra-db` → `cholopay_sierra`, `oriente-db` → `cholopay_oriente`. Run it only against disposable local volumes and verify the service health afterward.
 
 ## Participant outage and credential rotation
 

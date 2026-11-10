@@ -183,11 +183,15 @@ class UtilitiesHandler(BaseHTTPRequestHandler):
             invoice = INVOICES.get(invoice_id)
             if not invoice:
                 return response_payload(self, 404, {"error": "invoice_not_found"})
+            intent_record = next((record["intent"] for record in _payment_intents.values() if record["intent"]["id"] == intent_id), None)
+            if not intent_record or intent_record["invoice_id"] != invoice_id:
+                return response_payload(self, 409, {"error": "payment_intent_not_bound_to_invoice"})
             if invoice.get("payment_intent_id") not in (None, intent_id):
                 return response_payload(self, 409, {"error": "invoice_payment_intent_conflict"})
             invoice["payment_intent_id"] = intent_id
             invoice["status"] = "paid"
             invoice["settlement_state"] = "APPLIED"
+            intent_record["status"] = "settled"
             receipt = {"event_id": event_id, "invoice_id": invoice_id, "payment_intent_id": intent_id, "status": "PAID", "debit_performed": False, "ledger_entry_created": False, "synthetic": True}
             _payment_events[event_id] = {"fingerprint": fingerprint, "receipt": receipt}
         return response_payload(self, 200, receipt)
