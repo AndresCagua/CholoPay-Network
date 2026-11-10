@@ -1,6 +1,6 @@
-# CholoPay gateway scaffold
+# CholoPay gateway sandbox
 
-Docker-only Node.js/TypeScript scaffold for the Phase 5 public gateway (`cholopay-gateway`). It provides a minimal HTTP surface, synthetic scoped API keys, and documented route placeholders.
+Docker-only Node.js/TypeScript public gateway (`cholopay-gateway`). It provides synthetic scoped API keys and an in-memory payment-intent flow for sandbox behavior only.
 
 ## Run
 
@@ -24,18 +24,19 @@ Send `X-Api-Key` on every protected route. These development-only keys are inten
 
 Missing or unknown keys return `401`; a known key without the route scope returns `403`. Keys are kept in memory and must not be used outside the sandbox.
 
-## Contract placeholders
+## Synthetic payment intents
 
-The following Phase 5 routes are present. They return `501 Not Implemented` until later tasks add commerce/payment behavior:
+`POST /v1/payment-intents` (`payment:write`) creates an in-memory intent from `amount_minor`, three-letter uppercase `currency`, `merchant_order_id`, and optional `description`. New intents start in `requires_confirmation` and receive a synthetic `pi_sandbox_...` identifier.
 
-- `POST /v1/payment-intents` (`payment:write`)
-- `GET /v1/payment-intents/{id}` (`payment:read`)
-- `POST /v1/payment-intents/{id}/confirm` (`payment:write`)
-- `POST /v1/refunds` (`payment:write`)
-- `POST /v1/webhook-endpoints` (`webhook:write`)
+Every create and confirm request requires an `Idempotency-Key`. Repeating the same key with the same JSON payload replays the original response; reusing it with a different payload returns `409 idempotency_key_conflict`.
+
+- `GET /v1/payment-intents/{id}` (`payment:read`) queries the current synthetic state.
+- `POST /v1/payment-intents/{id}/confirm` (`payment:write`) transitions `requires_confirmation` to `succeeded`.
+- `POST /v1/refunds` (`payment:write`) remains reserved and returns `501`.
+- `POST /v1/webhook-endpoints` (`webhook:write`) remains reserved and returns `501`.
 
 `GET /health/live` is unauthenticated and returns `200`.
 
 ## Explicit ledger boundary
 
-This scaffold has no ledger client, database, balance store, payment processor, commerce state, webhook delivery, or payment behavior. It stores no request data and never reads or modifies balances. Any future implementation must integrate through an explicit non-ledger contract and must not write a bank or settlement ledger from this service.
+Payment intents are stored only in the gateway process memory. This service has no ledger client, database, balance store, payment processor, commerce state, or webhook delivery, and never reads or modifies balances. Confirmation is synthetic and does not create ledger entries or move money.
