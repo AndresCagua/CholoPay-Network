@@ -48,6 +48,7 @@ const syntheticApiKeys = new Map<string, ReadonlySet<Scope>>([
 ]);
 
 const placeholderRoutes: Array<{ method: string; pattern: RegExp; scope: Scope; route: string; authRequired?: boolean }> = [
+  { method: 'GET', pattern: /^\/v1\/participants\/[^/]+\/obligations$/, scope: 'payment:read', route: 'GET /v1/participants/{participantId}/obligations' },
   { method: 'POST', pattern: /^\/v1\/bill-payments$/, scope: 'payment:write', route: 'POST /v1/bill-payments' },
   { method: 'GET', pattern: /^\/v1\/bill-payments\/[^/]+$/, scope: 'payment:read', route: 'GET /v1/bill-payments/{id}' },
   { method: 'POST', pattern: /^\/v1\/bill-payments\/[^/]+\/apply$/, scope: 'payment:write', route: 'POST /v1/bill-payments/{id}/apply' },
@@ -177,6 +178,24 @@ export function createServer(options: GatewayOptions = {}): Server {
 
     const segments = pathname.split('/');
     const endpointId = segments[3] ?? '';
+    if (route.route === 'GET /v1/participants/{participantId}/obligations') {
+      const participantId = decodeURIComponent(segments[3] ?? '');
+      try {
+        const [utilitiesResponse, transitResponse] = await Promise.all([
+          fetch(`${utilitiesBaseUrl}/v1/invoices`, { signal: AbortSignal.timeout(1000) }),
+          fetch(`${transitBaseUrl}/v1/obligations`, { signal: AbortSignal.timeout(1000) }),
+        ]);
+        if (!utilitiesResponse.ok || !transitResponse.ok) return sendJson(response, 502, errorBody('biller_unavailable', 'No se pudieron consultar las obligaciones sintéticas'));
+        const utilities = await utilitiesResponse.json() as { invoices?: Array<Record<string, unknown>> };
+        const transit = await transitResponse.json() as { items?: Array<Record<string, unknown>> };
+        const obligations = [
+          ...(utilities.invoices ?? []).map((item) => ({ id: item.id, participantId, kind: item.service, description: `Factura sintética de ${item.service}`, amountMinor: Math.round(Number(item.amount) * 100), currency: item.currency, status: String(item.status ?? '').toUpperCase() })),
+          ...(transit.items ?? []).map((item) => ({ id: item.id, participantId, kind: item.type, description: `Obligación sintética ${item.type}`, amountMinor: item.amount_minor, currency: item.currency, status: String(item.status ?? '').toUpperCase() })),
+        ];
+        sendJson(response, 200, { participantId, obligations });
+      } catch { sendJson(response, 502, errorBody('biller_unavailable', 'No se pudieron consultar las obligaciones sintéticas')); }
+      return;
+    }
     const endpoint = webhookEndpoints.get(endpointId);
     if (route.route === 'GET /v1/bill-payments/{id}') {
       const payment = billPayments.get(segments[3] ?? '');

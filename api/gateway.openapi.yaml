@@ -4,6 +4,15 @@ servers: [{url: http://localhost:8090}]
 security: [{apiKey: []}]
 paths:
   /health/live: {get: {security: [], responses: {'200': {description: Activo}}}}
+  /v1/participants/{participantId}/obligations:
+    get:
+      summary: Consultar obligaciones sintéticas delimitadas por participante
+      parameters:
+        - {in: path, name: participantId, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Obligaciones agregadas desde APIs HTTP de utilities y tránsito}
+        '401': {description: Clave API ausente o sin permiso de lectura}
+        '502': {description: Facturador sintético no disponible}
   /v1/bill-payments:
     post:
       summary: Pago sintético de obligación de utilities o tránsito

@@ -28,11 +28,17 @@ Las claves ausentes o desconocidas devuelven `401`; una clave conocida sin el al
 
 `POST /v1/payment-intents` (`payment:write`) crea en memoria una intención a partir de `amount_minor`, la `currency` en mayúsculas de tres letras, `merchant_order_id` y `description` opcional. Las intenciones nuevas comienzan en `requires_confirmation` y reciben el identificador sintético `pi_sandbox_...`.
 
-Cada solicitud de creación y confirmación requiere an `Idempotency-Key`. Repetir la misma clave con la misma carga JSON reproduce la respuesta original; reutilizarla con una carga diferente devuelve `409 idempotency_key_conflict`.
+Cada solicitud de creación y confirmación requiere una cabecera `Idempotency-Key`. Repetir la misma clave con la misma carga JSON reproduce la respuesta original; reutilizarla con una carga diferente devuelve `409 idempotency_key_conflict`.
 
 - `GET /v1/payment-intents/{id}` (`payment:read`) consulta el estado sintético actual.
 - `POST /v1/payment-intents/{id}/confirm` (`payment:write`) transiciona de `requires_confirmation` a `succeeded`.
 - `POST /v1/refunds` (`payment:write`) acepta `{ "payment_intent_id": "pi_sandbox_...", "amount_minor": 2500, "currency": "USD"` }` solo después de que la intención esté en `succeeded`. Este entorno aislado acotado admite un reembolso completo por intención, devuelve `201` con `status: succeeded`, y nunca escribe un diario. Reutilizar una clave de idempotencia con otra carga devuelve `409`; un segundo reembolso para la misma intención devuelve `409 refund_conflict`.
+
+## Proyección y flujo de obligaciones sintéticas
+
+`GET /v1/participants/{participantId}/obligations` (`payment:read`) agrega obligaciones de utilities y tránsito mediante sus APIs HTTP internas. La pasarela no accede a bases de datos; devuelve únicamente una proyección delimitada por el participante solicitado y responde `502` si algún facturador no está disponible.
+
+`POST /v1/bill-payments` acepta obligaciones de utilities (`electricity`, `water`, `internet`, `mobile`) o tránsito (`biller: transit`, `obligation_id`) mediante URLs internas configurables. Conserva idempotencia, aplicación eventual, firma HMAC y la frontera sin escritura de ledger.
 
 ## Flujo de facturación eléctrica de Banco Costa
 

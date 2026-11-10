@@ -4,8 +4,8 @@ import type { AddressInfo } from 'node:net';
 import { createServer as createMockServer } from 'node:http';
 import { createServer } from './server.js';
 
-async function withServer(run: (baseUrl: string) => Promise<void>): Promise<void> {
-  const server = createServer();
+async function withServer(run: (baseUrl: string) => Promise<void>, options: Parameters<typeof createServer>[0] = {}): Promise<void> {
+  const server = createServer(options);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address() as AddressInfo;
   try {
@@ -24,6 +24,8 @@ async function withBiller(run: (baseUrl: string, setAvailable: () => void, setUn
     const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {};
     response.setHeader('content-type', 'application/json');
     if (!available) { response.writeHead(503); response.end(JSON.stringify({ error: 'unavailable' })); return; }
+    if (request.method === 'GET' && request.url === '/v1/invoices') { response.writeHead(200); response.end(JSON.stringify({ invoices: [{ id: 'invoice-elec-2025-001', service: 'electricity', amount: '42.50', currency: 'USD', status: 'open' }] })); return; }
+    if (request.method === 'GET' && request.url === '/v1/obligations') { response.writeHead(200); response.end(JSON.stringify({ items: [{ id: 'obligation-fine-001', type: 'fine', amount_minor: 2500, currency: 'SYN', status: 'unpaid' }] })); return; }
     if (request.url === '/api/v1/payment-intents' || request.url?.startsWith('/v1/obligations/') && request.url.endsWith('/payment-intents')) {
       const key = String(request.headers['idempotency-key']);
       const id = intents.get(key) ?? `pi_${intents.size + 1}`;
@@ -179,6 +181,17 @@ test('completa un pago eléctrico de Banco Costa mediante el facturador y conser
         assert.equal(conflict.status, 409);
       } finally { await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); }
     });
+  });
+});
+
+test('agrega obligaciones participant-scoped de utilities y tránsito', async () => {
+  await withBiller(async (billerUrl) => {
+    await withServer(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/v1/participants/BANCO_COSTA/obligations`, { headers: { 'X-Api-Key': 'sk_sandbox_merchant_ro' } });
+      assert.equal(response.status, 200);
+      const body = await response.json() as { obligations: Array<{ kind: string }> };
+      assert.deepEqual(body.obligations.map((item) => item.kind), ['electricity', 'fine']);
+    }, { billerBaseUrl: billerUrl, transitBaseUrl: billerUrl });
   });
 });
 
