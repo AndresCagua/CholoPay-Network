@@ -23,7 +23,7 @@ Fuente de verdad del primer slice financiero ejecutable. Lee hasta `## Log` ante
 - T6 (S8): Eliminar requisitos de toolchains y puertos del host del flujo predeterminado; agregar compilación Docker multietapa y servicio de pruebas Compose. Commit: pending.
 - T7 (S1, S3, S5): Reemplazar el estado de transferencias en memoria por persistencia transaccional en PostgreSQL. Commit: pending.
 - T8 (S2, S3): Completar la aceptación JDBC concurrente contra PostgreSQL con saldo limitado, sin saldos negativos, sin journals duplicados y con todos los journals equilibrados. Ruta: siguiente slice. Commit: `680395b` y ajuste `d496770`.
-- T9 (S2, S3, S4): Endurecer la aceptación concurrente y de conflictos del receiver inbox sin modificar el contrato público ni la migración existente. Ruta: siguiente slice. Commit: pendiente.
+- T9 (S2, S3, S4): Endurecer la aceptación concurrente y de conflictos del receiver inbox sin modificar el contrato público ni la migración existente. Ruta: siguiente slice. Commit: `b54ba77`.
 
 La evidencia de ejecución exclusiva en contenedores y persistencia PostgreSQL se registra abajo antes del commit posterior.
 
@@ -46,3 +46,4 @@ L12. T8 implementado y verificado en Docker: 100 transferencias concurrentes de 
 L13. Se atendieron las advertencias informativas de la review: la prueba ahora comprueba explícitamente el mensaje de fondos insuficientes y espera cada `Future` con timeout de cinco segundos. La prueba Docker focalizada y `git diff --check` volvieron a pasar.
 L14. Solicitud vigente: "arregla y continua con las specs". T8 quedó revisado y aprobado; el siguiente slice no especulativo es T9, endurecimiento del receiver inbox existente, sin inventar todavía un contrato de outbox.
 L15. T9 implementado y verificado en Docker: el receiver inbox bloquea las cuentas de destino y compensación en orden determinista antes de consultar la entrega, serializa duplicados concurrentes y conserva replay/conflicto sin efectos financieros duplicados. Las pruebas focalizadas de integración y HTTP pasaron con código 0; `git diff --check` pasó.
+L16. La suite completa de integración `mvn -q -Pintegration test` pasó dentro del perfil Docker `bank-core-test`; `git diff --check` pasó. T9 queda cerrado en `b54ba77` y no modifica migraciones ni endpoints públicos.
