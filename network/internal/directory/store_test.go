@@ -74,6 +74,22 @@ func TestPostgresDirectoryResolvesWithinOwningNetwork(t *testing.T) {
 	if _, err := store.Resolve(ctx, fintech, key.KeyType, key.KeyValue, uuid.New(), uuid.New(), "directory-test-2"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected network isolation, got %v", err)
 	}
+	duplicate := key
+	duplicate.KeyID = uuid.New()
+	duplicate.NetworkID = fintech
+	duplicate.ParticipantID = walletParticipant
+	if err := store.Register(ctx, duplicate); !errors.Is(err, ErrKeyConflict) {
+		t.Fatalf("expected global identity conflict, got %v", err)
+	}
+	for index := 0; index < 4; index++ {
+		entry := Entry{KeyID: uuid.New(), NetworkID: banking, ParticipantID: bankParticipant, KeyType: "RANDOM", KeyValue: uuid.NewString(), AccountRef: "costa-account-1", AccountKind: "PERSONAL", Status: "ACTIVE", Version: 1}
+		if err := store.Register(ctx, entry); err != nil {
+			t.Fatalf("register key %d: %v", index, err)
+		}
+	}
+	if err := store.Register(ctx, Entry{KeyID: uuid.New(), NetworkID: banking, ParticipantID: bankParticipant, KeyType: "RANDOM", KeyValue: uuid.NewString(), AccountRef: "costa-account-1", AccountKind: "PERSONAL", Status: "ACTIVE", Version: 1}); !errors.Is(err, ErrKeyLimit) {
+		t.Fatalf("expected personal key limit, got %v", err)
+	}
 	if _, err := db.ExecContext(ctx, "UPDATE directory_key SET status='SUSPENDED' WHERE key_id=$1", key.KeyID); err != nil {
 		t.Fatal(err)
 	}
