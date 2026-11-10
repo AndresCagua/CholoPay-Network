@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import json
 import threading
 import unittest
@@ -65,6 +67,29 @@ class UtilitiesApiContractTests(unittest.TestCase):
         status, conflict = self.request("POST", "/api/v1/payment-intents", {**payload, "amount": "1.00"}, headers)
         self.assertEqual(status, 409)
         self.assertEqual(conflict["error"], "idempotency_key_reused_with_different_request")
+
+    def test_settled_event_applies_invoice_once_and_replays(self):
+        payload = {"event_type": "payment.settled", "invoice_id": "invoice-elec-2025-001", "payment_intent_id": "pi_synthetic_001"}
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        timestamp = "1700000000"
+        signature = hmac.new(b"local-test-only", f"{timestamp}.{canonical}".encode(), hashlib.sha256).hexdigest()
+        headers = {"X-CholoPay-Event-Id": "evt-settled-001", "X-CholoPay-Timestamp": timestamp, "X-CholoPay-Signature": signature}
+        status, receipt = self.request("POST", "/api/v1/internal/payment-events", payload, headers)
+        self.assertEqual(status, 200)
+        self.assertEqual(receipt["status"], "PAID")
+        self.assertFalse(receipt["debit_performed"])
+        status, replay = self.request("POST", "/api/v1/internal/payment-events", payload, headers)
+        self.assertEqual(status, 200)
+        self.assertEqual(replay, receipt)
+        status, payment_status = self.request("GET", "/api/v1/invoices/invoice-elec-2025-001/payment-status")
+        self.assertEqual(status, 200)
+        self.assertEqual(payment_status["status"], "paid")
+
+    def test_settled_event_rejects_bad_signature(self):
+        payload = {"event_type": "payment.settled", "invoice_id": "invoice-water-2025-001", "payment_intent_id": "pi_bad"}
+        status, body = self.request("POST", "/api/v1/internal/payment-events", payload, {"X-CholoPay-Event-Id": "evt-bad", "X-CholoPay-Timestamp": "1700000000", "X-CholoPay-Signature": "bad"})
+        self.assertEqual(status, 401)
+        self.assertEqual(body["error"], "invalid_event_signature")
 
     def test_payment_intent_requires_key_and_known_invoice(self):
         status, body = self.request("POST", "/api/v1/payment-intents", {"invoice_id": "invoice-elec-2025-001"})

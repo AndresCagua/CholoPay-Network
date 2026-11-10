@@ -24,7 +24,9 @@ The API is available to other containers at `http://utilities:8080`.
 - `GET /api/v1/invoices?contract_id={contract_id}` — query invoices, optionally by contract.
 - `GET /api/v1/invoices/{invoice_id}` — retrieve an invoice.
 - `GET /api/v1/invoices/{invoice_id}/collection-status` — query synthetic collection state.
+- `GET /api/v1/invoices/{invoice_id}/payment-status` — query application state for a synthetic settlement.
 - `POST /api/v1/payment-intents` — create an intent with `Idempotency-Key` and JSON `{ "invoice_id": "...", "amount": "...", "currency": "USD" }`.
+- `POST /api/v1/internal/payment-events` — apply a signed synthetic `payment.settled` event with event-id replay protection. This endpoint does not debit accounts or write a ledger.
 
 A repeated idempotency key and identical request returns the original intent. Reusing the key with a different request returns `409`. Every new intent remains `pending` and explicitly reports `debit_performed: false` and `ledger_entry_created: false`.
 

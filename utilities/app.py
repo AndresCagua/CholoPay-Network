@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import threading
@@ -47,7 +48,9 @@ INVOICES = {
 }
 
 _payment_intents: dict[str, dict] = {}
+_payment_events: dict[str, dict] = {}
 _payment_lock = threading.Lock()
+_INTERNAL_EVENT_SECRET = os.getenv("INTERNAL_EVENT_SECRET", "local-test-only")
 
 
 def response_payload(handler: BaseHTTPRequestHandler, status: int, payload: dict) -> None:
@@ -86,6 +89,17 @@ class UtilitiesHandler(BaseHTTPRequestHandler):
         if len(parts) == 4 and parts[:3] == ["api", "v1", "invoices"]:
             invoice = INVOICES.get(parts[3])
             return response_payload(self, 200, invoice) if invoice else response_payload(self, 404, {"error": "invoice_not_found"})
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "invoices"] and parts[4] == "payment-status":
+            invoice = INVOICES.get(parts[3])
+            if not invoice:
+                return response_payload(self, 404, {"error": "invoice_not_found"})
+            return response_payload(self, 200, {
+                "invoice_id": invoice["id"],
+                "status": invoice["status"],
+                "payment_intent_id": invoice.get("payment_intent_id"),
+                "settlement_state": invoice.get("settlement_state", "NOT_SETTLED"),
+                "synthetic": True,
+            })
         if len(parts) == 5 and parts[:3] == ["api", "v1", "invoices"] and parts[4] == "collection-status":
             invoice = INVOICES.get(parts[3])
             if not invoice:
@@ -101,6 +115,8 @@ class UtilitiesHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/api/v1/internal/payment-events":
+            return self.apply_payment_event()
         if parsed.path != "/api/v1/payment-intents":
             return response_payload(self, 404, {"error": "not_found"})
         key = self.headers.get("Idempotency-Key", "").strip()
@@ -132,7 +148,49 @@ class UtilitiesHandler(BaseHTTPRequestHandler):
                 "synthetic": True,
             }
             _payment_intents[key] = {"request_fingerprint": fingerprint, "intent": intent}
+        with _payment_lock:
+            INVOICES[invoice_id]["settlement_state"] = "AWAITING_APPLICATION"
+            intent["status"] = "pending"
         return response_payload(self, 201, intent)
+
+    def apply_payment_event(self) -> None:
+        event_id = self.headers.get("X-CholoPay-Event-Id", "").strip()
+        signature = self.headers.get("X-CholoPay-Signature", "").strip()
+        timestamp = self.headers.get("X-CholoPay-Timestamp", "").strip()
+        if not event_id or not signature or not timestamp:
+            return response_payload(self, 400, {"error": "event_headers_required"})
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length)
+            payload = json.loads(raw or b"{}")
+        except (ValueError, json.JSONDecodeError):
+            return response_payload(self, 400, {"error": "invalid_json"})
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        expected = hmac.new(_INTERNAL_EVENT_SECRET.encode(), f"{timestamp}.{canonical}".encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            return response_payload(self, 401, {"error": "invalid_event_signature"})
+        intent_id = payload.get("payment_intent_id")
+        invoice_id = payload.get("invoice_id")
+        if payload.get("event_type") != "payment.settled" or not isinstance(intent_id, str) or not isinstance(invoice_id, str):
+            return response_payload(self, 400, {"error": "invalid_payment_event"})
+        with _payment_lock:
+            existing = _payment_events.get(event_id)
+            fingerprint = hashlib.sha256(canonical.encode()).hexdigest()
+            if existing:
+                if existing["fingerprint"] != fingerprint:
+                    return response_payload(self, 409, {"error": "event_id_reused_with_different_payload"})
+                return response_payload(self, 200, existing["receipt"])
+            invoice = INVOICES.get(invoice_id)
+            if not invoice:
+                return response_payload(self, 404, {"error": "invoice_not_found"})
+            if invoice.get("payment_intent_id") not in (None, intent_id):
+                return response_payload(self, 409, {"error": "invoice_payment_intent_conflict"})
+            invoice["payment_intent_id"] = intent_id
+            invoice["status"] = "paid"
+            invoice["settlement_state"] = "APPLIED"
+            receipt = {"event_id": event_id, "invoice_id": invoice_id, "payment_intent_id": intent_id, "status": "PAID", "debit_performed": False, "ledger_entry_created": False, "synthetic": True}
+            _payment_events[event_id] = {"fingerprint": fingerprint, "receipt": receipt}
+        return response_payload(self, 200, receipt)
 
 
 def main() -> None:
