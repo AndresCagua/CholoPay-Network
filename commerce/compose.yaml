@@ -1,0 +1,20 @@
+name: ${COMPOSE_PROJECT_NAME:-cholopay-commerce}
+
+services:
+  commerce:
+    build:
+      context: .
+      target: runtime
+    environment:
+      PORT: 8081
+    ports:
+      - "${COMMERCE_HOST_PORT:-18081}:8081"
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  commerce-test:
+    build:
+      context: .
+      target: test
+    profiles: [test]
