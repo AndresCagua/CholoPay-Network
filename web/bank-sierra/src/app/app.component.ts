@@ -1,10 +1,5 @@
-import { ChangeDetectionStrategy, Component } from "@angular/core";
-import {
-  SIERRA_PARTICIPANT_ID,
-  TransferReadModel,
-  TransferState,
-  transferFixtures,
-} from "./transfer-read-model";
+import { ChangeDetectionStrategy, Component, OnInit } from "@angular/core";
+import { SIERRA_PARTICIPANT_ID, TransferReadModel, TransferState, createTransferApi } from "./transfer-read-model";
 
 const STATE_LABELS: Record<TransferState, string> = {
   INSTRUCTION_ACCEPTED: "Instruction accepted",
@@ -43,6 +38,8 @@ const STATE_LABELS: Record<TransferState, string> = {
           <span class="count">{{ visibleTransfers.length }} visible</span>
         </div>
 
+        @if (loading) { <p class="empty" role="status">Loading transfers…</p> }
+        @if (error) { <p class="empty" role="alert">{{ error }}</p> }
         @for (transfer of visibleTransfers; track transfer.transfer_id) {
           <article class="transfer-card" [attr.aria-label]="'Transfer ' + transfer.transfer_id">
             <div class="card-topline">
@@ -111,14 +108,21 @@ const STATE_LABELS: Record<TransferState, string> = {
     @media (max-width: 420px) { .shell { padding-inline: 1rem; } .metadata { grid-template-columns: 1fr; } }
   `,
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   readonly participantId = SIERRA_PARTICIPANT_ID;
-  readonly visibleTransfers = transferFixtures.filter(
-    (transfer) =>
-      transfer.participant_id === this.participantId &&
-      (transfer.source_participant_id === this.participantId ||
-        transfer.destination_participant_id === this.participantId),
-  );
+  visibleTransfers: TransferReadModel[] = [];
+  loading = true;
+  error: string | null = null;
+
+  ngOnInit(): void {
+    createTransferApi(this.participantId).read().then((transfers) => {
+      this.visibleTransfers = transfers;
+      this.loading = false;
+    }).catch((reason: unknown) => {
+      this.error = reason instanceof Error ? reason.message : "Transfer API unavailable";
+      this.loading = false;
+    });
+  }
 
   stateLabel(state: TransferState): string {
     return STATE_LABELS[state];

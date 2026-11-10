@@ -1,12 +1,5 @@
-import {
-  BANCO_ORIENTE_PARTICIPANT_ID,
-  formatAmount,
-  isTransferVisibleToParticipant,
-  maskIdempotencyKey,
-  transferFixture,
-  transferStates,
-  type TransferReadModel,
-} from "./transfer";
+import { useEffect, useState } from "react";
+import { BANCO_ORIENTE_PARTICIPANT_ID, createTransferApi, formatAmount, maskIdempotencyKey, transferStates, type TransferReadModel } from "./transfer";
 
 const stateLabels: Record<TransferReadModel["state"], string> = {
   INSTRUCTION_ACCEPTED: "INSTRUCTION_ACCEPTED",
@@ -17,12 +10,10 @@ const stateLabels: Record<TransferReadModel["state"], string> = {
 };
 
 function App() {
-  const transfer = isTransferVisibleToParticipant(
-    transferFixture,
-    BANCO_ORIENTE_PARTICIPANT_ID,
-  )
-    ? transferFixture
-    : null;
+  const [transfers, setTransfers] = useState<TransferReadModel[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { createTransferApi(BANCO_ORIENTE_PARTICIPANT_ID).read().then(setTransfers).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Transfer API unavailable")); }, []);
+  const transfer = transfers?.[0] ?? null;
 
   return (
     <main>
@@ -38,7 +29,7 @@ function App() {
         <span className="readonly-badge">READ_ONLY</span>
       </header>
 
-      {transfer ? (
+      {error ? <section role="alert"><h2>Transfer unavailable</h2><p>{error}</p></section> : transfers === null ? <section role="status"><h2>Loading transfers…</h2></section> : transfer ? (
         <>
           <section aria-labelledby="state-heading" className="state-panel">
             <div className="section-heading">
@@ -98,9 +89,7 @@ function App() {
             </dl>
           </section>
 
-          <p className="fixture-note">
-            Local fixture only · no database access · no backend calls
-          </p>
+          <p className="fixture-note">Participant-scoped API read only · no database access</p>
         </>
       ) : (
         <section role="status"><h2>Transfer unavailable</h2></section>
