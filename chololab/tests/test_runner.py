@@ -1,7 +1,10 @@
+import io
+import json
 import unittest
+from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from runner import Result, request_once, run
+from runner import Result, main, request_once, run
 
 
 class RunnerTests(unittest.TestCase):
@@ -24,6 +27,37 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(summary["successful"], 3)
         self.assertEqual(summary["injected_failures"], 2)
         self.assertEqual(summary["failed"], 2)
+
+    def test_summary_contains_reproducible_red_fields(self):
+        class Response:
+            status = 200
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def read(self): return b"ok"
+
+        with patch("runner.urllib.request.urlopen", return_value=Response()):
+            summary = run("http://synthetic.local/health/live", 4, 2, 2)
+
+        self.assertEqual(summary["red"]["rate_requests_per_second"], summary["throughput_per_second"])
+        self.assertEqual(summary["red"]["errors"], 2)
+        self.assertEqual(summary["red"]["error_rate"], 0.5)
+        self.assertEqual(summary["red"]["duration_ms"], summary["elapsed_ms"])
+
+    def test_main_emits_structured_start_and_summary_logs(self):
+        output = io.StringIO()
+        with patch.dict("runner.os.environ", {
+            "TARGET_URL": "http://synthetic.local/health/live",
+            "REQUESTS": "2",
+            "CONCURRENCY": "1",
+            "FAILURE_EVERY": "2",
+        }, clear=True), patch("runner.run", return_value={"requests": 2, "failed": 1}), redirect_stdout(output):
+            main()
+
+        records = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual([record["event"] for record in records], ["run_started", "run_summary"])
+        self.assertEqual(records[0]["scenario"], "synthetic_http_load")
+        self.assertEqual(records[0]["failure_every"], 2)
+        self.assertEqual(records[1]["summary"], {"failed": 1, "requests": 2})
 
     def test_invalid_parameters_are_rejected(self):
         with self.assertRaises(ValueError):

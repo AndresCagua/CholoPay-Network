@@ -22,4 +22,19 @@ docker compose -f compose.yaml run --rm \
 docker compose -f compose.yaml down
 ```
 
-The runner reports request count, injected failures, successful responses, elapsed time, throughput, and min/median/max latency. These are local smoke measurements, not production capacity claims.
+The runner emits one JSON `run_started` record and one JSON `run_summary` record. The summary keeps request count, injected failures, successful responses, elapsed time, throughput, and min/median/max latency, plus the RED-style fields:
+
+- `red.rate_requests_per_second`: completed request rate for this run.
+- `red.errors` and `red.error_rate`: non-2xx, transport, and injected failures.
+- `red.duration_ms`: total elapsed run duration.
+
+These are deterministic synthetic smoke measurements for the selected inputs, not production capacity claims. Compare complete JSON records from runs with the same target, request count, concurrency, and `FAILURE_EVERY`; do not extrapolate them to production hardware or traffic.
+
+## Runbook
+
+1. Start only the internal synthetic target: `docker compose -f compose.yaml up -d synthetic-target`.
+2. Run the bounded scenario shown above. Keep `TARGET_URL` on the Compose network; do not add a host `ports` mapping.
+3. Inspect the two JSON lines. Confirm the start record matches the requested inputs, then use `run_summary.red` for rate, errors, and duration. `injected_failures` should match the deterministic `FAILURE_EVERY` schedule when the target is healthy; other failures are evidence of transport or target behavior.
+4. Tear down the synthetic target: `docker compose -f compose.yaml down`.
+
+This runbook uses synthetic traffic only, does not access ledgers, and does not establish production readiness or capacity.

@@ -26,9 +26,9 @@ Scope: laboratorio Docker-only para escenarios sintéticos; no publicar puertos 
 
 ## Tasks
 
-- T1 (S1, S4): Definir CholoLab Docker-only, escenarios sintéticos y formato de evidencia reproducible. Route: inline after bounded exploration. Commit: pending.
-- T2 (S1, S3): Implementar un escenario mínimo de carga y fault injection contra interfaces públicas, sin escribir directamente en ledgers. Route: delegated only if independent heavy unit emerges. Commit: pending.
-- T3 (S2, S3): Añadir métricas/logs estructurados y runbook de ejecución/interpretación, sin prometer resultados universales. Route: inline. Commit: pending.
+- T1 (S1, S4): Definir CholoLab Docker-only, escenarios sintéticos y formato de evidencia reproducible. Route: inline after bounded exploration. Commit: `4908f08`.
+- T2 (S1, S3): Implementar un escenario mínimo de carga y fault injection contra interfaces públicas, sin escribir directamente en ledgers. Route: delegated only if independent heavy unit emerges. Commit: `4908f08`.
+- T3 (S2, S3): Añadir métricas/logs estructurados y runbook de ejecución/interpretación, sin prometer resultados universales. Route: worker. Commit: pending.
 - T4 (S1-S5): Ejecutar checks Docker, validar `docker compose config`, registrar metodología, resultados y límites. Route: inline. Commit: pending.
 
 ## Log
@@ -37,3 +37,5 @@ L1. Usuario: "bacano avancemos con los specs"
 L2. El slice anterior implementó facturadores sintéticos en `utilities/` y `transit/`; esta fase continúa con rendimiento, resiliencia y observabilidad reproducible sin introducir infraestructura externa.
 L3. Implementado `chololab/` como runner HTTP sintético Docker-only, con objetivo interno de prueba, concurrencia configurable, latencias, throughput y fallos deterministas cada N solicitudes. No accede directamente a ledgers o bases.
 L4. Evidencia Docker: 3/3 tests del runner PASS; `docker compose config` PASS; smoke de 20 solicitudes con concurrencia 4 y `FAILURE_EVERY=5`: 16 exitosas, 4 fallas inyectadas, throughput local 276.84 req/s, mediana 2.958 ms. Estos números son evidencia local reproducible y no capacidad de producción.
+L5. T3 (S2, S3): el runner emite registros JSON estructurados `run_started`/`run_summary` y un bloque RED reproducible (`rate_requests_per_second`, `errors`, `error_rate`, `duration_ms`); el README documenta ejecución e interpretación sin afirmar capacidad de producción. Se preservan Docker-only, sin puertos publicados por defecto, tráfico sintético, sin acceso a ledgers y fault injection determinista.
+L6. T4 (S1-S5): tests Docker PASS (5/5), `docker compose -p chololab-t3 config` PASS y smoke PASS con 20 solicitudes, concurrencia 4, 16 exitosas, 4 fallas inyectadas, `red.error_rate=0.2` y `rate_requests_per_second=288.288`. Las métricas son evidencia local reproducible, no capacidad de producción.
