@@ -13,6 +13,7 @@ type Handler struct{ store *Store }
 func NewHandler(store *Store) *Handler { return &Handler{store: store} }
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /internal/v1/directory/resolve", h.resolve)
+	mux.HandleFunc("POST /internal/v1/directory/port", h.port)
 }
 
 type resolveRequest struct {
@@ -22,6 +23,19 @@ type resolveRequest struct {
 	CorrelationID  uuid.UUID `json:"correlation_id"`
 	CausationID    uuid.UUID `json:"causation_id"`
 	IdempotencyKey string    `json:"idempotency_key"`
+}
+
+type portRequest struct {
+	IdempotencyKey    string    `json:"idempotency_key"`
+	KeyType           string    `json:"key_type"`
+	KeyValue          string    `json:"key_value"`
+	AccountRef        string    `json:"account_ref"`
+	AccountKind       string    `json:"account_kind"`
+	FromNetworkID     uuid.UUID `json:"from_network_id"`
+	FromParticipantID uuid.UUID `json:"from_participant_id"`
+	ToNetworkID       uuid.UUID `json:"to_network_id"`
+	ToParticipantID   uuid.UUID `json:"to_participant_id"`
+	NewKeyID          uuid.UUID `json:"new_key_id"`
 }
 
 type resolveResponse struct {
@@ -34,6 +48,28 @@ type resolveResponse struct {
 	CausationID    uuid.UUID `json:"causation_id"`
 	IdempotencyKey string    `json:"idempotency_key"`
 	ResolvedAt     string    `json:"resolved_at"`
+}
+
+func (h *Handler) port(w http.ResponseWriter, r *http.Request) {
+	var request portRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if request.IdempotencyKey == "" || request.NewKeyID == uuid.Nil {
+		http.Error(w, "idempotency_key and new_key_id are required", http.StatusBadRequest)
+		return
+	}
+	err := h.store.Port(r.Context(), PortRequest{IdempotencyKey: request.IdempotencyKey, KeyType: request.KeyType, KeyValue: request.KeyValue, AccountRef: request.AccountRef, AccountKind: request.AccountKind, FromNetworkID: request.FromNetworkID, FromParticipantID: request.FromParticipantID, ToNetworkID: request.ToNetworkID, ToParticipantID: request.ToParticipantID, NewKeyID: request.NewKeyID})
+	if err != nil {
+		status := http.StatusConflict
+		if errors.Is(err, ErrNotFound) {
+			status = http.StatusNotFound
+		}
+		http.Error(w, err.Error(), status)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h *Handler) resolve(w http.ResponseWriter, r *http.Request) {

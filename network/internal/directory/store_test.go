@@ -96,4 +96,22 @@ func TestPostgresDirectoryResolvesWithinOwningNetwork(t *testing.T) {
 	if _, err := store.Resolve(ctx, banking, key.KeyType, key.KeyValue, uuid.New(), uuid.New(), "directory-test-3"); !errors.Is(err, ErrSuspended) {
 		t.Fatalf("expected suspended key, got %v", err)
 	}
+	portValue := "+593990000002"
+	portKey := Entry{KeyID: uuid.New(), NetworkID: banking, ParticipantID: bankParticipant, KeyType: "PHONE", KeyValue: portValue, AccountRef: "costa-account-2", AccountKind: "PERSONAL", Status: "ACTIVE", Version: 1}
+	if err := store.Register(ctx, portKey); err != nil {
+		t.Fatal(err)
+	}
+	portRequest := PortRequest{IdempotencyKey: "port-001", KeyType: portKey.KeyType, KeyValue: portValue, AccountRef: portKey.AccountRef, AccountKind: "PERSONAL", FromNetworkID: banking, FromParticipantID: bankParticipant, ToNetworkID: fintech, ToParticipantID: walletParticipant, NewKeyID: uuid.New()}
+	if err := store.Port(ctx, portRequest); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Port(ctx, portRequest); err != nil {
+		t.Fatalf("expected idempotent port replay, got %v", err)
+	}
+	if _, err := store.Resolve(ctx, banking, portKey.KeyType, portValue, uuid.New(), uuid.New(), "directory-port-old"); !errors.Is(err, ErrSuspended) {
+		t.Fatalf("expected old owner suspended, got %v", err)
+	}
+	if resolved, err := store.Resolve(ctx, fintech, portKey.KeyType, portValue, uuid.New(), uuid.New(), "directory-port-new"); err != nil || resolved.Entry.ParticipantID != walletParticipant {
+		t.Fatalf("expected new owner resolution, got %+v, %v", resolved, err)
+	}
 }

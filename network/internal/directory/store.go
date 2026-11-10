@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,9 +33,10 @@ type Resolution struct {
 }
 
 var (
-	ErrNotFound  = errors.New("directory key not found")
-	ErrSuspended = errors.New("directory key is suspended")
-	ErrAmbiguous = errors.New("directory key is ambiguous")
+	ErrNotFound     = errors.New("directory key not found")
+	ErrSuspended    = errors.New("directory key is suspended")
+	ErrAmbiguous    = errors.New("directory key is ambiguous")
+	ErrPortConflict = errors.New("directory key porting conflict")
 )
 
 type Store struct{ db *sql.DB }
@@ -67,6 +69,10 @@ func (s *Store) Migrate(ctx context.Context) error {
 		return err
 	}
 	_, err = s.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS directory_key_lookup ON directory_key(network_id,key_type,key_value,status)`)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS directory_key_operations (idempotency_key VARCHAR(128) PRIMARY KEY, request_fingerprint CHAR(64) NOT NULL, key_id UUID NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`)
 	return err
 }
 
@@ -108,6 +114,61 @@ func (s *Store) Register(ctx context.Context, entry Entry) error {
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key(key_id,network_id,participant_id,key_type,key_value,account_ref,account_kind,status,version) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, entry.KeyID, entry.NetworkID, entry.ParticipantID, entry.KeyType, entry.KeyValue, entry.AccountRef, kind, entry.Status, entry.Version); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+type PortRequest struct {
+	IdempotencyKey    string
+	KeyType           string
+	KeyValue          string
+	AccountRef        string
+	AccountKind       string
+	FromNetworkID     uuid.UUID
+	FromParticipantID uuid.UUID
+	ToNetworkID       uuid.UUID
+	ToParticipantID   uuid.UUID
+	NewKeyID          uuid.UUID
+}
+
+func (s *Store) Port(ctx context.Context, request PortRequest) error {
+	fingerprint := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s", request.KeyType, request.KeyValue, request.AccountRef, request.FromNetworkID, request.FromParticipantID, request.ToNetworkID, request.ToParticipantID)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, request.KeyType+":"+request.KeyValue); err != nil {
+		return err
+	}
+	var existingFingerprint string
+	if err := tx.QueryRowContext(ctx, `SELECT request_fingerprint FROM directory_key_operations WHERE idempotency_key=$1`, request.IdempotencyKey).Scan(&existingFingerprint); err == nil {
+		if existingFingerprint != fingerprint {
+			return ErrPortConflict
+		}
+		return nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	var oldKeyID uuid.UUID
+	if err := tx.QueryRowContext(ctx, `SELECT key_id FROM directory_key WHERE network_id=$1 AND participant_id=$2 AND key_type=$3 AND key_value=$4 AND account_ref=$5 AND status='ACTIVE' FOR UPDATE`, request.FromNetworkID, request.FromParticipantID, request.KeyType, request.KeyValue, request.AccountRef).Scan(&oldKeyID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE directory_key SET status='SUSPENDED', version=version+1 WHERE key_id=$1`, oldKeyID); err != nil {
+		return err
+	}
+	kind := request.AccountKind
+	if kind == "" {
+		kind = "PERSONAL"
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key(key_id,network_id,participant_id,key_type,key_value,account_ref,account_kind,status,version) VALUES ($1,$2,$3,$4,$5,$6,$7,'ACTIVE',1)`, request.NewKeyID, request.ToNetworkID, request.ToParticipantID, request.KeyType, request.KeyValue, request.AccountRef, kind); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key_operations(idempotency_key,request_fingerprint,key_id) VALUES ($1,$2,$3)`, request.IdempotencyKey, fingerprint, request.NewKeyID); err != nil {
 		return err
 	}
 	return tx.Commit()
