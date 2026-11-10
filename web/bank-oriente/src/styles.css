@@ -1,0 +1,60 @@
+:root {
+  color: #172033;
+  background: #eef2f7;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body { margin: 0; }
+
+main {
+  box-sizing: border-box;
+  max-width: 64rem;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+header, section {
+  padding: 1.5rem;
+  border: 1px solid #d7dfeb;
+  border-radius: 0.85rem;
+  background: #fff;
+  box-shadow: 0 0.5rem 1.5rem rgb(28 45 76 / 5%);
+}
+
+section { margin-top: 1rem; }
+
+.hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.eyebrow { margin: 0 0 0.5rem; color: #52627a; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+h1, h2 { margin: 0; }
+h1 { font-size: clamp(2rem, 6vw, 3.3rem); letter-spacing: -0.04em; }
+h2 { font-size: 1.2rem; }
+.intro { max-width: 42rem; margin: 0.85rem 0 0; color: #52627a; line-height: 1.6; }
+code, dd { overflow-wrap: anywhere; }
+code { color: #145b90; font-size: 0.9em; }
+.readonly-badge { flex: none; padding: 0.45rem 0.65rem; border-radius: 999px; color: #145b90; background: #e5f2fb; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; }
+.section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.current-state { padding: 0.5rem 0.7rem; border-radius: 0.5rem; color: #176b4d; background: #e5f5ed; font-size: 0.82rem; letter-spacing: 0.03em; }
+.amount { color: #145b90; font-size: 1.25rem; font-weight: 800; }
+.state-list { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; margin: 1.75rem 0 0; padding: 0; list-style: none; }
+.state-list li { display: flex; flex-direction: column; gap: 0.5rem; color: #8a96a8; font-size: 0.72rem; font-weight: 700; line-height: 1.35; }
+.state-list li.active { color: #176b4d; }
+.state-dot { width: 0.7rem; height: 0.7rem; border: 2px solid currentColor; border-radius: 50%; box-sizing: border-box; }
+.state-list li.active .state-dot { background: currentColor; box-shadow: 0 0 0 4px #e5f5ed; }
+.state-note { margin: 1.5rem 0 0; padding-top: 1rem; border-top: 1px solid #e6ebf2; color: #52627a; font-size: 0.88rem; line-height: 1.55; }
+.details-grid, .metadata-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1.25rem 0 0; }
+dl div { min-width: 0; }
+dt { color: #718096; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; }
+dd { margin: 0.35rem 0 0; color: #172033; font-size: 0.9rem; }
+.metadata-grid { grid-template-columns: repeat(2, 1fr); }
+.metadata-grid dd { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.82rem; }
+.fixture-note { margin: 1.25rem 0 0; color: #718096; font-size: 0.78rem; text-align: center; }
+
+@media (max-width: 42rem) {
+  .hero, .section-heading { flex-direction: column; }
+  .state-list { grid-template-columns: 1fr; gap: 0.7rem; }
+  .state-list li { flex-direction: row; align-items: center; }
+  .details-grid, .metadata-grid { grid-template-columns: 1fr; }
+}

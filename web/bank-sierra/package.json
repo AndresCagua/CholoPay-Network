@@ -1,0 +1,23 @@
+{
+  "name": "@cholopay/bank-sierra-web",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "ng build",
+    "dev": "ng serve --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@angular/common": "^20.0.0",
+    "@angular/compiler": "^20.0.0",
+    "@angular/core": "^20.0.0",
+    "@angular/platform-browser": "^20.0.0",
+    "rxjs": "^7.8.0",
+    "zone.js": "^0.15.0"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^20.0.0",
+    "@angular/cli": "^20.0.0",
+    "@angular/compiler-cli": "^20.0.0",
+    "typescript": "~5.8.0"
+  }
+}
