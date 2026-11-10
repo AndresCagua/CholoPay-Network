@@ -11,6 +11,8 @@ import os
 import threading
 import uuid
 from http import HTTPStatus
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import urlparse
@@ -29,6 +31,8 @@ class CommerceStore:
         self.carts: dict[str, dict[str, Any]] = {}
         self.orders: dict[str, dict[str, Any]] = {}
         self.order_keys: dict[str, tuple[str, str]] = {}
+        self.checkouts: dict[str, dict[str, Any]] = {}
+        self.checkout_keys: dict[str, tuple[str, str]] = {}
 
     def create_cart(self) -> dict[str, Any]:
         with self._lock:
@@ -91,6 +95,40 @@ class CommerceStore:
         with self._lock:
             return self.orders.get(order_id)
 
+    def get_checkout(self, checkout_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            return self.checkouts.get(checkout_id)
+
+
+GATEWAY_URL = os.environ.get("GATEWAY_URL", "").rstrip("/")
+GATEWAY_ADAPTER = os.environ.get("GATEWAY_ADAPTER", "synthetic")
+
+
+def gateway_create_intent(amount_minor: int, order_id: str, idempotency_key: str) -> tuple[int, dict[str, Any]]:
+    if GATEWAY_ADAPTER == "synthetic":
+        return HTTPStatus.CREATED, {"id": f"pi_synthetic_{uuid.uuid4().hex}", "status": "requires_confirmation", "amount_minor": amount_minor, "currency": "USD", "ledger_boundary": "Commerce synthetic adapter never moves money."}
+    if not GATEWAY_URL:
+        return HTTPStatus.SERVICE_UNAVAILABLE, {"error": "gateway_not_configured"}
+    payload = json.dumps({"amount_minor": amount_minor, "currency": "USD", "merchant_order_id": order_id}).encode()
+    request = Request(f"{GATEWAY_URL}/v1/payment-intents", data=payload, method="POST", headers={"Content-Type": "application/json", "X-Api-Key": os.environ.get("GATEWAY_API_KEY", "sk_sandbox_merchant_rw"), "Idempotency-Key": idempotency_key})
+    try:
+        with urlopen(request, timeout=2) as response:
+            return response.status, json.loads(response.read())
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
+        return HTTPStatus.BAD_GATEWAY, {"error": "gateway_unavailable"}
+
+
+def gateway_confirm_intent(intent_id: str, idempotency_key: str) -> tuple[int, dict[str, Any]]:
+    if GATEWAY_ADAPTER == "synthetic":
+        return HTTPStatus.OK, {"id": intent_id, "status": "succeeded"}
+    payload = b"{}"
+    request = Request(f"{GATEWAY_URL}/v1/payment-intents/{intent_id}/confirm", data=payload, method="POST", headers={"Content-Type": "application/json", "X-Api-Key": os.environ.get("GATEWAY_API_KEY", "sk_sandbox_merchant_rw"), "Idempotency-Key": idempotency_key})
+    try:
+        with urlopen(request, timeout=2) as response:
+            return response.status, json.loads(response.read())
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
+        return HTTPStatus.BAD_GATEWAY, {"error": "gateway_unavailable"}
+
 
 STORE = CommerceStore()
 
@@ -149,6 +187,42 @@ class CommerceHandler(BaseHTTPRequestHandler):
                 return self._json(HTTPStatus.BAD_REQUEST, {"error": "cart_id_and_idempotency_key_required"})
             status, order = STORE.create_order(cart_id, key)
             return self._json(status, order)
+        if path == "/v1/checkout":
+            cart_id, key = body.get("cart_id"), self.headers.get("Idempotency-Key")
+            if not cart_id or not key:
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "cart_id_and_idempotency_key_required"})
+            cart = STORE.get_cart(cart_id)
+            fingerprint = json.dumps(cart["items"], sort_keys=True) if cart else ""
+            previous = STORE.checkout_keys.get(key)
+            if previous:
+                if previous[1] != fingerprint or previous[0] not in STORE.checkouts:
+                    return self._json(HTTPStatus.CONFLICT, {"error": "idempotency_key_payload_mismatch"})
+                return self._json(HTTPStatus.OK, STORE.checkouts[previous[0]])
+            status, order = STORE.create_order(cart_id, f"order:{key}")
+            if status not in (HTTPStatus.CREATED, HTTPStatus.OK):
+                return self._json(status, order)
+            gateway_status, intent = gateway_create_intent(order["total_minor"], order["id"], f"checkout:{key}")
+            if gateway_status >= 400:
+                return self._json(HTTPStatus.BAD_GATEWAY, {"error": "gateway_unavailable"})
+            checkout = {"id": f"co_sandbox_{uuid.uuid4().hex}", "order": order, "payment_intent_id": intent["id"], "payment_status": "succeeded" if intent.get("status") == "succeeded" else "pending", "synthetic": GATEWAY_ADAPTER == "synthetic"}
+            with STORE._lock:
+                STORE.checkouts[checkout["id"]] = checkout
+                STORE.checkout_keys[key] = (checkout["id"], fingerprint)
+            return self._json(HTTPStatus.CREATED, checkout)
+        if len(parts) == 5 and parts[1:3] == ["v1", "checkouts"] and parts[4] == "confirm":
+            checkout = STORE.get_checkout(parts[3])
+            key = self.headers.get("Idempotency-Key")
+            if not checkout:
+                return self._json(HTTPStatus.NOT_FOUND, {"error": "checkout_not_found"})
+            if not key:
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "idempotency_key_required"})
+            status, result = gateway_confirm_intent(checkout["payment_intent_id"], f"checkout-confirm:{key}")
+            if status >= 400:
+                return self._json(HTTPStatus.BAD_GATEWAY, {"error": "gateway_unavailable"})
+            with STORE._lock:
+                checkout["payment_status"] = "succeeded" if result.get("status") == "succeeded" else "pending"
+                checkout["synthetic"] = GATEWAY_ADAPTER == "synthetic"
+            return self._json(HTTPStatus.OK, checkout)
         return self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
     def log_message(self, format: str, *args: Any) -> None:

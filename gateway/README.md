@@ -32,7 +32,7 @@ Every create and confirm request requires an `Idempotency-Key`. Repeating the sa
 
 - `GET /v1/payment-intents/{id}` (`payment:read`) queries the current synthetic state.
 - `POST /v1/payment-intents/{id}/confirm` (`payment:write`) transitions `requires_confirmation` to `succeeded`.
-- `POST /v1/refunds` (`payment:write`) remains reserved and returns `501`.
+- `POST /v1/refunds` (`payment:write`) accepts `{ "payment_intent_id": "pi_sandbox_...", "amount_minor": 2500, "currency": "USD" }` only after the intent is `succeeded`. This bounded sandbox supports one full refund per intent, returns `201` with `status: succeeded`, and never writes a ledger. Reusing an idempotency key with another payload returns `409`; a second refund for the same intent returns `409 refund_conflict`.
 
 ## Banco Costa electricity bill flow
 

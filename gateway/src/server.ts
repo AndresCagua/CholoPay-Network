@@ -24,6 +24,15 @@ type PaymentIntent = {
   status: PaymentIntentStatus;
   ledger_boundary: string;
 };
+type Refund = {
+  id: string;
+  object: 'refund';
+  payment_intent_id: string;
+  amount_minor: number;
+  currency: string;
+  status: 'succeeded';
+  ledger_boundary: string;
+};
 type IdempotentResponse = { payload: string; status: number; body: Record<string, unknown> };
 type WebhookEndpoint = { id: string; url: string; secret: string; replayedSignatures: Set<string> };
 type WebhookDelivery = { endpointId: string; eventId: string; attempt: number; event: Record<string, unknown>; deadLettered?: boolean };
@@ -120,10 +129,13 @@ export type GatewayOptions = { billerBaseUrl?: string; billerEventSecret?: strin
 
 export function createServer(options: GatewayOptions = {}): Server {
   const intents = new Map<string, PaymentIntent>();
+  const refunds = new Map<string, Refund>();
+  const refundByIntent = new Map<string, Refund>();
   const billPayments = new Map<string, BillPayment>();
   const billPaymentRequests = new Map<string, { payload: string; payment: BillPayment; request: Record<string, unknown> }>();
   const idempotency = new Map<string, IdempotentResponse>();
   let nextIntentId = 1;
+  let nextRefundId = 1;
   let nextBillPaymentId = 1;
   let nextWebhookEndpointId = 1;
   const billerBaseUrl = options.billerBaseUrl ?? process.env.BILLER_URL ?? 'http://utilities:8080';
@@ -317,6 +329,44 @@ export function createServer(options: GatewayOptions = {}): Server {
       delivery.deadLettered = true;
       deadLetterQueue.push(delivery);
       sendJson(response, 202, { status: 'dead_lettered', attempt: delivery.attempt, max_attempts: MAX_WEBHOOK_ATTEMPTS, dlq_size: deadLetterQueue.length });
+      return;
+    }
+
+    if (route.route === 'POST /v1/refunds') {
+      const key = idempotencyKeyFrom(request);
+      if (!key) return sendJson(response, 400, errorBody('invalid_request', 'Idempotency-Key header is required'));
+      let body: unknown;
+      try { body = await readJsonBody(request); } catch {
+        return sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON'));
+      }
+      const payload = canonicalize(body);
+      const idempotencyId = `refund:${key}`;
+      const previous = idempotency.get(idempotencyId);
+      if (previous) {
+        if (previous.payload !== payload) return sendJson(response, 409, errorBody('idempotency_key_conflict', 'Idempotency-Key was already used with a different payload'));
+        return sendJson(response, previous.status, previous.body);
+      }
+      const input = body as Record<string, unknown>;
+      if (!body || typeof body !== 'object' || Array.isArray(body) || typeof input.payment_intent_id !== 'string' || !Number.isSafeInteger(input.amount_minor) || (input.amount_minor as number) <= 0 || typeof input.currency !== 'string') {
+        return sendJson(response, 400, errorBody('invalid_request', 'payment_intent_id, amount_minor, and currency are required'));
+      }
+      const intent = intents.get(input.payment_intent_id);
+      if (!intent) return sendJson(response, 404, errorBody('not_found', 'Payment intent not found'));
+      if (intent.status !== 'succeeded') return sendJson(response, 409, errorBody('invalid_state', 'Only succeeded payment intents can be refunded'));
+      if (input.currency !== intent.currency || input.amount_minor !== intent.amount_minor) {
+        return sendJson(response, 422, errorBody('invalid_request', 'Only a full refund in the payment intent currency is supported'));
+      }
+      if (refundByIntent.has(intent.id)) return sendJson(response, 409, errorBody('refund_conflict', 'Payment intent has already been refunded'));
+      const refund: Refund = {
+        id: `re_sandbox_${String(nextRefundId++).padStart(8, '0')}`,
+        object: 'refund', payment_intent_id: intent.id, amount_minor: intent.amount_minor,
+        currency: intent.currency, status: 'succeeded', ledger_boundary: ledgerBoundary,
+      };
+      refunds.set(refund.id, refund);
+      refundByIntent.set(intent.id, refund);
+      const result = { status: 201, body: refund as unknown as Record<string, unknown>, payload };
+      idempotency.set(idempotencyId, result);
+      sendJson(response, result.status, result.body);
       return;
     }
 

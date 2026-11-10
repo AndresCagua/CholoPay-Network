@@ -205,6 +205,41 @@ test('keeps bill payment pending while biller is unavailable and applies it on r
   });
 });
 
+test('refunds only succeeded intents and rejects conflicting idempotency reuse', async () => {
+  await withServer(async (baseUrl) => {
+    const create = await fetch(`${baseUrl}/v1/payment-intents`, {
+      method: 'POST',
+      headers: { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Idempotency-Key': 'refund-create', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount_minor: 900, currency: 'USD', merchant_order_id: 'ORDER-REFUND' }),
+    });
+    const intent = await create.json() as { id: string };
+    const beforeConfirmation = await fetch(`${baseUrl}/v1/refunds`, {
+      method: 'POST',
+      headers: { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Idempotency-Key': 'refund-before-confirm', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_intent_id: intent.id, amount_minor: 900, currency: 'USD' }),
+    });
+    assert.equal(beforeConfirmation.status, 409);
+
+    await fetch(`${baseUrl}/v1/payment-intents/${intent.id}/confirm`, {
+      method: 'POST',
+      headers: { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Idempotency-Key': 'refund-confirm' },
+    });
+    const headers = { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Idempotency-Key': 'refund-1', 'Content-Type': 'application/json' };
+    const body = { payment_intent_id: intent.id, amount_minor: 900, currency: 'USD' };
+    const first = await fetch(`${baseUrl}/v1/refunds`, { method: 'POST', headers, body: JSON.stringify(body) });
+    assert.equal(first.status, 201);
+    const refund = await first.json() as Record<string, unknown>;
+    assert.equal(refund.status, 'succeeded');
+    assert.equal(refund.payment_intent_id, intent.id);
+    assert.match(String(refund.ledger_boundary), /never writes balances or any ledger/);
+    const replay = await fetch(`${baseUrl}/v1/refunds`, { method: 'POST', headers, body: JSON.stringify(body) });
+    assert.equal(replay.status, 201);
+    assert.deepEqual(await replay.json(), refund);
+    const conflict = await fetch(`${baseUrl}/v1/refunds`, { method: 'POST', headers, body: JSON.stringify({ ...body, amount_minor: 800 }) });
+    assert.equal(conflict.status, 409);
+  });
+});
+
 test('validates payment intent input and keeps read scope unchanged', async () => {
   await withServer(async (baseUrl) => {
     const invalid = await fetch(`${baseUrl}/v1/payment-intents`, {

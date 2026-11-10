@@ -28,11 +28,15 @@ paths:
       parameters: [{in: path, name: id, required: true, schema: {type: string, format: uuid}}]
       responses: {'200': {description: Current intent and settlement-derived state}}
   /v1/payment-intents/{id}/confirm:
-    post: {responses: {'202': {description: Confirmation accepted; browser redirect is not proof}, '409': {description: Invalid state}}}
+    post:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}, {in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
+      responses: {'200': {description: Synthetic confirmation; browser redirect is not proof}, '409': {description: Invalid state}}
   /v1/refunds:
     post:
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
-      responses: {'202': {description: Compensating return requested}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RefundCreate'}}}}
+      responses: {'201': {description: Full synthetic refund}, '400': {description: Invalid request}, '409': {description: Intent is not succeeded or key/refund conflicts}, '422': {description: Partial or mismatched currency refund}}
+
   /v1/webhook-endpoints:
     post: {responses: {'201': {description: Endpoint registered with secret shown once}}}
 components:
@@ -55,3 +59,10 @@ components:
         currency: {type: string, const: USD}
         merchant_order_id: {type: string}
         description: {type: string}
+    RefundCreate:
+      type: object
+      required: [payment_intent_id, amount_minor, currency]
+      properties:
+        payment_intent_id: {type: string}
+        amount_minor: {type: integer, format: int64, minimum: 1, description: Must equal the succeeded intent amount}
+        currency: {type: string, const: USD}

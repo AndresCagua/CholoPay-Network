@@ -16,6 +16,10 @@ class CommerceFlowTest(unittest.TestCase):
         cls.thread.start()
         cls.base = f"http://127.0.0.1:{cls.server.server_port}"
 
+    def setUp(self):
+        app.STORE = app.CommerceStore()
+        app.GATEWAY_ADAPTER = "synthetic"
+
     @classmethod
     def tearDownClass(cls):
         cls.server.shutdown()
@@ -67,6 +71,33 @@ class CommerceFlowTest(unittest.TestCase):
         self.assertEqual(second, first)
         _, inventory = self.request("GET", "/v1/inventory")
         self.assertEqual(inventory["items"]["demo-mug"], 4)
+
+    def test_checkout_exposes_pending_then_succeeded_without_redirect_proof(self):
+        app.GATEWAY_ADAPTER = "synthetic"
+        _, cart = self.request("POST", "/v1/carts", {})
+        self.request("POST", f"/v1/carts/{cart['id']}/items", {"sku": "demo-coffee", "quantity": 1})
+        status, checkout = self.request("POST", "/v1/checkout", {"cart_id": cart["id"]}, {"Idempotency-Key": "checkout-1"})
+        self.assertEqual(status, 201)
+        self.assertEqual(checkout["payment_status"], "pending")
+        self.assertEqual(checkout["order"]["status"], "created")
+        self.assertNotIn("redirect", checkout)
+        status, succeeded = self.request("POST", f"/v1/checkouts/{checkout['id']}/confirm", {}, {"Idempotency-Key": "checkout-confirm-1"})
+        self.assertEqual(status, 200)
+        self.assertEqual(succeeded["payment_status"], "succeeded")
+        status, replay = self.request("POST", f"/v1/checkouts/{checkout['id']}/confirm", {}, {"Idempotency-Key": "checkout-confirm-1"})
+        self.assertEqual(status, 200)
+        self.assertEqual(replay, succeeded)
+
+    def test_checkout_rejects_conflicting_idempotency_reuse(self):
+        app.GATEWAY_ADAPTER = "synthetic"
+        _, first_cart = self.request("POST", "/v1/carts", {})
+        self.request("POST", f"/v1/carts/{first_cart['id']}/items", {"sku": "demo-mug", "quantity": 1})
+        self.assertEqual(self.request("POST", "/v1/checkout", {"cart_id": first_cart["id"]}, {"Idempotency-Key": "checkout-conflict"})[0], 201)
+        _, second_cart = self.request("POST", "/v1/carts", {})
+        self.request("POST", f"/v1/carts/{second_cart['id']}/items", {"sku": "demo-coffee", "quantity": 1})
+        status, error = self.request("POST", "/v1/checkout", {"cart_id": second_cart["id"]}, {"Idempotency-Key": "checkout-conflict"})
+        self.assertEqual(status, 409)
+        self.assertEqual(error["error"], "idempotency_key_payload_mismatch")
 
     def test_invalid_item_does_not_change_cart(self):
         _, cart = self.request("POST", "/v1/carts", {})
