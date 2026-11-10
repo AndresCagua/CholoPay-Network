@@ -81,6 +81,8 @@ services:
     environment:
       SERVER_PORT: 8080
       NETWORK_DB_URL: postgres://${POSTGRES_USER:-cholopay}:${POSTGRES_PASSWORD:-cholopay_local_only}@network-db:5432/${NETWORK_DB_NAME:-cholopay_network}?sslmode=disable
+      OPERATOR_CONSOLE_TOKEN: ${OPERATOR_CONSOLE_TOKEN:-}
+      DIRECTORY_PORT_TOKEN: ${DIRECTORY_PORT_TOKEN:-}
     expose: ["8080"]
     depends_on:
       network-db: {condition: service_healthy}

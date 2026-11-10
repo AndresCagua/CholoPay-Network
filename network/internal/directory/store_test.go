@@ -15,6 +15,40 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+func TestPortFingerprintCoversAllOwnershipFields(t *testing.T) {
+	base := PortRequest{SchemaVersion: "1.0", KeyType: "PHONE", KeyValue: "+593990000001", AccountRef: "account-1", AccountKind: "PERSONAL", FromNetworkID: uuid.New(), FromParticipantID: uuid.New(), ToNetworkID: uuid.New(), ToParticipantID: uuid.New(), NewKeyID: uuid.New()}
+	first, err := fingerprintForPort(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	variants := []PortRequest{
+		func() PortRequest { value := base; value.NewKeyID = uuid.New(); return value }(),
+		func() PortRequest { value := base; value.ToParticipantID = uuid.New(); return value }(),
+		func() PortRequest { value := base; value.AccountRef = "account-2"; return value }(),
+	}
+	for index, variant := range variants {
+		fingerprint, err := fingerprintForPort(variant)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fingerprint == first || len(fingerprint) != 64 {
+			t.Fatalf("variant %d did not produce a distinct SHA-256 fingerprint: %q", index, fingerprint)
+		}
+	}
+}
+
+func TestPortRequiresAuthorization(t *testing.T) {
+	t.Setenv("DIRECTORY_PORT_TOKEN", "expected-token")
+	mux := http.NewServeMux()
+	NewHandler(nil).Register(mux)
+	req := httptest.NewRequest(http.MethodPost, "/internal/v1/directory/port", bytes.NewReader([]byte(`{}`)))
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, req)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthorized port request, got %d", response.Code)
+	}
+}
+
 func TestPostgresDirectoryResolvesWithinOwningNetwork(t *testing.T) {
 	url := os.Getenv("NETWORK_DB_URL")
 	if url == "" {
@@ -39,7 +73,7 @@ func TestPostgresDirectoryResolvesWithinOwningNetwork(t *testing.T) {
 	if err := store.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, "TRUNCATE directory_key, network_participant, payment_network CASCADE"); err != nil {
+	if _, err := db.ExecContext(ctx, "TRUNCATE directory_key, directory_key_operations, network_participant, payment_network CASCADE"); err != nil {
 		t.Fatal(err)
 	}
 	banking, fintech := uuid.New(), uuid.New()

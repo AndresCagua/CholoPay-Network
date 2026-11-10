@@ -2,9 +2,11 @@ package directory
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -72,8 +74,22 @@ func (s *Store) Migrate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS directory_key_operations (idempotency_key VARCHAR(128) PRIMARY KEY, request_fingerprint CHAR(64) NOT NULL, key_id UUID NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`)
-	return err
+	_, err = s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS directory_key_operations (idempotency_key VARCHAR(128) PRIMARY KEY, request_fingerprint CHAR(64) NOT NULL, key_id UUID NOT NULL, schema_version VARCHAR(32) NOT NULL DEFAULT '1.0', correlation_id UUID, causation_id UUID, trace_id VARCHAR(128), requested_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`)
+	if err != nil {
+		return err
+	}
+	for _, statement := range []string{
+		`ALTER TABLE directory_key_operations ADD COLUMN IF NOT EXISTS schema_version VARCHAR(32) NOT NULL DEFAULT '1.0'`,
+		`ALTER TABLE directory_key_operations ADD COLUMN IF NOT EXISTS correlation_id UUID`,
+		`ALTER TABLE directory_key_operations ADD COLUMN IF NOT EXISTS causation_id UUID`,
+		`ALTER TABLE directory_key_operations ADD COLUMN IF NOT EXISTS trace_id VARCHAR(128)`,
+		`ALTER TABLE directory_key_operations ADD COLUMN IF NOT EXISTS requested_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+	} {
+		if _, err := s.db.ExecContext(ctx, statement); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 var ErrKeyLimit = errors.New("directory key limit exceeded")
@@ -120,6 +136,11 @@ func (s *Store) Register(ctx context.Context, entry Entry) error {
 }
 
 type PortRequest struct {
+	SchemaVersion     string
+	CorrelationID     uuid.UUID
+	CausationID       uuid.UUID
+	TraceID           string
+	RequestedAt       time.Time
 	IdempotencyKey    string
 	KeyType           string
 	KeyValue          string
@@ -132,8 +153,48 @@ type PortRequest struct {
 	NewKeyID          uuid.UUID
 }
 
+type portFingerprint struct {
+	SchemaVersion     string    `json:"schema_version"`
+	CorrelationID     uuid.UUID `json:"correlation_id"`
+	CausationID       uuid.UUID `json:"causation_id"`
+	TraceID           string    `json:"trace_id"`
+	KeyType           string    `json:"key_type"`
+	KeyValue          string    `json:"key_value"`
+	AccountRef        string    `json:"account_ref"`
+	AccountKind       string    `json:"account_kind"`
+	FromNetworkID     uuid.UUID `json:"from_network_id"`
+	FromParticipantID uuid.UUID `json:"from_participant_id"`
+	ToNetworkID       uuid.UUID `json:"to_network_id"`
+	ToParticipantID   uuid.UUID `json:"to_participant_id"`
+	NewKeyID          uuid.UUID `json:"new_key_id"`
+}
+
+func fingerprintForPort(request PortRequest) (string, error) {
+	payload, err := json.Marshal(portFingerprint{SchemaVersion: request.SchemaVersion, CorrelationID: request.CorrelationID, CausationID: request.CausationID, TraceID: request.TraceID, KeyType: request.KeyType, KeyValue: request.KeyValue, AccountRef: request.AccountRef, AccountKind: request.AccountKind, FromNetworkID: request.FromNetworkID, FromParticipantID: request.FromParticipantID, ToNetworkID: request.ToNetworkID, ToParticipantID: request.ToParticipantID, NewKeyID: request.NewKeyID})
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:]), nil
+}
+
 func (s *Store) Port(ctx context.Context, request PortRequest) error {
-	fingerprint := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s", request.KeyType, request.KeyValue, request.AccountRef, request.FromNetworkID, request.FromParticipantID, request.ToNetworkID, request.ToParticipantID)
+	if request.SchemaVersion == "" {
+		request.SchemaVersion = "1.0"
+	}
+	if request.RequestedAt.IsZero() {
+		request.RequestedAt = time.Now().UTC()
+	}
+	if request.TraceID == "" {
+		request.TraceID = request.IdempotencyKey
+	}
+	if request.AccountKind == "" {
+		request.AccountKind = "PERSONAL"
+	}
+	fingerprint, err := fingerprintForPort(request)
+	if err != nil {
+		return err
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -161,14 +222,10 @@ func (s *Store) Port(ctx context.Context, request PortRequest) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE directory_key SET status='SUSPENDED', version=version+1 WHERE key_id=$1`, oldKeyID); err != nil {
 		return err
 	}
-	kind := request.AccountKind
-	if kind == "" {
-		kind = "PERSONAL"
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key(key_id,network_id,participant_id,key_type,key_value,account_ref,account_kind,status,version) VALUES ($1,$2,$3,$4,$5,$6,$7,'ACTIVE',1)`, request.NewKeyID, request.ToNetworkID, request.ToParticipantID, request.KeyType, request.KeyValue, request.AccountRef, kind); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key(key_id,network_id,participant_id,key_type,key_value,account_ref,account_kind,status,version) VALUES ($1,$2,$3,$4,$5,$6,$7,'ACTIVE',1)`, request.NewKeyID, request.ToNetworkID, request.ToParticipantID, request.KeyType, request.KeyValue, request.AccountRef, request.AccountKind); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key_operations(idempotency_key,request_fingerprint,key_id) VALUES ($1,$2,$3)`, request.IdempotencyKey, fingerprint, request.NewKeyID); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key_operations(idempotency_key,request_fingerprint,key_id,schema_version,correlation_id,causation_id,trace_id,requested_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, request.IdempotencyKey, fingerprint, request.NewKeyID, request.SchemaVersion, request.CorrelationID, request.CausationID, request.TraceID, request.RequestedAt); err != nil {
 		return err
 	}
 	return tx.Commit()

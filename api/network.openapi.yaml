@@ -19,6 +19,26 @@ paths:
       responses:
         '200': {description: Dependencies are ready}
         '503': {description: Dependencies are unavailable}
+  /internal/v1/operator/overview:
+    get:
+      summary: Read the aggregated simulated operator projection
+      security:
+        - serviceBearer: []
+      responses:
+        '200': {description: Aggregated read-only projection}
+        '401': {description: Authorization required}
+        '503': {description: Projection unavailable}
+  /internal/v1/directory/port:
+    post:
+      summary: Port a synthetic CholoKey between participants
+      security:
+        - serviceBearer: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PortRequest'}}}}
+      responses:
+        '202': {description: Port accepted}
+        '400': {description: Missing contract metadata}
+        '401': {description: Authorization required}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/participants:
     post:
       summary: Register a simulated participant
@@ -48,6 +68,25 @@ components:
   securitySchemes:
     serviceBearer: {type: http, scheme: bearer}
   schemas:
+    PortRequest:
+      type: object
+      required: [schema_version, correlation_id, causation_id, requested_at, idempotency_key, new_key_id]
+      properties:
+        schema_version: {type: string}
+        correlation_id: {type: string, format: uuid}
+        causation_id: {type: string, format: uuid}
+        trace_id: {type: string}
+        requested_at: {type: string, format: date-time}
+        idempotency_key: {type: string, minLength: 1}
+        key_type: {type: string}
+        key_value: {type: string}
+        account_ref: {type: string}
+        account_kind: {type: string, enum: [PERSONAL, BUSINESS]}
+        from_network_id: {type: string, format: uuid}
+        from_participant_id: {type: string, format: uuid}
+        to_network_id: {type: string, format: uuid}
+        to_participant_id: {type: string, format: uuid}
+        new_key_id: {type: string, format: uuid}
     TransferRequest:
       type: object
       required: [amount_minor, currency, source_participant_id, destination_key]

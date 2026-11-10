@@ -1,9 +1,13 @@
 package directory
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -26,6 +30,11 @@ type resolveRequest struct {
 }
 
 type portRequest struct {
+	SchemaVersion     string    `json:"schema_version"`
+	CorrelationID     uuid.UUID `json:"correlation_id"`
+	CausationID       uuid.UUID `json:"causation_id"`
+	TraceID           string    `json:"trace_id"`
+	RequestedAt       time.Time `json:"requested_at"`
 	IdempotencyKey    string    `json:"idempotency_key"`
 	KeyType           string    `json:"key_type"`
 	KeyValue          string    `json:"key_value"`
@@ -51,16 +60,20 @@ type resolveResponse struct {
 }
 
 func (h *Handler) port(w http.ResponseWriter, r *http.Request) {
+	if !authorizedBearer(r, os.Getenv("DIRECTORY_PORT_TOKEN")) {
+		http.Error(w, "authorization required", http.StatusUnauthorized)
+		return
+	}
 	var request portRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	if request.IdempotencyKey == "" || request.NewKeyID == uuid.Nil {
-		http.Error(w, "idempotency_key and new_key_id are required", http.StatusBadRequest)
+	if request.SchemaVersion == "" || request.CorrelationID == uuid.Nil || request.CausationID == uuid.Nil || request.IdempotencyKey == "" || request.NewKeyID == uuid.Nil || request.RequestedAt.IsZero() {
+		http.Error(w, "schema_version, correlation_id, causation_id, requested_at, idempotency_key and new_key_id are required", http.StatusBadRequest)
 		return
 	}
-	err := h.store.Port(r.Context(), PortRequest{IdempotencyKey: request.IdempotencyKey, KeyType: request.KeyType, KeyValue: request.KeyValue, AccountRef: request.AccountRef, AccountKind: request.AccountKind, FromNetworkID: request.FromNetworkID, FromParticipantID: request.FromParticipantID, ToNetworkID: request.ToNetworkID, ToParticipantID: request.ToParticipantID, NewKeyID: request.NewKeyID})
+	err := h.store.Port(r.Context(), PortRequest{SchemaVersion: request.SchemaVersion, CorrelationID: request.CorrelationID, CausationID: request.CausationID, TraceID: request.TraceID, RequestedAt: request.RequestedAt, IdempotencyKey: request.IdempotencyKey, KeyType: request.KeyType, KeyValue: request.KeyValue, AccountRef: request.AccountRef, AccountKind: request.AccountKind, FromNetworkID: request.FromNetworkID, FromParticipantID: request.FromParticipantID, ToNetworkID: request.ToNetworkID, ToParticipantID: request.ToParticipantID, NewKeyID: request.NewKeyID})
 	if err != nil {
 		status := http.StatusConflict
 		if errors.Is(err, ErrNotFound) {
@@ -70,6 +83,14 @@ func (h *Handler) port(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func authorizedBearer(r *http.Request, expected string) bool {
+	if expected == "" {
+		return false
+	}
+	value := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	return len(value) == len(expected) && subtle.ConstantTimeCompare([]byte(value), []byte(expected)) == 1
 }
 
 func (h *Handler) resolve(w http.ResponseWriter, r *http.Request) {

@@ -42,3 +42,5 @@ L2. Se continúa después de la gobernanza básica con el ciclo de vida de Cholo
 L3. Se añadió `Store.Port` con lock transaccional por clave, actualización atómica del propietario anterior, alta del propietario nuevo y tabla de idempotencia; se expuso `POST /internal/v1/directory/port`.
 L4. Evidencia Docker: suite completa de `network` PASS, incluyendo replay de portabilidad y resolución suspendida en origen / activa en destino; `gofmt` y `git diff --check` PASS.
 L5. Commit de implementación: `c0c51a7 20261109: agrega ciclo de vida de CholoKey`.
+L6. Correcciones RDD: la huella de idempotencia de portabilidad ahora es SHA-256 sobre todos los campos de propiedad y destino, y `directory_key_operations` conserva `schema_version`, correlación, causación, trazabilidad y `requested_at`. El endpoint de portabilidad exige bearer token y metadatos de contrato; la proyección de operador también exige token bearer.
+L7. Evidencia Docker: `docker compose config`, `gofmt`, `git diff --check` y suite completa `network-test` PASS.

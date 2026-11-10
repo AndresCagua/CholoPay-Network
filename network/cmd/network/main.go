@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/cholopay/network/internal/directory"
@@ -35,6 +37,10 @@ type operatorOverview struct {
 
 func operatorOverviewHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !authorizedBearer(r, os.Getenv("OPERATOR_CONSOLE_TOKEN")) {
+			http.Error(w, "authorization required", http.StatusUnauthorized)
+			return
+		}
 		var overview operatorOverview
 		overview.SchemaVersion = "1.0"
 		overview.Source = "cholonet-network-read-model"
@@ -59,6 +65,14 @@ func operatorOverviewHandler(db *sql.DB) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(overview)
 	}
+}
+
+func authorizedBearer(r *http.Request, expected string) bool {
+	if expected == "" {
+		return false
+	}
+	value := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	return len(value) == len(expected) && subtle.ConstantTimeCompare([]byte(value), []byte(expected)) == 1
 }
 
 func main() {
