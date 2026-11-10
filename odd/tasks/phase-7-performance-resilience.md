@@ -28,8 +28,8 @@ Scope: laboratorio Docker-only para escenarios sintéticos; no publicar puertos 
 
 - T1 (S1, S4): Definir CholoLab Docker-only, escenarios sintéticos y formato de evidencia reproducible. Route: inline after bounded exploration. Commit: `4908f08`.
 - T2 (S1, S3): Implementar un escenario mínimo de carga y fault injection contra interfaces públicas, sin escribir directamente en ledgers. Route: delegated only if independent heavy unit emerges. Commit: `4908f08`.
-- T3 (S2, S3): Añadir métricas/logs estructurados y runbook de ejecución/interpretación, sin prometer resultados universales. Route: worker. Commit: pending.
-- T4 (S1-S5): Ejecutar checks Docker, validar `docker compose config`, registrar metodología, resultados y límites. Route: inline. Commit: pending.
+- T3 (S2, S3): Añadir métricas/logs estructurados y runbook de ejecución/interpretación, sin prometer resultados universales. Route: worker. Commit: `19c9165`.
+- T4 (S1-S5): Ejecutar checks Docker, validar `docker compose config`, registrar metodología, resultados y límites. Route: inline. Commit: `19c9165`.
 
 ## Log
 
