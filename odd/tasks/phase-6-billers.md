@@ -21,12 +21,13 @@ Scope: dos superficies independientes, sintéticas y Docker-only; no modificar i
 
 ## Tasks
 
-- T1 (S1, S2): Crear utilities API Docker-only con contratos sintéticos de contratos, facturas, consulta y estado de cobranza. Route: delegated by utilities surface. Commit: pending.
-- T2 (S1, S2): Crear transit API Docker-only con matrículas, multas, obligaciones, consulta y constancias sintéticas. Route: delegated by transit surface. Commit: pending.
-- T3 (S2, S3): Añadir idempotencia y frontera explícita: los facturadores no debitan cuentas ni escriben ledgers; dejar endpoints de pago como intentos pendientes para integración posterior. Route: delegated by both surfaces. Commit: pending.
-- T4 (S1-S4): Ejecutar pruebas Docker, actualizar contratos/documentación y registrar evidencia. Route: inline. Commit: pending.
+- T1 (S1, S2): Crear utilities API Docker-only con contratos sintéticos de contratos, facturas, consulta y estado de cobranza. Route: delegated by utilities surface. Commit: `ef14f3e`.
+- T2 (S1, S2): Crear transit API Docker-only con matrículas, multas, obligaciones, consulta y constancias sintéticas. Route: delegated by transit surface. Commit: `ef14f3e`.
+- T3 (S2, S3): Añadir idempotencia y frontera explícita: los facturadores no debitan cuentas ni escriben ledgers; dejar endpoints de pago como intentos pendientes para integración posterior. Route: delegated by both surfaces. Commit: `ef14f3e`.
+- T4 (S1-S4): Ejecutar pruebas Docker, actualizar contratos/documentación y registrar evidencia. Route: inline. Commit: `ef14f3e`.
 
 ## Log
 
 L1. Usuario: continuar con el resto de las specs después de que el binding de revisión no pudiera admitir los dos reviewers restantes.
 L2. La revisión RDD del candidato Phase 5 fue abandonada explícitamente con `operator_disposition`; no se usará inspección visual como sustituto de reviewers nativos. Se continúa con un nuevo slice independiente: facturadores de utilities y tránsito.
+L3. Implementados utilities y transit como APIs sintéticas Docker-only, con datos en memoria, tests HTTP públicos, payment intents idempotentes pendientes y frontera explícita sin débito ni escritura de ledger. Utilities: 4 tests; transit: 3 tests; ambos Compose config válidos. Commit: `ef14f3e`.
