@@ -41,13 +41,22 @@ func (s *Service) Intake(ctx context.Context, request Intake) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	created, err := s.instructions.Create(ctx, instruction.Instruction{TransferID: request.TransferID, IdempotencyKey: request.IdempotencyKey, SourceParticipantID: request.SourceParticipantID, DestinationParticipantID: &request.DestinationParticipantID, AmountMinor: request.AmountMinor, Currency: request.Currency, CorrelationID: request.CorrelationID})
+	instructionRequest := instruction.Instruction{TransferID: request.TransferID, IdempotencyKey: request.IdempotencyKey, SourceParticipantID: request.SourceParticipantID, DestinationParticipantID: &request.DestinationParticipantID, AmountMinor: request.AmountMinor, Currency: request.Currency, CorrelationID: request.CorrelationID}
+	if route.Kind == routing.IntraNetwork {
+		created, err := s.instructions.Create(ctx, instructionRequest)
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{Instruction: created, Route: route}, nil
+	}
+	tx, err := s.instructions.BeginTx(ctx)
 	if err != nil {
 		return Result{}, err
 	}
-	result := Result{Instruction: created, Route: route}
-	if route.Kind == routing.IntraNetwork {
-		return result, nil
+	defer tx.Rollback()
+	created, err := s.instructions.CreateTx(ctx, tx, instructionRequest)
+	if err != nil {
+		return Result{}, err
 	}
 	payload, err := json.Marshal(map[string]any{
 		"transfer_id":                created.TransferID,
@@ -62,10 +71,13 @@ func (s *Service) Intake(ctx context.Context, request Intake) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	accepted, err := s.messages.Accept(ctx, message.Envelope{MessageID: created.TransferID, IdempotencyKey: "transfer:" + created.IdempotencyKey, SenderNetworkID: route.SourceNetwork.ID, DestinationNetworkID: route.DestinationNetwork.ID, SchemaVersion: "1.0", MessageType: "TRANSFER_REQUESTED", CorrelationID: created.CorrelationID, CausationID: created.TransferID, Payload: payload})
+	accepted, err := s.messages.AcceptTx(ctx, tx, message.Envelope{MessageID: created.TransferID, IdempotencyKey: "transfer:" + created.IdempotencyKey, SenderNetworkID: route.SourceNetwork.ID, DestinationNetworkID: route.DestinationNetwork.ID, SchemaVersion: "1.0", MessageType: "TRANSFER_REQUESTED", CorrelationID: created.CorrelationID, CausationID: created.TransferID, Payload: payload})
 	if err != nil {
 		return Result{}, err
 	}
-	result.Message = &accepted
+	if err := tx.Commit(); err != nil {
+		return Result{}, err
+	}
+	result := Result{Instruction: created, Route: route, Message: &accepted}
 	return result, nil
 }

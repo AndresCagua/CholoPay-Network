@@ -70,28 +70,46 @@ func PayloadHash(payload json.RawMessage) string {
 }
 
 func (s *Store) Accept(ctx context.Context, envelope Envelope) (AcceptedMessage, error) {
-	if envelope.MessageID == uuid.Nil || envelope.IdempotencyKey == "" || envelope.SenderNetworkID == uuid.Nil || envelope.DestinationNetworkID == uuid.Nil || envelope.SenderNetworkID == envelope.DestinationNetworkID || envelope.SchemaVersion == "" || envelope.MessageType == "" || envelope.CorrelationID == uuid.Nil || envelope.CausationID == uuid.Nil || len(envelope.Payload) == 0 || !json.Valid(envelope.Payload) {
-		return AcceptedMessage{}, ErrBoundary
+	if err := validateEnvelope(envelope); err != nil {
+		return AcceptedMessage{}, err
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return AcceptedMessage{}, err
 	}
 	defer tx.Rollback()
-	var senderStatus, destinationStatus string
-	if err := tx.QueryRowContext(ctx, `SELECT status FROM payment_network WHERE network_id=$1`, envelope.SenderNetworkID).Scan(&senderStatus); err != nil {
-		return AcceptedMessage{}, ErrBoundary
+	accepted, err := s.acceptTx(ctx, tx, envelope)
+	if err != nil {
+		return AcceptedMessage{}, err
 	}
-	if err := tx.QueryRowContext(ctx, `SELECT status FROM payment_network WHERE network_id=$1`, envelope.DestinationNetworkID).Scan(&destinationStatus); err != nil || senderStatus != "ACTIVE" || destinationStatus != "ACTIVE" {
-		return AcceptedMessage{}, ErrBoundary
+	if err := tx.Commit(); err != nil {
+		return AcceptedMessage{}, err
 	}
+	return accepted, nil
+}
+
+func validateEnvelope(envelope Envelope) error {
+	if envelope.MessageID == uuid.Nil || envelope.IdempotencyKey == "" || envelope.SenderNetworkID == uuid.Nil || envelope.DestinationNetworkID == uuid.Nil || envelope.SenderNetworkID == envelope.DestinationNetworkID || envelope.SchemaVersion == "" || envelope.MessageType == "" || envelope.CorrelationID == uuid.Nil || envelope.CausationID == uuid.Nil || len(envelope.Payload) == 0 || !json.Valid(envelope.Payload) {
+		return ErrBoundary
+	}
+	return nil
+}
+
+func (s *Store) AcceptTx(ctx context.Context, tx *sql.Tx, envelope Envelope) (AcceptedMessage, error) {
+	if err := validateEnvelope(envelope); err != nil {
+		return AcceptedMessage{}, err
+	}
+	return s.acceptTx(ctx, tx, envelope)
+}
+
+func (s *Store) acceptTx(ctx context.Context, tx *sql.Tx, envelope Envelope) (AcceptedMessage, error) {
 	hash := PayloadHash(envelope.Payload)
 	var existing Envelope
 	var existingHash, status string
 	var createdAt time.Time
-	err = tx.QueryRowContext(ctx, `SELECT message_id,idempotency_key,sender_network_id,destination_network_id,schema_version,message_type,correlation_id,causation_id,payload_hash,payload,status,created_at FROM inter_network_message WHERE idempotency_key=$1 FOR UPDATE`, envelope.IdempotencyKey).Scan(&existing.MessageID, &existing.IdempotencyKey, &existing.SenderNetworkID, &existing.DestinationNetworkID, &existing.SchemaVersion, &existing.MessageType, &existing.CorrelationID, &existing.CausationID, &existingHash, &existing.Payload, &status, &createdAt)
+	err := tx.QueryRowContext(ctx, `SELECT message_id,idempotency_key,sender_network_id,destination_network_id,schema_version,message_type,correlation_id,causation_id,payload_hash,payload,status,created_at FROM inter_network_message WHERE idempotency_key=$1 FOR UPDATE`, envelope.IdempotencyKey).Scan(&existing.MessageID, &existing.IdempotencyKey, &existing.SenderNetworkID, &existing.DestinationNetworkID, &existing.SchemaVersion, &existing.MessageType, &existing.CorrelationID, &existing.CausationID, &existingHash, &existing.Payload, &status, &createdAt)
 	if err == nil {
-		if existingHash != hash || existing.MessageID != envelope.MessageID || existing.SenderNetworkID != envelope.SenderNetworkID || existing.DestinationNetworkID != envelope.DestinationNetworkID {
+		if existingHash != hash || existing.MessageID != envelope.MessageID || existing.SenderNetworkID != envelope.SenderNetworkID || existing.DestinationNetworkID != envelope.DestinationNetworkID || existing.SchemaVersion != envelope.SchemaVersion || existing.MessageType != envelope.MessageType || existing.CorrelationID != envelope.CorrelationID || existing.CausationID != envelope.CausationID {
 			return AcceptedMessage{}, ErrConflict
 		}
 		return AcceptedMessage{Envelope: existing, PayloadHash: existingHash, Status: status, CreatedAt: createdAt, Replayed: true}, nil
@@ -99,12 +117,16 @@ func (s *Store) Accept(ctx context.Context, envelope Envelope) (AcceptedMessage,
 	if !errors.Is(err, sql.ErrNoRows) {
 		return AcceptedMessage{}, err
 	}
+	var senderStatus, destinationStatus string
+	if err := tx.QueryRowContext(ctx, `SELECT status FROM payment_network WHERE network_id=$1`, envelope.SenderNetworkID).Scan(&senderStatus); err != nil {
+		return AcceptedMessage{}, ErrBoundary
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT status FROM payment_network WHERE network_id=$1`, envelope.DestinationNetworkID).Scan(&destinationStatus); err != nil || senderStatus != "ACTIVE" || destinationStatus != "ACTIVE" {
+		return AcceptedMessage{}, ErrBoundary
+	}
 	createdAt = time.Now().UTC()
 	_, err = tx.ExecContext(ctx, `INSERT INTO inter_network_message(message_id,idempotency_key,sender_network_id,destination_network_id,schema_version,message_type,correlation_id,causation_id,payload_hash,payload,status,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'ACCEPTED',$11)`, envelope.MessageID, envelope.IdempotencyKey, envelope.SenderNetworkID, envelope.DestinationNetworkID, envelope.SchemaVersion, envelope.MessageType, envelope.CorrelationID, envelope.CausationID, hash, envelope.Payload, createdAt)
 	if err != nil {
-		return AcceptedMessage{}, err
-	}
-	if err := tx.Commit(); err != nil {
 		return AcceptedMessage{}, err
 	}
 	return AcceptedMessage{Envelope: envelope, PayloadHash: hash, Status: "ACCEPTED", CreatedAt: createdAt}, nil

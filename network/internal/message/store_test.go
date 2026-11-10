@@ -58,6 +58,26 @@ func TestPostgresInterNetworkMessageIsIdempotentAndBounded(t *testing.T) {
 	if !replayed.Replayed || replayed.Envelope.MessageID != envelope.MessageID {
 		t.Fatalf("unexpected replay: %+v", replayed)
 	}
+	metadataConflict := envelope
+	metadataConflict.MessageType = "TRANSFER_CANCELLED"
+	if _, err := store.Accept(ctx, metadataConflict); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected metadata conflict, got %v", err)
+	}
+	metadataConflict = envelope
+	metadataConflict.CorrelationID = uuid.New()
+	if _, err := store.Accept(ctx, metadataConflict); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected correlation conflict, got %v", err)
+	}
+	if _, err := db.ExecContext(ctx, "UPDATE payment_network SET status='SUSPENDED' WHERE network_id=$1", banking); err != nil {
+		t.Fatal(err)
+	}
+	suspendedReplay, err := store.Accept(ctx, envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !suspendedReplay.Replayed {
+		t.Fatalf("expected replay after suspension, got %+v", suspendedReplay)
+	}
 	conflict := envelope
 	conflict.Payload = json.RawMessage(`{"transfer_id":"synthetic-transfer","amount_minor":101}`)
 	if _, err := store.Accept(ctx, conflict); !errors.Is(err, ErrConflict) {

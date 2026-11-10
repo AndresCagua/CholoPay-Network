@@ -29,6 +29,8 @@ type Store struct{ db *sql.DB }
 
 func NewStore(db *sql.DB) *Store { return &Store{db: db} }
 
+func (s *Store) BeginTx(ctx context.Context) (*sql.Tx, error) { return s.db.BeginTx(ctx, nil) }
+
 func RequestHash(source uuid.UUID, destination *uuid.UUID, amount int64, currency string) string {
 	destinationValue := ""
 	if destination != nil {
@@ -39,6 +41,22 @@ func RequestHash(source uuid.UUID, destination *uuid.UUID, amount int64, currenc
 }
 
 func (s *Store) Create(ctx context.Context, instruction Instruction) (Instruction, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Instruction{}, err
+	}
+	defer tx.Rollback()
+	existing, err := s.CreateTx(ctx, tx, instruction)
+	if err != nil {
+		return Instruction{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Instruction{}, err
+	}
+	return existing, nil
+}
+
+func (s *Store) CreateTx(ctx context.Context, tx *sql.Tx, instruction Instruction) (Instruction, error) {
 	if instruction.TransferID == uuid.Nil {
 		instruction.TransferID = uuid.New()
 	}
@@ -51,7 +69,7 @@ func (s *Store) Create(ctx context.Context, instruction Instruction) (Instructio
 	if instruction.State == "" {
 		instruction.State = transfer.Created
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO transfer_instruction
+	_, err := tx.ExecContext(ctx, `INSERT INTO transfer_instruction
 		(transfer_id, idempotency_key, request_hash, source_participant_id, destination_participant_id, amount_minor, currency, state, schema_version, correlation_id, causation_id)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 		ON CONFLICT (idempotency_key) DO NOTHING`, instruction.TransferID, instruction.IdempotencyKey, instruction.RequestHash, instruction.SourceParticipantID, instruction.DestinationParticipantID, instruction.AmountMinor, instruction.Currency, instruction.State, instruction.SchemaVersion, instruction.CorrelationID, instruction.CausationID)
@@ -59,7 +77,7 @@ func (s *Store) Create(ctx context.Context, instruction Instruction) (Instructio
 		return Instruction{}, err
 	}
 	var existing Instruction
-	err = s.db.QueryRowContext(ctx, `SELECT transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,amount_minor,currency,state,schema_version,correlation_id,causation_id FROM transfer_instruction WHERE idempotency_key=$1`, instruction.IdempotencyKey).Scan(&existing.TransferID, &existing.IdempotencyKey, &existing.RequestHash, &existing.SourceParticipantID, &existing.DestinationParticipantID, &existing.AmountMinor, &existing.Currency, &existing.State, &existing.SchemaVersion, &existing.CorrelationID, &existing.CausationID)
+	err = tx.QueryRowContext(ctx, `SELECT transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,amount_minor,currency,state,schema_version,correlation_id,causation_id FROM transfer_instruction WHERE idempotency_key=$1 FOR UPDATE`, instruction.IdempotencyKey).Scan(&existing.TransferID, &existing.IdempotencyKey, &existing.RequestHash, &existing.SourceParticipantID, &existing.DestinationParticipantID, &existing.AmountMinor, &existing.Currency, &existing.State, &existing.SchemaVersion, &existing.CorrelationID, &existing.CausationID)
 	if err != nil {
 		return Instruction{}, err
 	}
