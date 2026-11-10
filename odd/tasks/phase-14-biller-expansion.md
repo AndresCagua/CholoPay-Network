@@ -32,9 +32,9 @@ Alcance: generalizar el recorrido sintético de obligaciones más allá de elect
 
 ## Tasks
 
-- T1 (S1, S3, S4): Extender utilities con catálogo, cuatro servicios, contratos/facturas y consultas contractuales, conservando payment intents y eventos idempotentes. Ruta: worker utilities. Commit: `pendiente de commit Phase 14`.
-- T2 (S2, S3, S4): Extender transit con consulta de obligaciones por placa, intents ligados a obligación, eventos de aplicación y constancia únicamente tras confirmación. Ruta: worker transit. Commit: `pendiente de commit Phase 14`.
-- T3 (S1-S5): Integrar gateway con obligaciones genéricas sin ampliar la frontera de ledger y añadir regresiones públicas de idempotencia, replay y estados pendientes. Ruta: inline después de T1/T2. Commit: `pendiente de commit Phase 14`.
+- T1 (S1, S3, S4): Extender utilities con catálogo, cuatro servicios, contratos/facturas y consultas contractuales, conservando payment intents y eventos idempotentes. Ruta: worker utilities. Commit: `240dabd`.
+- T2 (S2, S3, S4): Extender transit con consulta de obligaciones por placa, intents ligados a obligación, eventos de aplicación y constancia únicamente tras confirmación. Ruta: worker transit. Commit: `240dabd`.
+- T3 (S1-S5): Integrar gateway con obligaciones genéricas sin ampliar la frontera de ledger y añadir regresiones públicas de idempotencia, replay y estados pendientes. Ruta: inline después de T1/T2. Commit: `240dabd`.
 - T4 (S1-S5): Actualizar OpenAPI, documentación, Compose y evidencia Docker; ejecutar aceptación de las seis obligaciones sintéticas. Ruta: inline. Commit: pendiente.
 
 ## Log
@@ -45,3 +45,4 @@ L3. T1 completó catálogo, contratos, facturas e intents idempotentes para elec
 L4. T2 completó consulta de obligaciones por placa, intents de tránsito, eventos HMAC idempotentes, estado `SETTLED_AWAITING_APPLICATION` y constancias condicionadas a confirmación final. Prueba Docker: 5/5.
 L5. T3 generalizó gateway mediante `biller: utilities|transit`, URLs internas configurables y payloads/eventos específicos por facturador, sin escribir balances ni ledgers. Gateway Docker: 13/13.
 L6. Verificación de Compose y `git diff --check` PASS para infra, commerce, utilities y transit. La aceptación consolidada de las seis obligaciones queda pendiente de conectar los recorridos de banco/Flutter y de cerrar T4.
+L7. Aceptación sintética del slice: utilities expone electricidad, agua, internet y móvil; transit expone matrícula/multa; gateway enruta utilities/transit con idempotencia, HMAC y aplicación eventual. Suites Docker PASS: utilities 10/10, transit 5/5 y gateway 13/13. La aceptación end-to-end desde banco y Flutter queda explícitamente fuera de este slice porque esas rutas browser-facing aún no existen.
