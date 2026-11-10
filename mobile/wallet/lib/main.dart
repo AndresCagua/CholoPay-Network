@@ -106,6 +106,26 @@ class MovementFixture {
   final int amountMinor;
 }
 
+class SyntheticConfirmationResult {
+  const SyntheticConfirmationResult({required this.wasCreated});
+
+  final bool wasCreated;
+}
+
+class SyntheticConfirmationStore {
+  TransferFixture? _confirmedTransfer;
+
+  SyntheticConfirmationResult confirm(TransferFixture transfer) {
+    if (_confirmedTransfer != null &&
+        _confirmedTransfer!.idempotencyKey == transfer.idempotencyKey) {
+      return const SyntheticConfirmationResult(wasCreated: false);
+    }
+
+    _confirmedTransfer = transfer;
+    return const SyntheticConfirmationResult(wasCreated: true);
+  }
+}
+
 const sessionFixture = WalletSession(
   sessionId: 'sess-0001',
   participantId: 'COSTA',
@@ -174,6 +194,20 @@ class WalletShell extends StatefulWidget {
 
 class _WalletShellState extends State<WalletShell> {
   WalletAccount selectedAccount = accountFixtures.first;
+  final SyntheticConfirmationStore _confirmationStore =
+      SyntheticConfirmationStore();
+  String confirmationState = 'NOT CONFIRMED';
+  bool wasDuplicateReplay = false;
+  int transfersCreated = 0;
+
+  void _confirmTransfer() {
+    final result = _confirmationStore.confirm(transferFixture);
+    setState(() {
+      confirmationState = 'CONFIRMED';
+      wasDuplicateReplay = !result.wasCreated;
+      if (result.wasCreated) transfersCreated += 1;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -205,11 +239,19 @@ class _WalletShellState extends State<WalletShell> {
           const SizedBox(height: 16),
           _BalanceCard(account: selectedAccount),
           const SizedBox(height: 16),
-          _QrCard(payload: qrFixture, receiver: receiverKeyFixture),
+          const _QrCard(payload: qrFixture, receiver: receiverKeyFixture),
           const SizedBox(height: 16),
-          _TransferCard(transfer: transferFixture),
+          _TransferCard(
+            transfer: transferFixture,
+            payer: selectedAccount,
+            payee: receiverKeyFixture,
+            confirmationState: confirmationState,
+            wasDuplicateReplay: wasDuplicateReplay,
+            transfersCreated: transfersCreated,
+            onConfirm: _confirmTransfer,
+          ),
           const SizedBox(height: 16),
-          _MovementsCard(movements: movementFixtures),
+          const _MovementsCard(movements: movementFixtures),
         ],
       ),
     );
@@ -269,17 +311,57 @@ class _QrCard extends StatelessWidget {
 }
 
 class _TransferCard extends StatelessWidget {
-  const _TransferCard({required this.transfer});
+  const _TransferCard({
+    required this.transfer,
+    required this.payer,
+    required this.payee,
+    required this.confirmationState,
+    required this.wasDuplicateReplay,
+    required this.transfersCreated,
+    required this.onConfirm,
+  });
+
   final TransferFixture transfer;
+  final WalletAccount payer;
+  final CholoKey payee;
+  final String confirmationState;
+  final bool wasDuplicateReplay;
+  final int transfersCreated;
+  final VoidCallback onConfirm;
 
   @override
   Widget build(BuildContext context) => Card(
-        child: ListTile(
-          leading: const Icon(Icons.swap_horiz),
-          title: const Text('Transfer fixture'),
-          subtitle: Text('State: ${transfer.state}\nIdempotency: ${transfer.idempotencyKey}'),
-          isThreeLine: true,
-          trailing: Text('\$${(transfer.amountMinor / 100).toStringAsFixed(2)}'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Synthetic confirmation',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('Payer: ${payer.label}'),
+              Text('Payee: ${payee.displayName}'),
+              Text('Amount: \$${(transfer.amountMinor / 100).toStringAsFixed(2)} ${transfer.currency}'),
+              const SizedBox(height: 8),
+              Text('Confirmation: $confirmationState'),
+              if (wasDuplicateReplay)
+                const Text('Duplicate replay: REUSED_EXISTING_TRANSFER'),
+              Text('Transfer ID: ${transfer.transferId}'),
+              Text('Idempotency: ${transfer.idempotencyKey}'),
+              Text('Transfers created: $transfersCreated'),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  key: const Key('confirm-transfer'),
+                  onPressed: onConfirm,
+                  child: const Text('Confirm synthetic transfer'),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text('Read-only local result; no ledger or backend access.'),
+            ],
+          ),
         ),
       );
 }

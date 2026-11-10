@@ -1,10 +1,10 @@
 # CholoPay Wallet scaffold
 
-This is a minimal, read-only Flutter wallet shell for Phase 4 T2. It uses typed, local synthetic fixtures for a wallet session, accounts, CholoKeys, CholoPay QR payloads, transfers, and movements.
+This is a minimal Flutter wallet shell for Phase 4 T2/T3. It uses typed, local synthetic fixtures for a wallet session, accounts, CholoKeys, CholoPay QR payloads, transfers, movements, and payer/payee confirmation.
 
 The QR format is CholoPay-owned and versioned. It is **not Pix-compatible**, and this scaffold makes no external-network compatibility claim.
 
-The app does not access databases, call a backend, contain secrets, or confirm transfers. Transfer fixtures include the contract idempotency key so the later confirmation flow can reuse it without creating a new transfer identifier.
+The app does not access databases, call a backend, or contain secrets. Confirmation is local-only: repeated confirmation replays the existing transfer using its contract idempotency key without creating a second transfer identifier. Results are read-only UI projections.
 
 ## Docker-only checks
 
