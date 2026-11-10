@@ -44,6 +44,24 @@ services:
     volumes: [redis-data:/data]
     healthcheck: {test: [CMD, redis-cli, ping], interval: 5s, timeout: 3s, retries: 10}
 
+  utilities:
+    build:
+      context: ../utilities
+    expose: ["8080"]
+    networks: [internal_services, default]
+
+  gateway:
+    build:
+      context: ../gateway
+    environment:
+      PORT: 8090
+      BILLER_URL: http://utilities:8080
+      INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:-local-test-only}
+    expose: ["8090"]
+    depends_on:
+      utilities: {condition: service_started}
+    networks: [internal_services, default]
+
   bank-core:
     build:
       context: ../bank-core

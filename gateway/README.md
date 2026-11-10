@@ -34,6 +34,12 @@ Every create and confirm request requires an `Idempotency-Key`. Repeating the sa
 - `POST /v1/payment-intents/{id}/confirm` (`payment:write`) transitions `requires_confirmation` to `succeeded`.
 - `POST /v1/refunds` (`payment:write`) remains reserved and returns `501`.
 
+## Banco Costa electricity bill flow
+
+`POST /v1/bill-payments` is the bounded public vertical slice. It requires the merchant write key, an `Idempotency-Key`, and `{ "participant_id": "BANCO_COSTA", "invoice_id": "invoice-elec-2025-001", "service": "electricity", "amount": "42.50", "currency": "USD" }`. The gateway validates the explicit Banco Costa caller boundary, asks CholoServicios for a pending intent, and submits a signed `payment.settled` event for idempotent application. `201 APPLIED` means the synthetic biller application completed; `202 PENDING_BILLER` or `PENDING_APPLICATION` is not settlement proof. `POST /v1/bill-payments/{id}/apply` retries eventual application and `GET /v1/bill-payments/{id}` reads status.
+
+This is Docker-only synthetic traffic: no real money, external infrastructure, gateway ledger writes, or utility ledger writes occur.
+
 ## Synthetic webhooks
 
 `POST /v1/webhook-endpoints` (`webhook:write`) registers an in-memory endpoint from a synthetic HTTP(S) URL and returns a sandbox-only `whsec_...` signing secret. No network delivery is performed. The returned secret signs the exact request body with HMAC-SHA256 using the format `${timestamp}.${raw_body}`; send it as `Webhook-Signature: t=<unix_seconds>,v1=<hex_digest>` to `POST /v1/webhook-endpoints/{id}/events`. Timestamps older than five minutes, malformed signatures, and mismatches return `401`; an already accepted timestamp/signature pair returns `409 replay_detected`.

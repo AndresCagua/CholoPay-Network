@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
+import { createServer as createMockServer } from 'node:http';
 import { createServer } from './server.js';
 
 async function withServer(run: (baseUrl: string) => Promise<void>): Promise<void> {
@@ -12,6 +13,30 @@ async function withServer(run: (baseUrl: string) => Promise<void>): Promise<void
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
+}
+
+async function withBiller(run: (baseUrl: string, setAvailable: () => void, setUnavailable: () => void) => Promise<void>): Promise<void> {
+  let available = true;
+  const intents = new Map<string, string>();
+  const biller = createMockServer(async (request, response) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {};
+    response.setHeader('content-type', 'application/json');
+    if (!available) { response.writeHead(503); response.end(JSON.stringify({ error: 'unavailable' })); return; }
+    if (request.url === '/api/v1/payment-intents') {
+      const key = String(request.headers['idempotency-key']);
+      const id = intents.get(key) ?? `pi_${intents.size + 1}`;
+      intents.set(key, id);
+      response.writeHead(201); response.end(JSON.stringify({ id })); return;
+    }
+    if (request.url === '/api/v1/internal/payment-events') { response.writeHead(200); response.end(JSON.stringify({ status: 'PAID', synthetic: true })); return; }
+    response.writeHead(404); response.end('{}');
+  });
+  await new Promise<void>((resolve) => biller.listen(0, '127.0.0.1', resolve));
+  const address = biller.address() as AddressInfo;
+  try { await run(`http://127.0.0.1:${address.port}`, () => { available = true; }, () => { available = false; }); }
+  finally { await new Promise<void>((resolve, reject) => biller.close((error) => error ? reject(error) : resolve())); }
 }
 
 test('health is public and reports the gateway scaffold', async () => {
@@ -129,6 +154,54 @@ test('confirms an intent through explicit synthetic state transitions', async ()
       headers: { 'X-Api-Key': 'sk_sandbox_merchant_ro' },
     });
     assert.equal((await queried.json() as { status: string }).status, 'succeeded');
+  });
+});
+
+test('completes Banco Costa electricity payment through the biller and preserves replay/conflict semantics', async () => {
+  await withBiller(async (billerUrl) => {
+    await withServer(async () => {
+      const headers = { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Idempotency-Key': 'costa-elec-001', 'Content-Type': 'application/json' };
+      const body = { participant_id: 'BANCO_COSTA', invoice_id: 'invoice-elec-2025-001', service: 'electricity', amount: '42.50', currency: 'USD' };
+      const server = createServer({ billerBaseUrl: billerUrl });
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const address = server.address() as AddressInfo;
+      try {
+        const url = `http://127.0.0.1:${address.port}/v1/bill-payments`;
+        const first = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        assert.equal(first.status, 201);
+        const payment = await first.json() as Record<string, unknown>;
+        assert.equal(payment.status, 'APPLIED');
+        assert.equal(payment.participant_id, 'BANCO_COSTA');
+        const replay = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        assert.equal(replay.status, 201);
+        assert.deepEqual(await replay.json(), payment);
+        const conflict = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ ...body, amount: '1.00' }) });
+        assert.equal(conflict.status, 409);
+      } finally { await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); }
+    });
+  });
+});
+
+test('keeps bill payment pending while biller is unavailable and applies it on retry', async () => {
+  await withBiller(async (billerUrl, setAvailable, setUnavailable) => {
+    await withServer(async () => {
+      setUnavailable();
+      const server = createServer({ billerBaseUrl: billerUrl });
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const address = server.address() as AddressInfo;
+      try {
+        const headers = { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Idempotency-Key': 'costa-elec-eventual', 'Content-Type': 'application/json' };
+        const body = { participant_id: 'BANCO_COSTA', invoice_id: 'invoice-elec-2025-001', service: 'electricity', amount: '42.50', currency: 'USD' };
+        const first = await fetch(`http://127.0.0.1:${address.port}/v1/bill-payments`, { method: 'POST', headers, body: JSON.stringify(body) });
+        assert.equal(first.status, 202);
+        const pending = await first.json() as { id: string; status: string };
+        assert.equal(pending.status, 'PENDING_BILLER');
+        setAvailable();
+        const apply = await fetch(`http://127.0.0.1:${address.port}/v1/bill-payments/${pending.id}/apply`, { method: 'POST', headers, body: '{}' });
+        assert.equal(apply.status, 201);
+        assert.equal((await apply.json() as { status: string }).status, 'APPLIED');
+      } finally { await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); }
+    });
   });
 });
 

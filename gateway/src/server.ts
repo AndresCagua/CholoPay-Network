@@ -3,6 +3,17 @@ import { createServer as createHttpServer, type IncomingMessage, type Server, ty
 
 export type Scope = 'payment:read' | 'payment:write' | 'webhook:write';
 type PaymentIntentStatus = 'requires_confirmation' | 'succeeded';
+type BillPayment = {
+  id: string;
+  object: 'bill_payment';
+  participant_id: 'BANCO_COSTA';
+  invoice_id: string;
+  amount: string;
+  currency: 'USD';
+  status: 'APPLIED' | 'PENDING_BILLER' | 'PENDING_APPLICATION';
+  payment_intent_id?: string;
+  ledger_boundary: string;
+};
 type PaymentIntent = {
   id: string;
   object: 'payment_intent';
@@ -26,6 +37,9 @@ const syntheticApiKeys = new Map<string, ReadonlySet<Scope>>([
 ]);
 
 const placeholderRoutes: Array<{ method: string; pattern: RegExp; scope: Scope; route: string; authRequired?: boolean }> = [
+  { method: 'POST', pattern: /^\/v1\/bill-payments$/, scope: 'payment:write', route: 'POST /v1/bill-payments' },
+  { method: 'GET', pattern: /^\/v1\/bill-payments\/[^/]+$/, scope: 'payment:read', route: 'GET /v1/bill-payments/{id}' },
+  { method: 'POST', pattern: /^\/v1\/bill-payments\/[^/]+\/apply$/, scope: 'payment:write', route: 'POST /v1/bill-payments/{id}/apply' },
   { method: 'POST', pattern: /^\/v1\/payment-intents$/, scope: 'payment:write', route: 'POST /v1/payment-intents' },
   { method: 'GET', pattern: /^\/v1\/payment-intents\/[^/]+$/, scope: 'payment:read', route: 'GET /v1/payment-intents/{id}' },
   { method: 'POST', pattern: /^\/v1\/payment-intents\/[^/]+\/confirm$/, scope: 'payment:write', route: 'POST /v1/payment-intents/{id}/confirm' },
@@ -102,11 +116,18 @@ function verifyWebhookSignature(header: string | undefined, secret: string, rawB
   return { timestamp, signature };
 }
 
-export function createServer(): Server {
+export type GatewayOptions = { billerBaseUrl?: string; billerEventSecret?: string };
+
+export function createServer(options: GatewayOptions = {}): Server {
   const intents = new Map<string, PaymentIntent>();
+  const billPayments = new Map<string, BillPayment>();
+  const billPaymentRequests = new Map<string, { payload: string; payment: BillPayment; request: Record<string, unknown> }>();
   const idempotency = new Map<string, IdempotentResponse>();
   let nextIntentId = 1;
+  let nextBillPaymentId = 1;
   let nextWebhookEndpointId = 1;
+  const billerBaseUrl = options.billerBaseUrl ?? process.env.BILLER_URL ?? 'http://utilities:8080';
+  const billerEventSecret = options.billerEventSecret ?? process.env.INTERNAL_EVENT_SECRET ?? 'local-test-only';
   const webhookEndpoints = new Map<string, WebhookEndpoint>();
   const webhookDeliveries = new Map<string, WebhookDelivery>();
   const deadLetterQueue: WebhookDelivery[] = [];
@@ -142,6 +163,61 @@ export function createServer(): Server {
     const segments = pathname.split('/');
     const endpointId = segments[3] ?? '';
     const endpoint = webhookEndpoints.get(endpointId);
+    if (route.route === 'GET /v1/bill-payments/{id}') {
+      const payment = billPayments.get(segments[3] ?? '');
+      if (!payment) return sendJson(response, 404, errorBody('not_found', 'Bill payment not found'));
+      sendJson(response, 200, payment);
+      return;
+    }
+
+    if (route.route === 'POST /v1/bill-payments' || route.route === 'POST /v1/bill-payments/{id}/apply') {
+      const isApply = route.route.endsWith('/apply');
+      const key = idempotencyKeyFrom(request);
+      if (!key) return sendJson(response, 400, errorBody('invalid_request', 'Idempotency-Key header is required'));
+      let body: unknown;
+      try { body = await readJsonBody(request); } catch { return sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON')); }
+      let payment: BillPayment;
+      let input: Record<string, unknown>;
+      if (isApply) {
+        const existing = billPayments.get(segments[3] ?? '');
+        const saved = existing && [...billPaymentRequests.values()].find((entry) => entry.payment.id === existing.id);
+        if (!existing || !saved) return sendJson(response, 404, errorBody('not_found', 'Bill payment not found'));
+        payment = existing;
+        input = saved.request;
+      } else {
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJson(response, 400, errorBody('invalid_request', 'Request body must be an object'));
+        input = body as Record<string, unknown>;
+        if (input.participant_id !== 'BANCO_COSTA' || input.invoice_id !== 'invoice-elec-2025-001' || input.service !== 'electricity' || typeof input.amount !== 'string' || input.currency !== 'USD') {
+          return sendJson(response, 422, errorBody('invalid_request', 'Only Banco Costa electricity invoice payments are supported'));
+        }
+        const payload = canonicalize(input);
+        const previous = billPaymentRequests.get(key);
+        if (previous) {
+          if (previous.payload !== payload) return sendJson(response, 409, errorBody('idempotency_key_conflict', 'Idempotency-Key was already used with a different payload'));
+          return sendJson(response, previous.payment.status === 'APPLIED' ? 201 : 202, previous.payment);
+        }
+        payment = { id: `bp_sandbox_${String(nextBillPaymentId++).padStart(8, '0')}`, object: 'bill_payment', participant_id: 'BANCO_COSTA', invoice_id: input.invoice_id as string, amount: input.amount as string, currency: 'USD', status: 'PENDING_BILLER', ledger_boundary: ledgerBoundary };
+        billPayments.set(payment.id, payment);
+        billPaymentRequests.set(key, { payload, payment, request: input });
+      }
+      const utilityKey = `bill-payment:${key}`;
+      try {
+        const intentResponse = await fetch(`${billerBaseUrl}/api/v1/payment-intents`, { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': utilityKey }, body: JSON.stringify({ invoice_id: payment.invoice_id, amount: payment.amount, currency: payment.currency }), signal: AbortSignal.timeout(1000) });
+        if (!intentResponse.ok) { payment.status = 'PENDING_BILLER'; return sendJson(response, 202, payment); }
+        const intent = await intentResponse.json() as { id?: string };
+        if (!intent.id) { payment.status = 'PENDING_APPLICATION'; return sendJson(response, 202, payment); }
+        const event = { event_type: 'payment.settled', invoice_id: payment.invoice_id, payment_intent_id: intent.id };
+        const timestamp = String(Math.floor(Date.now() / 1000));
+        const canonical = canonicalize(event);
+        const signature = createHmac('sha256', billerEventSecret).update(`${timestamp}.${canonical}`).digest('hex');
+        const eventResponse = await fetch(`${billerBaseUrl}/api/v1/internal/payment-events`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-cholopay-event-id': payment.id, 'x-cholopay-timestamp': timestamp, 'x-cholopay-signature': signature }, body: JSON.stringify(event), signal: AbortSignal.timeout(1000) });
+        payment.payment_intent_id = intent.id;
+        payment.status = eventResponse.ok ? 'APPLIED' : 'PENDING_APPLICATION';
+      } catch { payment.status = 'PENDING_BILLER'; }
+      sendJson(response, payment.status === 'APPLIED' ? 201 : 202, payment);
+      return;
+    }
+
     if (route.route === 'GET /v1/payment-intents/{id}') {
       const intent = intents.get(segments[3] ?? '');
       if (!intent) {

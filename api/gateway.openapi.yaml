@@ -4,6 +4,20 @@ servers: [{url: http://localhost:8090}]
 security: [{apiKey: []}]
 paths:
   /health/live: {get: {security: [], responses: {'200': {description: Alive}}}}
+  /v1/bill-payments:
+    post:
+      summary: Banco Costa synthetic electricity bill payment
+      parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BillPaymentCreate'}}}}
+      responses: {'201': {description: Applied by CholoServicios}, '202': {description: Biller unavailable or application pending}, '409': {description: Payload differs for key}, '422': {description: Unsupported participant or bill}}
+  /v1/bill-payments/{id}:
+    get:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}]
+      responses: {'200': {description: Current synthetic bill payment}}
+  /v1/bill-payments/{id}/apply:
+    post:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}, {in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
+      responses: {'201': {description: Applied}, '202': {description: Still unavailable}}
   /v1/payment-intents:
     post:
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
@@ -24,6 +38,15 @@ paths:
 components:
   securitySchemes: {apiKey: {type: apiKey, in: header, name: X-Api-Key}}
   schemas:
+    BillPaymentCreate:
+      type: object
+      required: [participant_id, invoice_id, service, amount, currency]
+      properties:
+        participant_id: {type: string, const: BANCO_COSTA}
+        invoice_id: {type: string, const: invoice-elec-2025-001}
+        service: {type: string, const: electricity}
+        amount: {type: string, const: '42.50'}
+        currency: {type: string, const: USD}
     PaymentIntentCreate:
       type: object
       required: [amount_minor, currency, merchant_order_id]
