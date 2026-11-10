@@ -73,9 +73,13 @@ services:
       PARTICIPANT_ID: COSTA
       SERVER_PORT: 8080
       NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
+      GATEWAY_URL: http://gateway:8090
+      GATEWAY_API_KEY: ${GATEWAY_API_KEY:-sk_sandbox_merchant_rw}
+      BANK_API_TOKEN: ${BANK_API_TOKEN:-bank-local-test-only}
     expose: ["8080"]
     depends_on:
       costa-db: {condition: service_healthy}
+      gateway: {condition: service_started}
 
   bank-core-test:
     build:
@@ -88,8 +92,12 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
       PARTICIPANT_ID: COSTA
       NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
+      GATEWAY_URL: http://gateway:8090
+      GATEWAY_API_KEY: ${GATEWAY_API_KEY:-sk_sandbox_merchant_rw}
+      BANK_API_TOKEN: ${BANK_API_TOKEN:-bank-local-test-only}
     depends_on:
       costa-db: {condition: service_healthy}
+      gateway: {condition: service_started}
     command: ["mvn", "-q", "-Pintegration", "test"]
 
   network:

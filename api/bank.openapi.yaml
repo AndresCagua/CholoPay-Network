@@ -21,6 +21,35 @@ paths:
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TransferInput'}}}}
       responses: {'202': {description: Aceptado; no es prueba de liquidación}, '409': {description: Conflicto}}
+  /v1/participants/{participantId}/obligations/{obligationId}/payment-intents:
+    post:
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: participantId, required: true, schema: {type: string}}
+        - {in: path, name: obligationId, required: true, schema: {type: string}}
+        - {in: header, name: Idempotency-Key, required: true, schema: {type: string}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ObligationPaymentInput'}}}}
+      responses:
+        '201': {description: Estado sintético APPLIED devuelto por el gateway}
+        '202': {description: Estado sintético pendiente devuelto por el gateway}
+        '401': {description: Autenticación bancaria ausente o inválida}
+        '422': {description: Participante, cuenta de origen u obligación inválidos}
+        '503': {description: Configuración interna incompleta}
+        '502': {description: Gateway no disponible o no autenticado}
+  /v1/obligations/{obligationId}/payment-intents:
+    post:
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: obligationId, required: true, schema: {type: string}}
+        - {in: header, name: Idempotency-Key, required: true, schema: {type: string}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ObligationPaymentInput'}}}}
+      responses:
+        '201': {description: Estado sintético APPLIED devuelto por el gateway}
+        '202': {description: Estado sintético pendiente devuelto por el gateway}
+        '401': {description: Autenticación bancaria ausente o inválida}
+        '422': {description: Participante, cuenta de origen u obligación inválidos}
+        '503': {description: Configuración interna incompleta}
+        '502': {description: Gateway no disponible o no autenticado}
   /v1/keys:
     post: {responses: {'201': {description: Registro solicitado}, '409': {description: La clave ya está activa}}}
 components:
@@ -28,3 +57,4 @@ components:
   schemas:
     CustomerCreate: {type: object, required: [synthetic_reference], properties: {synthetic_reference: {type: string}}}
     TransferInput: {type: object, required: [source_account_id, amount_minor, currency], properties: {source_account_id: {type: string, format: uuid}, destination_account_ref: {type: string}, amount_minor: {type: integer, format: int64, minimum: 1}, currency: {type: string, const: USD}, correlation_id: {type: string, format: uuid}}}
+    ObligationPaymentInput: {type: object, required: [participant_id, source_account_id, biller, amount, currency], properties: {participant_id: {type: string}, source_account_id: {type: string, format: uuid}, biller: {type: string, enum: [utilities, transit]}, amount: {type: string}, currency: {type: string}, service: {type: string}, invoice_id: {type: string}}}

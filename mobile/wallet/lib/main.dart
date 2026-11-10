@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'obligations_client.dart';
 
 void main() {
   runApp(const CholoPayWalletApp());
 }
 
 class CholoPayWalletApp extends StatelessWidget {
-  const CholoPayWalletApp({super.key});
+  const CholoPayWalletApp({
+    super.key,
+    this.obligationsClient = const SyntheticObligationsClient(),
+  });
+
+  final ObligationsClient obligationsClient;
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +21,7 @@ class CholoPayWalletApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff185c50)),
         useMaterial3: true,
       ),
-      home: const WalletShell(),
+      home: WalletShell(obligationsClient: obligationsClient),
     );
   }
 }
@@ -186,7 +192,9 @@ const movementFixtures = [
 ];
 
 class WalletShell extends StatefulWidget {
-  const WalletShell({super.key});
+  const WalletShell({super.key, required this.obligationsClient});
+
+  final ObligationsClient obligationsClient;
 
   @override
   State<WalletShell> createState() => _WalletShellState();
@@ -199,6 +207,51 @@ class _WalletShellState extends State<WalletShell> {
   String confirmationState = 'NOT CONFIRMED';
   bool wasDuplicateReplay = false;
   int transfersCreated = 0;
+  bool obligationsLoading = true;
+  Object? obligationsError;
+  List<Obligation> obligations = const [];
+  final Map<String, PaymentIntent> paymentIntents = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadObligations();
+  }
+
+  Future<void> _loadObligations() async {
+    try {
+      final result = await widget.obligationsClient.fetchObligations(
+        participantId: sessionFixture.participantId,
+      );
+      if (!mounted) return;
+      setState(() {
+        obligations = result;
+        obligationsLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        obligationsError = error;
+        obligationsLoading = false;
+      });
+    }
+  }
+
+  Future<void> _startPayment(Obligation obligation) async {
+    try {
+      final intent = await widget.obligationsClient.startPayment(
+        participantId: sessionFixture.participantId,
+        obligationId: obligation.id,
+        idempotencyKey: 'wallet-${obligation.id}',
+        amount: (obligation.amountMinor / 100).toStringAsFixed(2),
+      );
+      if (!mounted) return;
+      setState(() => paymentIntents[obligation.id] = intent);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => obligationsError = error);
+    }
+  }
 
   void _confirmTransfer() {
     final result = _confirmationStore.confirm(transferFixture);
@@ -251,8 +304,91 @@ class _WalletShellState extends State<WalletShell> {
             onConfirm: _confirmTransfer,
           ),
           const SizedBox(height: 16),
+          _ObligationsCard(
+            loading: obligationsLoading,
+            error: obligationsError,
+            obligations: obligations,
+            paymentIntents: paymentIntents,
+            onStartPayment: _startPayment,
+          ),
+          const SizedBox(height: 16),
           const _MovementsCard(movements: movementFixtures),
         ],
+      ),
+    );
+  }
+}
+
+class _ObligationsCard extends StatelessWidget {
+  const _ObligationsCard({
+    required this.loading,
+    required this.error,
+    required this.obligations,
+    required this.paymentIntents,
+    required this.onStartPayment,
+  });
+
+  final bool loading;
+  final Object? error;
+  final List<Obligation> obligations;
+  final Map<String, PaymentIntent> paymentIntents;
+  final Future<void> Function(Obligation obligation) onStartPayment;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Text('Cargando obligaciones…'),
+        ),
+      );
+    }
+    if (error != null) {
+      final message = error.toString().replaceFirst('Exception: ', '');
+      return Card(
+        child: ListTile(
+          leading: const Icon(Icons.error_outline),
+          title: const Text('No se pudieron consultar las obligaciones'),
+          subtitle: Text(message),
+        ),
+      );
+    }
+    if (obligations.isEmpty) {
+      return const Card(
+        child: ListTile(
+          leading: Icon(Icons.receipt_long_outlined),
+          title: Text('No hay obligaciones abiertas'),
+          subtitle: Text('La consulta participant-scoped no devolvió obligaciones.'),
+        ),
+      );
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Obligaciones sintéticas', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            for (final obligation in obligations)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(obligation.description),
+                subtitle: Text(
+                  'Participante ${obligation.participantId} · ${obligation.status} · '
+                  '\$${(obligation.amountMinor / 100).toStringAsFixed(2)} ${obligation.currency}',
+                ),
+                trailing: paymentIntents[obligation.id] == null
+                    ? OutlinedButton(
+                        key: Key('pay-obligation-${obligation.id}'),
+                        onPressed: () => onStartPayment(obligation),
+                        child: const Text('Iniciar pago'),
+                      )
+                    : Text('Pago iniciado: ${paymentIntents[obligation.id]!.state}'),
+              ),
+          ],
+        ),
       ),
     );
   }

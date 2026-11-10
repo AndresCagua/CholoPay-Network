@@ -33,4 +33,10 @@ El servicio solo es accesible para otros servicios Compose en `http://bank-core:
 
 Las migraciones de PostgreSQL están en `src/main/resources/db/migration`. El adaptador receptor interno se expone en `POST /internal/v1/receiver-credits`; aplica un abono sintético de compensación de red a una cuenta de cliente en una transacción local y reproduce la misma entrega sin un segundo diario. No demuestra la liquidación central ni sustituye el protocolo de confirmación de la red.
 
+## Pago sintético de obligaciones desde el banco
+
+`POST /v1/obligations/{obligationId}/payment-intents` es una ruta participant-scoped para iniciar el pago de una obligación de `utilities` o `transit`. Requiere `Authorization: Bearer $BANK_API_TOKEN`, `Idempotency-Key` y un cuerpo con `participant_id`, `source_account_id`, `biller`, `amount` y `currency`; la cuenta de origen es explícita pero no se debita en este recorrido sintético.
+
+El banco solo delega a `GATEWAY_URL` (o `BILLER_GATEWAY_URL`) mediante `GATEWAY_API_KEY` y devuelve el estado sintético del gateway (`APPLIED`, `PENDING_BILLER` o `PENDING_APPLICATION`). Si el participante no coincide con `PARTICIPANT_ID`, falta autenticación o falta configuración, la operación se rechaza sin escribir balances, diarios ni ledgers bancarios. En Compose, el gateway se alcanza únicamente por la red interna.
+
 El siguiente corte de implementación añade transporte autenticado del adaptador banco-red y mapeo público de errores antes de afirmar un comportamiento similar al de producción.
