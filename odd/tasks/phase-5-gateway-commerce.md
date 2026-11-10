@@ -41,7 +41,7 @@ Scope: implementar el primer slice ejecutable del gateway público y una tienda 
 - T2 (S2, S4, S5): Implementar payment intents, consulta y confirmación idempotente con estado simulado; no escribir ledger. Route: delegated by gateway surface. Commit: `bf06cf6`.
 - T3 (S2, S6): Crear tienda sandbox mínima con catálogo, carrito, orden e inventario sintéticos. Route: delegated by commerce surface. Commit: pending.
 - T4 (S2, S3): Implementar webhook HMAC con timestamp, protección de replay, reintentos acotados y DLQ in-memory. Route: delegated by gateway surface. Commit: `d6777eb`.
-- T5 (S2, S4): Añadir pruebas públicas de contrato y comportamiento, documentación OpenAPI y evidencia Docker. Route: inline. Commit: pending.
+- T5 (S2, S4): Añadir pruebas públicas de contrato y comportamiento, documentación OpenAPI y evidencia Docker. Route: inline. Commit: `cd16ac9`.
 
 ## Log
 
@@ -50,4 +50,4 @@ L2. Se selecciona como siguiente incremento coherente el gateway público y come
 L3. T1 implementado en `gateway/`: scaffold Node.js/TypeScript Docker-only, autenticación X-Api-Key sintética con scopes, rutas contractuales placeholder y frontera explícita sin escritura de ledger. Build Docker y 3 tests pasaron. `package-lock.json` queda pendiente para fijar versiones. Commit: `bdcf987`.
 L4. T2 implementado en `gateway/`: payment intents sintéticos, consulta, confirmación, validación, replay/conflicto de idempotencia y 6 tests HTTP públicos. Docker build pasó y reportó 6 tests sin fallos. Commit: `bf06cf6`.
 L5. T4 implementado en `gateway/`: registro de endpoints webhook, HMAC-SHA256 con timestamp, replay protection, tres intentos máximos y DLQ in-memory limitada a 100 entradas. Docker build pasó y reportó 9 tests sin fallos. Commit: `d6777eb`.
-L6. La verificación final Docker de Phase 5 pasó: gateway build/test con 9 tests, commerce Compose test con 3 tests y validación de `docker compose config`. No se publicaron puertos. Commit de evidencia: pending.
+L6. La verificación final Docker de Phase 5 pasó: gateway build/test con 9 tests, commerce Compose test con 3 tests y validación de `docker compose config`. No se publicaron puertos. Commit de evidencia: `cd16ac9`.
