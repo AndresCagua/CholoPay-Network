@@ -1,0 +1,16 @@
+services:
+  utilities:
+    build: .
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+    # Deliberately no ports mapping: Docker-internal by default.
+    expose:
+      - "8080"
+
+  utilities-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: [test]
+    command: ["python", "-m", "unittest", "discover", "-s", "tests", "-v"]

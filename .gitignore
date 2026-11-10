@@ -8,3 +8,6 @@ infra/.env
 node_modules/
 .venv/
 bank-core/target/
+
+__pycache__/
+*.py[cod]

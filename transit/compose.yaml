@@ -1,0 +1,19 @@
+name: ${COMPOSE_PROJECT_NAME:-cholopay-transit}
+
+services:
+  transit:
+    build:
+      context: .
+      target: runtime
+    environment:
+      PORT: 8082
+    # Deliberately no host port mapping: Docker-only/private by default.
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  transit-test:
+    build:
+      context: .
+      target: test
+    profiles: [test]
