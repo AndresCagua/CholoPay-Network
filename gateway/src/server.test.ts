@@ -24,13 +24,13 @@ async function withBiller(run: (baseUrl: string, setAvailable: () => void, setUn
     const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {};
     response.setHeader('content-type', 'application/json');
     if (!available) { response.writeHead(503); response.end(JSON.stringify({ error: 'unavailable' })); return; }
-    if (request.url === '/api/v1/payment-intents') {
+    if (request.url === '/api/v1/payment-intents' || request.url?.startsWith('/v1/obligations/') && request.url.endsWith('/payment-intents')) {
       const key = String(request.headers['idempotency-key']);
       const id = intents.get(key) ?? `pi_${intents.size + 1}`;
       intents.set(key, id);
       response.writeHead(201); response.end(JSON.stringify({ id })); return;
     }
-    if (request.url === '/api/v1/internal/payment-events') { response.writeHead(200); response.end(JSON.stringify({ status: 'PAID', synthetic: true })); return; }
+    if (request.url === '/api/v1/internal/payment-events' || request.url === '/v1/internal/payment-events') { response.writeHead(200); response.end(JSON.stringify({ status: 'PAID', synthetic: true })); return; }
     response.writeHead(404); response.end('{}');
   });
   await new Promise<void>((resolve) => biller.listen(0, '127.0.0.1', resolve));
@@ -177,6 +177,28 @@ test('completa un pago eléctrico de Banco Costa mediante el facturador y conser
         assert.deepEqual(await replay.json(), payment);
         const conflict = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ ...body, amount: '1.00' }) });
         assert.equal(conflict.status, 409);
+      } finally { await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); }
+    });
+  });
+});
+
+test('generaliza el pago sintético de una obligación de tránsito', async () => {
+  await withBiller(async (billerUrl) => {
+    await withServer(async () => {
+      const server = createServer({ transitBaseUrl: billerUrl });
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const address = server.address() as AddressInfo;
+      try {
+        const response = await fetch(`http://127.0.0.1:${address.port}/v1/bill-payments`, {
+          method: 'POST',
+          headers: { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Idempotency-Key': 'transit-fine-001', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ participant_id: 'BANCO_SIERRA', biller: 'transit', obligation_id: 'obligation-fine-001', service: 'traffic_fine', amount: '25.00', currency: 'SYN' }),
+        });
+        assert.equal(response.status, 201);
+        const payment = await response.json() as Record<string, unknown>;
+        assert.equal(payment.status, 'APPLIED');
+        assert.equal(payment.biller, 'transit');
+        assert.equal(payment.obligation_id, 'obligation-fine-001');
       } finally { await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); }
     });
   });

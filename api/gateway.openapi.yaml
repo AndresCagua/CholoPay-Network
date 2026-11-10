@@ -6,7 +6,7 @@ paths:
   /health/live: {get: {security: [], responses: {'200': {description: Activo}}}}
   /v1/bill-payments:
     post:
-      summary: Pago sintético de factura de electricidad del Banco Costa
+      summary: Pago sintético de obligación de utilities o tránsito
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BillPaymentCreate'}}}}
       responses: {'201': {description: Aplicado por CholoServicios}, '202': {description: Facturador no disponible o aplicación pendiente}, '409': {description: El payload difiere para la clave}, '422': {description: Participante o factura no compatibles}}
@@ -44,13 +44,15 @@ components:
   schemas:
     BillPaymentCreate:
       type: object
-      required: [participant_id, invoice_id, service, amount, currency]
+      required: [participant_id, amount, currency]
       properties:
-        participant_id: {type: string, const: BANCO_COSTA}
-        invoice_id: {type: string, const: invoice-elec-2025-001}
-        service: {type: string, const: electricity}
-        amount: {type: string, const: '42.50'}
-        currency: {type: string, const: USD}
+        participant_id: {type: string}
+        biller: {type: string, enum: [utilities, transit], default: utilities}
+        invoice_id: {type: string, description: Referencia de factura de utilities}
+        obligation_id: {type: string, description: Referencia de obligación de tránsito}
+        service: {type: string, enum: [electricity, water, internet, mobile, traffic_fine]}
+        amount: {type: string}
+        currency: {type: string, enum: [USD, SYN]}
     PaymentIntentCreate:
       type: object
       required: [amount_minor, currency, merchant_order_id]

@@ -16,24 +16,31 @@ docker compose up --build
 
 La API está disponible para otros contenedores en `http://utilities:8080`.
 
-## Contract
+## Contrato
 
-- `GET /health` — respuesta sintética de salud.
-- `GET /api/v1/contracts` — lista contratos sintéticos de servicios.
-- `GET /api/v1/contracts/{contract_id}` — recupera un contrato.
-- `GET /api/v1/invoices?contract_id={contract_id}` — consulta facturas, opcionalmente por contrato.
-- `GET /api/v1/invoices/{invoice_id}` — recupera una factura.
-- `GET /api/v1/invoices/{invoice_id}/collection-status` — consulta el estado sintético de cobro.
-- `GET /api/v1/invoices/{invoice_id}/payment-status` — consulta el estado de aplicación de una liquidación sintética.
-- `POST /api/v1/payment-intents` — crea una intención con `Idempotency-Key` y JSON `{ "invoice_id": "...", "amount": "...", "currency": "USD" }`.
-- `POST /api/v1/internal/payment-events` — aplica un evento sintético `payment.settled` firmado con protección contra repetición por identificador de evento. Este endpoint no adeuda cuentas ni escribe un diario.
+La API nueva de obligaciones usa `/v1` (las rutas históricas `/api/v1` se conservan):
 
-Una clave de idempotencia repetida y una solicitud idéntica devuelven la intención original. Reutilizar la clave con una solicitud diferente devuelve `409`. Toda intención nueva permanece en `pending` e informa explícitamente de `debit_performed: false` y `ledger_entry_created: false`.
+- `GET /v1/services/catalog` — catálogo de electricidad, agua potable, internet fijo y telefonía móvil, todo en USD.
+- `GET /v1/contracts/{contractRef}/bills` — consulta las facturas del contrato.
+- `GET /v1/bills/{billId}` — recupera una factura.
+- `POST /v1/bills/{billId}/payment-intents` — crea una intención con `Idempotency-Key` y JSON `{ "amount": "...", "currency": "USD" }`.
+- `GET /v1/bills/{billId}/payment-status` — consulta el estado de aplicación.
+- `GET /api/v1/contracts`, `GET /api/v1/contracts/{contract_id}`, `GET /api/v1/invoices?...` y `GET /api/v1/invoices/{invoice_id}` — contratos y facturas históricos compatibles.
+- `POST /api/v1/payment-intents` — forma histórica, con JSON `{ "invoice_id": "...", "amount": "...", "currency": "USD" }`.
+- `POST /api/v1/internal/payment-events` — aplica un evento sintético `payment.settled` firmado y protegido contra repetición por identificador de evento. Este endpoint no adeuda cuentas ni escribe un diario.
+
+Una clave de idempotencia repetida y una solicitud idéntica devuelven la intención original. Para las rutas nuevas, dos claves distintas no pueden reservar concurrentemente la misma factura. Reutilizar una clave con una solicitud diferente devuelve `409`. Toda intención informa explícitamente de `debit_performed: false` y `ledger_entry_created: false`; los fondos solo se consideran aplicados tras un evento firmado.
 
 ## Pruebas de comportamiento HTTP
 
 Las pruebas usan la interfaz HTTP pública y el mismo controlador de la biblioteca estándar que usa el contenedor:
 
 ```sh
-PYTHONPATH=utilities python -m unittest discover -s utilities/tests -v
+docker compose --profile test run --rm utilities-test
+```
+
+La misma prueba pública puede ejecutarse localmente sin Docker para depuración:
+
+```sh
+PYTHONPATH=utilities python3 -m unittest discover -s utilities/tests -v
 ```

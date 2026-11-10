@@ -32,6 +32,52 @@ class UtilitiesApiContractTests(unittest.TestCase):
         connection.close()
         return response.status, result
 
+    def test_services_catalog_and_contract_bills_are_public(self):
+        status, catalog = self.request("GET", "/v1/services/catalog")
+        self.assertEqual(status, 200)
+        self.assertEqual([service["id"] for service in catalog["services"]], ["electricity", "water", "internet", "mobile"])
+        self.assertTrue(all(service["currency"] == "USD" for service in catalog["services"]))
+
+        status, bills = self.request("GET", "/v1/contracts/contract-internet-001/bills")
+        self.assertEqual(status, 200)
+        self.assertEqual([bill["service"] for bill in bills["bills"]], ["internet"])
+        self.assertEqual(bills["bills"][0]["currency"], "USD")
+
+    def test_bill_routes_create_idempotent_intent_and_apply_settlement_once(self):
+        status, bill = self.request("GET", "/v1/bills/bill-mobile-2025-001")
+        self.assertEqual(status, 200)
+        self.assertEqual(bill["service"], "mobile")
+
+        payload = {"amount": bill["amount"], "currency": "USD"}
+        headers = {"Idempotency-Key": "bill-mobile-intent-001"}
+        status, first = self.request("POST", "/v1/bills/bill-mobile-2025-001/payment-intents", payload, headers)
+        self.assertEqual(status, 201)
+        status, replay = self.request("POST", "/v1/bills/bill-mobile-2025-001/payment-intents", payload, headers)
+        self.assertEqual(status, 200)
+        self.assertEqual(replay["id"], first["id"])
+
+        event = {"event_type": "payment.settled", "bill_id": "bill-mobile-2025-001", "payment_intent_id": first["id"]}
+        canonical = json.dumps(event, sort_keys=True, separators=(",", ":"))
+        timestamp = "1700000002"
+        signature = hmac.new(b"local-test-only", f"{timestamp}.{canonical}".encode(), hashlib.sha256).hexdigest()
+        event_headers = {"X-CholoPay-Event-Id": "evt-mobile-001", "X-CholoPay-Timestamp": timestamp, "X-CholoPay-Signature": signature}
+        status, receipt = self.request("POST", "/api/v1/internal/payment-events", event, event_headers)
+        self.assertEqual(status, 200)
+        self.assertEqual(receipt["status"], "PAID")
+        status, state = self.request("GET", "/v1/bills/bill-mobile-2025-001/payment-status")
+        self.assertEqual(status, 200)
+        self.assertEqual(state["status"], "paid")
+        self.assertEqual(state["settlement_state"], "APPLIED")
+
+    def test_new_bill_rejects_a_second_payment_reservation(self):
+        payload = {"amount": "35.00", "currency": "USD"}
+        status, first = self.request("POST", "/v1/bills/bill-internet-2025-001/payment-intents", payload, {"Idempotency-Key": "bill-internet-intent-001"})
+        self.assertEqual(status, 201)
+        status, conflict = self.request("POST", "/v1/bills/bill-internet-2025-001/payment-intents", payload, {"Idempotency-Key": "bill-internet-intent-002"})
+        self.assertEqual(status, 409)
+        self.assertEqual(conflict["error"], "payment_already_in_progress")
+        self.assertNotEqual(first["id"], conflict.get("id"))
+
     def test_contract_and_invoice_query_contracts_are_public(self):
         status, contract = self.request("GET", "/api/v1/contracts/contract-elec-001")
         self.assertEqual(status, 200)

@@ -20,9 +20,13 @@ De forma predeterminada no se expone ningún puerto al host. Los datos son local
 - `POST /v1/fines` — crea una multa sintética y su obligación impagada.
 - `GET /v1/fines/{id}`
 - `GET /v1/obligations/{id}` y `GET /v1/obligations?registration_id=...&status=unpaid`
+- `GET /v1/vehicles/{syntheticPlate}/obligations` — consulta obligaciones de la placa sintética.
+- `POST /v1/obligations/{id}/payment-intents` — crea una intención ligada a esa obligación; requiere `Idempotency-Key`.
+- `GET /v1/obligations/{id}/receipt` — constancia sintética disponible únicamente después de confirmación final.
 - `GET /v1/status?registration_id=...`
-- `POST /v1/constancias` — crea una constancia de estado sintética; no es un certificado oficial.
+- `POST /v1/constancias` — crea una constancia de estado sintética solo cuando todas las obligaciones están confirmadas; no es un certificado oficial.
+- `POST /v1/internal/events` — aplica eventos internos firmados HMAC (`X-Transit-Signature`), idempotentes por `event_id`; una confirmación final marca la obligación pagada.
 - `POST /v1/payment-intents` — requiere `Idempotency-Key`; solo crea una intención pendiente.
 - `GET /v1/payment-intents/{id}`
 
-Las intenciones de pago son un límite explícito de integración. Repetir la misma clave y carga devuelve la misma intención; una discrepancia de carga devuelve `409`. El servicio nunca adeuda una cuenta, cambia una obligación a pagada ni escribe un diario. Todo el estado está en memoria.
+Las intenciones de pago son un límite explícito de integración. Repetir la misma clave y carga devuelve la misma intención; una discrepancia de carga devuelve `409`. El servicio nunca accede a cuentas ni escribe un ledger. Solo un evento interno firmado de confirmación final cambia una obligación a `paid`; si la aplicación no está disponible se conserva `SETTLED_AWAITING_APPLICATION` para reintento. Todo el estado está en memoria y los valores usan moneda sintética `SYN`.

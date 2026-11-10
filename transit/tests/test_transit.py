@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import json
 import threading
 import unittest
@@ -54,9 +56,38 @@ class TransitHttpTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(result["obligations"], [obligation])
         status, constancia = self.request("POST", "/v1/constancias", {"registration_id": registration["id"]})
-        self.assertEqual(status, 201)
-        self.assertTrue(constancia["synthetic"])
-        self.assertEqual(constancia["obligation_status"], "unpaid")
+        self.assertEqual(status, 409)
+        self.assertEqual(constancia["error"], "constancia_not_available_until_final_confirmation")
+
+    def test_obligations_are_queryable_by_synthetic_plate_and_receipt_waits_for_final_confirmation(self):
+        registration = self.registration()
+        _, created = self.request("POST", "/v1/fines", {"registration_id": registration["id"], "reason": "synthetic", "amount_minor": 100})
+        obligation = created["obligation"]
+        status, result = self.request("GET", f"/v1/vehicles/{registration['plate']}/obligations")
+        self.assertEqual(status, 200)
+        self.assertEqual(result["items"], [obligation])
+        status, result = self.request("GET", f"/v1/obligations/{obligation['id']}/receipt")
+        self.assertEqual(status, 409)
+        self.assertEqual(result["error"], "receipt_not_available_until_final_confirmation")
+
+    def test_signed_final_application_event_is_idempotent_and_emits_receipt(self):
+        registration = self.registration()
+        _, created = self.request("POST", "/v1/fines", {"registration_id": registration["id"], "reason": "synthetic", "amount_minor": 100})
+        obligation = created["obligation"]
+        headers = {"Idempotency-Key": "event-intent-1"}
+        _, intent = self.request("POST", f"/v1/obligations/{obligation['id']}/payment-intents", {}, headers)
+        event = {"event_id": "evt-1", "type": "payment.final.confirmed", "payment_intent_id": intent["id"], "obligation_id": obligation["id"]}
+        raw = json.dumps(event, separators=(",", ":")).encode()
+        signature = hmac.new(app.EVENT_SECRET.encode(), raw, hashlib.sha256).hexdigest()
+        event_headers = {"X-Transit-Signature": signature}
+        status, applied = self.request("POST", "/v1/internal/events", event, event_headers)
+        self.assertEqual(status, 200)
+        self.assertEqual(applied["status"], "APPLIED")
+        self.assertEqual(self.request("POST", "/v1/internal/events", event, event_headers)[1], applied)
+        self.assertEqual(self.request("GET", f"/v1/obligations/{obligation['id']}")[1]["status"], "paid")
+        status, receipt = self.request("GET", f"/v1/obligations/{obligation['id']}/receipt")
+        self.assertEqual(status, 200)
+        self.assertTrue(receipt["synthetic"])
 
     def test_payment_intent_is_idempotent_and_never_marks_obligation_paid(self):
         registration = self.registration()

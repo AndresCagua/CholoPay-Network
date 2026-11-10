@@ -6,10 +6,12 @@ type PaymentIntentStatus = 'requires_confirmation' | 'succeeded';
 type BillPayment = {
   id: string;
   object: 'bill_payment';
-  participant_id: 'BANCO_COSTA';
-  invoice_id: string;
+  participant_id: string;
+  biller: 'utilities' | 'transit';
+  invoice_id?: string;
+  obligation_id?: string;
   amount: string;
-  currency: 'USD';
+  currency: string;
   status: 'APPLIED' | 'PENDING_BILLER' | 'PENDING_APPLICATION';
   payment_intent_id?: string;
   ledger_boundary: string;
@@ -125,7 +127,7 @@ function verifyWebhookSignature(header: string | undefined, secret: string, rawB
   return { timestamp, signature };
 }
 
-export type GatewayOptions = { billerBaseUrl?: string; billerEventSecret?: string };
+export type GatewayOptions = { billerBaseUrl?: string; utilitiesBaseUrl?: string; transitBaseUrl?: string; billerEventSecret?: string };
 
 export function createServer(options: GatewayOptions = {}): Server {
   const intents = new Map<string, PaymentIntent>();
@@ -138,7 +140,8 @@ export function createServer(options: GatewayOptions = {}): Server {
   let nextRefundId = 1;
   let nextBillPaymentId = 1;
   let nextWebhookEndpointId = 1;
-  const billerBaseUrl = options.billerBaseUrl ?? process.env.BILLER_URL ?? 'http://utilities:8080';
+  const utilitiesBaseUrl = options.utilitiesBaseUrl ?? options.billerBaseUrl ?? process.env.UTILITIES_URL ?? process.env.BILLER_URL ?? 'http://utilities:8080';
+  const transitBaseUrl = options.transitBaseUrl ?? process.env.TRANSIT_URL ?? 'http://transit:8082';
   const billerEventSecret = options.billerEventSecret ?? process.env.INTERNAL_EVENT_SECRET ?? 'local-test-only';
   const webhookEndpoints = new Map<string, WebhookEndpoint>();
   const webhookDeliveries = new Map<string, WebhookDelivery>();
@@ -199,8 +202,16 @@ export function createServer(options: GatewayOptions = {}): Server {
       } else {
         if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJson(response, 400, errorBody('invalid_request', 'El cuerpo de la solicitud debe ser un objeto'));
         input = body as Record<string, unknown>;
-        if (input.participant_id !== 'BANCO_COSTA' || input.invoice_id !== 'invoice-elec-2025-001' || input.service !== 'electricity' || typeof input.amount !== 'string' || input.currency !== 'USD') {
-          return sendJson(response, 422, errorBody('invalid_request', 'Solo se admiten pagos de facturas eléctricas de Banco Costa'));
+        const biller = input.biller === 'transit' ? 'transit' : 'utilities';
+        const validUtilities = biller === 'utilities'
+          && typeof input.invoice_id === 'string'
+          && ['electricity', 'water', 'internet', 'mobile'].includes(String(input.service))
+          && input.currency === 'USD';
+        const validTransit = biller === 'transit'
+          && typeof input.obligation_id === 'string'
+          && input.currency === 'SYN';
+        if (typeof input.participant_id !== 'string' || (!validUtilities && !validTransit) || typeof input.amount !== 'string') {
+          return sendJson(response, 422, errorBody('invalid_request', 'La obligación sintética no es compatible con el facturador seleccionado'));
         }
         const payload = canonicalize(input);
         const previous = billPaymentRequests.get(key);
@@ -208,21 +219,28 @@ export function createServer(options: GatewayOptions = {}): Server {
           if (previous.payload !== payload) return sendJson(response, 409, errorBody('idempotency_key_conflict', 'Idempotency-Key ya se usó con una carga diferente'));
           return sendJson(response, previous.payment.status === 'APPLIED' ? 201 : 202, previous.payment);
         }
-        payment = { id: `bp_sandbox_${String(nextBillPaymentId++).padStart(8, '0')}`, object: 'bill_payment', participant_id: 'BANCO_COSTA', invoice_id: input.invoice_id as string, amount: input.amount as string, currency: 'USD', status: 'PENDING_BILLER', ledger_boundary: ledgerBoundary };
+        payment = { id: `bp_sandbox_${String(nextBillPaymentId++).padStart(8, '0')}`, object: 'bill_payment', participant_id: input.participant_id as string, biller, invoice_id: validUtilities ? input.invoice_id as string : undefined, obligation_id: validTransit ? input.obligation_id as string : undefined, amount: input.amount as string, currency: input.currency as string, status: 'PENDING_BILLER', ledger_boundary: ledgerBoundary };
         billPayments.set(payment.id, payment);
         billPaymentRequests.set(key, { payload, payment, request: input });
       }
-      const utilityKey = `bill-payment:${key}`;
+      const billerKey = `bill-payment:${key}`;
+      const billerBaseUrl = payment.biller === 'transit' ? transitBaseUrl : utilitiesBaseUrl;
       try {
-        const intentResponse = await fetch(`${billerBaseUrl}/api/v1/payment-intents`, { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': utilityKey }, body: JSON.stringify({ invoice_id: payment.invoice_id, amount: payment.amount, currency: payment.currency }), signal: AbortSignal.timeout(1000) });
+        const intentPath = payment.biller === 'transit'
+          ? `/v1/obligations/${encodeURIComponent(payment.obligation_id ?? '')}/payment-intents`
+          : '/api/v1/payment-intents';
+        const intentResponse = await fetch(`${billerBaseUrl}${intentPath}`, { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': billerKey }, body: JSON.stringify(payment.biller === 'transit' ? { amount_minor: Math.round(Number(payment.amount) * 100), currency: payment.currency } : { invoice_id: payment.invoice_id, amount: payment.amount, currency: payment.currency }), signal: AbortSignal.timeout(1000) });
         if (!intentResponse.ok) { payment.status = 'PENDING_BILLER'; return sendJson(response, 202, payment); }
         const intent = await intentResponse.json() as { id?: string };
         if (!intent.id) { payment.status = 'PENDING_APPLICATION'; return sendJson(response, 202, payment); }
-        const event = { event_type: 'payment.settled', invoice_id: payment.invoice_id, payment_intent_id: intent.id };
+        const event = payment.biller === 'transit'
+          ? { event_type: 'payment.settled', obligation_id: payment.obligation_id, payment_intent_id: intent.id }
+          : { event_type: 'payment.settled', invoice_id: payment.invoice_id, payment_intent_id: intent.id };
         const timestamp = String(Math.floor(Date.now() / 1000));
         const canonical = canonicalize(event);
         const signature = createHmac('sha256', billerEventSecret).update(`${timestamp}.${canonical}`).digest('hex');
-        const eventResponse = await fetch(`${billerBaseUrl}/api/v1/internal/payment-events`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-cholopay-event-id': payment.id, 'x-cholopay-timestamp': timestamp, 'x-cholopay-signature': signature }, body: JSON.stringify(event), signal: AbortSignal.timeout(1000) });
+        const eventPath = payment.biller === 'transit' ? '/v1/internal/payment-events' : '/api/v1/internal/payment-events';
+        const eventResponse = await fetch(`${billerBaseUrl}${eventPath}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-cholopay-event-id': payment.id, 'x-cholopay-timestamp': timestamp, 'x-cholopay-signature': signature }, body: JSON.stringify(event), signal: AbortSignal.timeout(1000) });
         payment.payment_intent_id = intent.id;
         payment.status = eventResponse.ok ? 'APPLIED' : 'PENDING_APPLICATION';
       } catch { payment.status = 'PENDING_BILLER'; }

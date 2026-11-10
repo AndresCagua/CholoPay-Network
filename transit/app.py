@@ -6,6 +6,7 @@ nunca accede a cuentas, debita dinero ni escribe en un libro mayor de pagos.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import threading
@@ -14,6 +15,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
+
+
+EVENT_SECRET = os.environ.get("TRANSIT_EVENT_SECRET", "synthetic-transit-event-secret")
 
 
 class TransitStore:
@@ -25,6 +29,7 @@ class TransitStore:
         self.payment_intents: dict[str, dict[str, Any]] = {}
         self.payment_keys: dict[str, tuple[str, str]] = {}
         self.constancias: dict[str, dict[str, Any]] = {}
+        self.events: dict[str, dict[str, Any]] = {}
 
     def register(self, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         plate = body.get("plate")
@@ -73,6 +78,8 @@ class TransitStore:
                 if previous_fingerprint != fingerprint:
                     return HTTPStatus.CONFLICT, {"error": "idempotency_key_payload_mismatch"}
                 return HTTPStatus.OK, self.payment_intents[intent_id]
+            if obligation["status"] != "unpaid":
+                return HTTPStatus.CONFLICT, {"error": "obligation_not_payable", "status": obligation["status"]}
             intent = {"id": str(uuid.uuid4()), "obligation_id": obligation_id,
                       "amount_minor": obligation["amount_minor"], "currency": obligation["currency"],
                       "status": "pending", "debit_attempted": False, "ledger_written": False}
@@ -80,17 +87,67 @@ class TransitStore:
             self.payment_keys[key] = (intent["id"], fingerprint)
             return HTTPStatus.CREATED, intent
 
+    def obligations_for_plate(self, plate: str) -> tuple[int, dict[str, Any]]:
+        with self._lock:
+            registration = next((r for r in self.registrations.values() if r["plate"] == plate.strip().upper()), None)
+            if not registration:
+                return HTTPStatus.NOT_FOUND, {"error": "vehicle_not_found"}
+            return HTTPStatus.OK, {"vehicle": registration, "items": [o for o in self.obligations.values() if o["registration_id"] == registration["id"]]}
+
+    def apply_event(self, body: dict[str, Any], signature: str | None) -> tuple[int, dict[str, Any]]:
+        raw = json.dumps(body, separators=(",", ":")).encode()
+        expected = hmac.new(EVENT_SECRET.encode(), raw, hashlib.sha256).hexdigest()
+        if not signature or not hmac.compare_digest(signature.removeprefix("sha256="), expected):
+            return HTTPStatus.UNAUTHORIZED, {"error": "invalid_event_signature"}
+        event_id = body.get("event_id")
+        if not isinstance(event_id, str) or not event_id:
+            return HTTPStatus.UNPROCESSABLE_ENTITY, {"error": "event_id_required"}
+        with self._lock:
+            if event_id in self.events:
+                return HTTPStatus.OK, self.events[event_id]
+            intent = self.payment_intents.get(body.get("payment_intent_id"))
+            obligation = self.obligations.get(body.get("obligation_id"))
+            if not intent or not obligation or intent["obligation_id"] != obligation["id"]:
+                return HTTPStatus.NOT_FOUND, {"error": "payment_intent_or_obligation_not_found"}
+            if body.get("type") not in ("payment.final.confirmed", "payment.confirmed"):
+                return HTTPStatus.UNPROCESSABLE_ENTITY, {"error": "unsupported_event_type"}
+            if body.get("application_available", True) is False:
+                result = {"event_id": event_id, "status": "SETTLED_AWAITING_APPLICATION", "payment_intent_id": intent["id"], "obligation_id": obligation["id"]}
+                intent["status"] = "settled_awaiting_application"
+            else:
+                intent["status"] = "confirmed"
+                intent["debit_attempted"] = True
+                obligation["status"] = "paid"
+                result = {"event_id": event_id, "status": "APPLIED", "payment_intent_id": intent["id"], "obligation_id": obligation["id"]}
+            self.events[event_id] = result
+            return HTTPStatus.OK, result
+
     def constancia(self, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         registration_id = body.get("registration_id")
         with self._lock:
             if registration_id not in self.registrations:
                 return HTTPStatus.NOT_FOUND, {"error": "registration_not_found"}
             obligations = [o for o in self.obligations.values() if o["registration_id"] == registration_id]
+            if not obligations or any(o["status"] != "paid" for o in obligations):
+                return HTTPStatus.CONFLICT, {"error": "constancia_not_available_until_final_confirmation"}
             record = {"id": str(uuid.uuid4()), "registration_id": registration_id,
-                      "obligation_status": "unpaid" if any(o["status"] == "unpaid" for o in obligations) else "clear",
-                      "obligation_ids": [o["id"] for o in obligations], "synthetic": True}
+                      "obligation_status": "clear", "obligation_ids": [o["id"] for o in obligations], "synthetic": True}
             self.constancias[record["id"]] = record
             return HTTPStatus.CREATED, record
+
+    def receipt(self, obligation_id: str) -> tuple[int, dict[str, Any]]:
+        with self._lock:
+            obligation = self.obligations.get(obligation_id)
+            if not obligation:
+                return HTTPStatus.NOT_FOUND, {"error": "obligation_not_found"}
+            if obligation["status"] != "paid":
+                return HTTPStatus.CONFLICT, {"error": "receipt_not_available_until_final_confirmation"}
+            existing = next((r for r in self.constancias.values() if r.get("obligation_id") == obligation_id), None)
+            if existing:
+                return HTTPStatus.OK, existing
+            record = {"id": str(uuid.uuid4()), "obligation_id": obligation_id, "amount_minor": obligation["amount_minor"], "currency": obligation["currency"], "synthetic": True}
+            self.constancias[record["id"]] = record
+            return HTTPStatus.OK, record
 
 
 STORE = TransitStore()
@@ -118,6 +175,12 @@ class TransitHandler(BaseHTTPRequestHandler):
         if path == "/health/live":
             return self._json(HTTPStatus.OK, {"status": "ok", "service": "transit-synthetic", "real_authority": False})
         parts = path.split("/")
+        if len(parts) == 5 and parts[1:3] == ["v1", "vehicles"] and parts[4] == "obligations":
+            status, result = STORE.obligations_for_plate(parts[3])
+            return self._json(status, result)
+        if len(parts) == 5 and parts[1:3] == ["v1", "obligations"] and parts[4] == "receipt":
+            status, result = STORE.receipt(parts[3])
+            return self._json(status, result)
         if len(parts) == 4 and parts[1:3] == ["v1", "registrations"]:
             with STORE._lock:
                 item = STORE.registrations.get(parts[3]) or next((r for r in STORE.registrations.values() if r["plate"] == parts[3].upper()), None)
@@ -149,6 +212,11 @@ class TransitHandler(BaseHTTPRequestHandler):
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "invalid_json"})
         if path == "/v1/registrations":
             status, result = STORE.register(body)
+        elif len(path.split("/")) == 5 and path.split("/")[1:3] == ["v1", "obligations"] and path.split("/")[4] == "payment-intents":
+            body["obligation_id"] = path.split("/")[3]
+            status, result = STORE.payment_intent(body, self.headers.get("Idempotency-Key"))
+        elif path == "/v1/internal/events":
+            status, result = STORE.apply_event(body, self.headers.get("X-Transit-Signature") or self.headers.get("X-Event-Signature"))
         elif path == "/v1/fines":
             status, result = STORE.create_fine(body)
         elif path == "/v1/payment-intents":
