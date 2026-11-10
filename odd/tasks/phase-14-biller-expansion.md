@@ -37,7 +37,7 @@ Alcance: generalizar el recorrido sintético de obligaciones más allá de elect
 - T3 (S1-S5): Integrar gateway con obligaciones genéricas sin ampliar la frontera de ledger y añadir regresiones públicas de idempotencia, replay y estados pendientes. Ruta: inline después de T1/T2. Commit: `240dabd`.
 - T4 (S1-S5): Actualizar OpenAPI, documentación, Compose y evidencia Docker; ejecutar aceptación de las seis obligaciones sintéticas. Ruta: inline. Commit: `099de91`.
 - T5 (S5): Conectar los recorridos de pago desde bancos y Flutter con las seis obligaciones, mediante APIs públicas participant-scoped y sin acceso directo a bases. Ruta: siguiente slice. Commit: `5c6890b`.
-- T6 (S4-S5): Exponer una proyección gateway participant-scoped de obligaciones sintéticas para que wallet y paneles consulten utilities/transit sin acceder a bases. Ruta: siguiente slice. Commit: pendiente.
+- T6 (S4-S5): Exponer una proyección gateway participant-scoped de obligaciones sintéticas para que wallet y paneles consulten utilities/transit sin acceder a bases. Ruta: siguiente slice. Commit: `32351d4`.
   - T5a: Añadir contrato y endpoint participant-scoped de pago de obligaciones en bank-core, delegando al gateway sin escribir ledger local.
   - T5b: Añadir cliente HTTP configurable y flujo sintético de pago de obligaciones en Flutter, sin acceso directo a bases.
 
