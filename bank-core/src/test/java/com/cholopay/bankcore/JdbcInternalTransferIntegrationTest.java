@@ -13,6 +13,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -65,6 +66,7 @@ class JdbcInternalTransferIntegrationTest {
                                     "concurrent-key-" + index, UUID.randomUUID());
                             return true;
                         } catch (IllegalStateException insufficientFunds) {
+                            assertEquals("fondos disponibles insuficientes", insufficientFunds.getMessage());
                             return false;
                         }
                     }))
@@ -73,7 +75,7 @@ class JdbcInternalTransferIntegrationTest {
 
             long successful = 0;
             for (Future<Boolean> attempt : attempts) {
-                if (attempt.get()) successful++;
+                if (attempt.get(5, TimeUnit.SECONDS)) successful++;
             }
 
             assertEquals(10, successful);
