@@ -101,7 +101,7 @@ class CommerceStore:
 
 
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "").rstrip("/")
-GATEWAY_ADAPTER = os.environ.get("GATEWAY_ADAPTER", "synthetic")
+GATEWAY_ADAPTER = os.environ.get("GATEWAY_ADAPTER") or ("http" if GATEWAY_URL else "synthetic")
 
 
 def gateway_create_intent(amount_minor: int, order_id: str, idempotency_key: str) -> tuple[int, dict[str, Any]]:
