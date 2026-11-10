@@ -1,18 +1,18 @@
-# Phase 0 backlog
+# Backlog de la fase 0
 
-| ID | Ticket | Depends on | Acceptance / test |
+| ID | Ticket | Depende de | Aceptación / prueba |
 |---|---|---|---|
-| P0-01 | Freeze service boundaries and trust model | — | ADR 0001, C4 diagrams, no bank DB cross-access |
-| P0-02 | Define ledger invariants and settlement vocabulary | P0-01 | ADRs 0002–0003, state machine, invariant checklist |
-| P0-03 | Define bank-owned onboarding and CholoKey boundary | P0-01 | ADR 0004 and threat model |
-| P0-04 | Prepare FOSS license inventory and source policy | — | SPDX inventory, no paid runtime dependency |
-| P0-05 | Create isolated local PostgreSQL Compose profile | P0-01 | Four DB services, separate volumes, readiness checks |
-| P0-06 | Add mandatory host-port preflight and smoke test | P0-05 | Occupied port prevents startup; health checks pass when available |
-| P0-07 | Add optional Kafka profile and outbox guidance | P0-02 | Default profile works without Kafka; docs explain source of truth |
-| P0-08 | Add CI structural checks | P0-04–P0-06 | YAML/OpenAPI/Compose checks run locally and in CI |
-| P0-09 | Publish onboarding and runbook | P0-05–P0-08 | Clean Linux checkout can render, start, smoke, stop |
-| P0-10 | Review phase 0 evidence and authorize vertical slice | P0-01–P0-09 | All acceptance evidence recorded; unresolved financial decisions listed |
+| P0-01 | Fijar límites de servicios y modelo de confianza | — | ADR 0001, diagramas C4, sin acceso cruzado a BD bancarias |
+| P0-02 | Definir invariantes del ledger y vocabulario de liquidación | P0-01 | ADRs 0002–0003, máquina de estados, lista de invariantes |
+| P0-03 | Definir el alta propiedad del banco y el límite de CholoKey | P0-01 | ADR 0004 y modelo de amenazas |
+| P0-04 | Preparar inventario de licencias FOSS y política de código fuente | — | SPDX inventory, no paid runtime dependency |
+| P0-05 | Crear perfil Compose local de PostgreSQL aislado | P0-01 | Four DB services, separate volumes, readiness checks |
+| P0-06 | Agregar preflight obligatorio de puertos del host y prueba smoke | P0-05 | Occupied port prevents startup; health checks pass when available |
+| P0-07 | Agregar perfil opcional de Kafka y guía de outbox | P0-02 | El perfil predeterminado funciona sin Kafka; la documentación explica la fuente de verdad |
+| P0-08 | Agregar checks estructurales de CI | P0-04–P0-06 | Los checks de YAML/OpenAPI/Compose se ejecutan localmente y en CI |
+| P0-09 | Publicar alta y runbook | P0-05–P0-08 | Clean Linux checkout can render, start, smoke, stop |
+| P0-10 | Revisar evidencia de la fase 0 y autorizar el slice vertical | P0-01–P0-09 | Toda la evidencia de aceptación registrada; decisiones financieras pendientes enumeradas |
 
-## Phase 1 preview
+## Vista previa de la fase 1
 
-Implement one parametrized Spring Boot bank core with immutable double-entry journal, reservations, internal transfer idempotency, migrations, and concurrent invariant tests before adding the network or interfaces.
+Implementar un núcleo bancario Spring Boot parametrizado con journal inmutable de partida doble, reservas, idempotencia de transferencias internas, migraciones y pruebas concurrentes de invariantes antes de agregar la red o las interfaces.

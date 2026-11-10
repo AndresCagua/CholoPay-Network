@@ -1,12 +1,12 @@
-# ADR 0005: Outbox/inbox and FOSS local tooling
+# ADR 0005: Outbox/inbox y herramientas locales FOSS
 
-- Status: Accepted for Phase 0
-- Date: 2026-11-09
+- Estado: Aceptado para la fase 0
+- Fecha: 2026-11-09
 
-## Decision
+## Decisión
 
-Services publish events through transactional outboxes and consume through durable idempotent inboxes. Kafka is optional in the first local profile. PostgreSQL is persistent truth; Redis 8+ with an AGPL distribution is cache/ephemeral state only. Local development uses Docker Engine or Podman, Compose, and open-source images; no Desktop, cloud, or paid SaaS dependency is required.
+Los servicios publican eventos mediante outboxes transaccionales y consumen mediante inboxes idempotentes duraderos. Kafka es opcional en el primer perfil local. PostgreSQL es la verdad persistente; Redis 8+ con una distribución AGPL se limita a caché/estado efímero. El desarrollo local usa Docker Engine o Podman, Compose e imágenes de código abierto; no se requiere Desktop, nube ni dependencia de SaaS de pago.
 
-## Consequences
+## Consecuencias
 
-Event replay and reconciliation are first-class. Exact image tags and licenses must be pinned and reviewed before production-like profiles. Copyleft obligations are tracked in the dependency inventory.
+El replay de eventos y la conciliación son capacidades de primera clase. Las etiquetas exactas de las imágenes y sus licencias deben fijarse y revisarse antes de los perfiles similares a producción. Las obligaciones de copyleft se registran en el inventario de dependencias.

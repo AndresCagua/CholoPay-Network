@@ -1,27 +1,27 @@
-# CholoPay Network — Phase 4 Flutter and QR
-Source of truth for the next bounded implementation slice. Read through `## Log` before working.
+# CholoPay Network — Flutter y QR de la fase 4
+Fuente de verdad del siguiente slice acotado de implementación. Lee hasta `## Log` antes de trabajar.
 
 ## Specs
 
 1. **S1 — Entregables:** "wallet, CholoKey, QR estático/dinámico, movimientos y confirmación."
 2. **S2 — Aceptación:** "pago móvil de A a B verificable en ledgers y UI."
-3. **S3 — Boundary:** The wallet consumes bank/network APIs only; it never accesses another institution's database or writes a ledger.
-4. **S4 — Reliability:** UI retries preserve the same idempotency key and must not create a second transfer.
-5. **S5 — QR:** QR payloads are CholoPay-owned, versioned, synthetic, and are not Pix-compatible claims.
-6. **S6 — Container rule:** Flutter builds and tests run inside Docker; no host SDK or host database is required.
+3. **S3 — Límite:** La billetera consume únicamente API del banco/la red; nunca accede a la base de otra institución ni escribe en un ledger.
+4. **S4 — Fiabilidad:** Los reintentos de la interfaz conservan la misma clave de idempotencia y no deben crear una segunda transferencia.
+5. **S5 — QR:** Los payloads QR son propios de CholoPay, versionados y sintéticos, y no constituyen afirmaciones de compatibilidad con Pix.
+6. **S6 — Regla de contenedores:** Las compilaciones y pruebas de Flutter se ejecutan dentro de Docker; no se requieren SDK ni bases de datos del host.
 
 ## Tasks
 
-- T1 (S1, S3, S5): Define wallet session, CholoKey, QR payload, and transfer-confirmation contracts. Route: inline. Commit: working tree.
-- T2 (S1, S2, S4): Scaffold Flutter wallet with typed fixtures, account selection, QR flows, movement view, and idempotent confirmation state. Route: delegated by disjoint surfaces. Commit: `3dcc78d`.
-- T3 (S2, S4): Add contract fixtures for payer/payee UI and duplicate-confirmation behavior without real ledger access. Route: delegated by mobile wallet surface. Commit: `9c3c8f2`.
-- T4 (S6): Add Docker-only Flutter build/test profile and record evidence. Route: inline. Commit: `3dcc78d`.
+- T1 (S1, S3, S5): Definir los contratos de sesión de billetera, CholoKey, payload QR y confirmación de transferencias. Ruta: inline. Commit: working tree.
+- T2 (S1, S2, S4): Crear el esqueleto de la billetera Flutter con fixtures tipados, selección de cuenta, flujos QR, vista de movimientos y estado de confirmación idempotente. Ruta: delegada a superficies disjuntas. Commit: `3dcc78d`.
+- T3 (S2, S4): Agregar fixtures contractuales para las interfaces de pagador/receptor y el comportamiento de confirmación duplicada sin acceso a un ledger real. Ruta: delegada a la superficie de billetera móvil. Commit: `9c3c8f2`.
+- T4 (S6): Agregar un perfil de compilación/pruebas de Flutter exclusivo de Docker y registrar la evidencia. Ruta: inline. Commit: `3dcc78d`.
 
 ## Log
 
-L1. User authorized continuation after Phase 3 web panels and Docker verification.
-L2. Phase 4 is the next explicit phase in `spec.md`: Flutter wallet, CholoKey, static/dynamic QR, movements, confirmation, and verifiable mobile payment flow.
-L3. Defined `docs/phase-4-wallet-contract.md` with synthetic participant-scoped sessions, minimized CholoKey resolution, CholoPay-owned versioned QR payloads, idempotent confirmation, movement projections, and explicit settlement/delivery states.
-L4. Added the Docker-only Flutter wallet scaffold under `mobile/wallet`: typed local session/account/CholoKey/QR/transfer/movement fixtures, read-only wallet shell, account selection, widget tests, and explicit non-Pix-compatible scope. Docker widget tests pass. Commit: `3dcc78d`.
-L5. The parent rebuilt the Flutter image and ran the widget suite inside Docker; both widget tests passed with exit code 0.
-L6. Added local payer/payee confirmation using the stable idempotency key, visible confirmation state, duplicate replay without a second transfer, and public widget coverage. Docker tests passed all 4 tests and `flutter analyze` reported no issues. Commit: `9c3c8f2`.
+L1. La persona usuaria autorizó continuar después de los paneles web de la fase 3 y la verificación Docker.
+L2. La fase 4 es la siguiente fase explícita de `spec.md`: billetera Flutter, CholoKey, QR estático/dinámico, movimientos, confirmación y flujo de pago móvil verificable.
+L3. Se definió `docs/phase-4-wallet-contract.md` con sesiones sintéticas delimitadas por participante, resolución minimizada de CholoKey, payloads QR versionados propios de CholoPay, confirmación idempotente, proyecciones de movimientos y estados explícitos de liquidación/entrega.
+L4. Se agregó el esqueleto de billetera Flutter exclusivo de Docker bajo `mobile/wallet`: fixtures locales tipados de sesión/cuenta/CholoKey/QR/transferencia/movimiento, shell de billetera de solo lectura, selección de cuenta, pruebas de widgets y alcance explícito no compatible con Pix. Las pruebas de widgets Docker pasan. Commit: `3dcc78d`.
+L5. El agente principal reconstruyó la imagen Flutter y ejecutó la suite de widgets dentro de Docker; ambas pruebas de widgets pasaron con código de salida 0.
+L6. Se agregó confirmación local de pagador/receptor usando la clave de idempotencia estable, estado de confirmación visible, replay duplicado sin una segunda transferencia y cobertura pública de widgets. Las pruebas Docker pasaron las 4 pruebas y `flutter analyze` no informó problemas. Commit: `9c3c8f2`.

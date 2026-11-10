@@ -39,7 +39,7 @@ type acceptResponse struct {
 func (h *Handler) accept(w http.ResponseWriter, r *http.Request) {
 	var req acceptRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid message envelope", http.StatusBadRequest)
+		http.Error(w, "sobre de mensaje inválido", http.StatusBadRequest)
 		return
 	}
 	accepted, err := h.store.Accept(r.Context(), Envelope{MessageID: req.MessageID, IdempotencyKey: req.IdempotencyKey, SenderNetworkID: req.SenderNetworkID, DestinationNetworkID: req.DestinationNetworkID, SchemaVersion: req.SchemaVersion, MessageType: req.MessageType, CorrelationID: req.CorrelationID, CausationID: req.CausationID, Payload: req.Payload})

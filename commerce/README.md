@@ -1,10 +1,10 @@
 # Commerce sandbox
 
-A minimal, synthetic commerce surface for the CholoPay sandbox. It is deliberately independent from the gateway: the service uses only process-local memory, seeded catalog data, and synthetic USD-denominated minor units. It does not process money, call external services, or write a ledger.
+Superficie comercial mínima y sintética para el entorno aislado de CholoPay. Es deliberadamente independiente de la pasarela: el servicio solo usa memoria local al proceso, datos de catálogo iniciales y unidades menores sintéticas denominadas en USD. No procesa dinero, llama a servicios externos ni escribe un diario.
 
-## Docker-only usage
+## Uso exclusivo para Docker
 
-From this directory:
+Desde este directorio:
 
 ```sh
 docker compose -f compose.yaml up --build commerce
@@ -12,19 +12,19 @@ docker compose -f compose.yaml --profile test run --rm commerce-test
 docker compose -f compose.yaml down
 ```
 
-The API is available on `http://localhost:18081` by default. Data disappears when the container stops.
+La API está disponible en `http://localhost:18081` de forma predeterminada. Los datos desaparecen cuando se detiene el contenedor.
 
-## Observable API
+## API observable
 
 - `GET /health/live`
 - `GET /v1/catalog`
-- `POST /v1/carts` — creates an empty cart.
+- `POST /v1/carts` — crea un carrito vacío.
 - `GET /v1/carts/{cart_id}`
 - `POST /v1/carts/{cart_id}/items` — JSON `{ "sku": "demo-coffee", "quantity": 2 }`.
-- `POST /v1/orders` — JSON `{ "cart_id": "..." }` and required `Idempotency-Key` header.
-- `POST /v1/checkout` — JSON `{ "cart_id": "..." }` and required `Idempotency-Key`; creates an order and a gateway payment intent, returning `payment_status: "pending"` or `"succeeded"`.
-- `POST /v1/checkouts/{checkout_id}/confirm` — server-side synthetic confirmation with required `Idempotency-Key`; a browser redirect is never treated as payment proof.
+- `POST /v1/orders` — JSON `{ "cart_id": "..." }` y la cabecera `Idempotency-Key` requerida.
+- `POST /v1/checkout` — JSON `{ "cart_id": "..." }` y la `Idempotency-Key` requerida; crea un pedido y una intención de pago de la pasarela, devolviendo `payment_status: "pending"` or `"succeeded"`.
+- `POST /v1/checkouts/{checkout_id}/confirm` — confirmación sintética en el servidor con la `Idempotency-Key` requerida; una redirección del navegador nunca se considera prueba de pago.
 - `GET /v1/orders/{order_id}`
 - `GET /v1/inventory`
 
-Creating an order checks and decrements synthetic inventory atomically. Repeating an order with the same idempotency key returns the original order without a second decrement. Checkout uses `GATEWAY_URL` plus `GATEWAY_API_KEY` for the HTTP gateway, or the explicitly named `GATEWAY_ADAPTER=synthetic` adapter (the default when no URL is configured). It exposes only pending/succeeded payment states; it has no redirect-based success path. A process restart resets all state.
+Crear un pedido comprueba y decrementa atómicamente el inventario sintético. Repetir un pedido con la misma clave de idempotencia devuelve el pedido original sin un segundo decremento. El checkout usa `GATEWAY_URL` plus `GATEWAY_API_KEY` para la pasarela HTTP, o el adaptador explícitamente denominado `GATEWAY_ADAPTER=synthetic` adapter (el valor predeterminado cuando no se configura una URL). Solo expone estados de pago pending/succeeded; no tiene una ruta de éxito basada en redirección. Reiniciar el proceso restablece todo el estado.

@@ -6,7 +6,7 @@ BACKUP_DIR="${BACKUP_DIR:-$ROOT_DIR/.artifacts/backups}"
 COMPOSE=(docker compose --env-file "$ROOT_DIR/infra/config.env.template" -f "$ROOT_DIR/infra/compose.yaml")
 mkdir -p "$BACKUP_DIR"
 
-usage() { echo "Usage: $0 backup|restore <file>" >&2; exit 2; }
+usage() { echo "Uso: $0 backup|restore <file>" >&2; exit 2; }
 
 backup() {
   local stamp file service
@@ -39,7 +39,7 @@ restore() {
   esac
   case "$(basename "$1")" in
     "$service"-*.sql) ;;
-    *) echo "backup file does not match RESTORE_SERVICE: $service" >&2; exit 2 ;;
+    *) echo "el archivo de respaldo no coincide con RESTORE_SERVICE: $service" >&2; exit 2 ;;
   esac
   "${COMPOSE[@]}" exec -T "$service" psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:-cholopay}" -d "$db" < "$1"
   printf 'RESTORE %s %s %s\n' "$service" "$db" "$1"

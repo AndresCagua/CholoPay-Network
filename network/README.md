@@ -1,11 +1,11 @@
-# CholoNet network skeleton — Phase 2
+# Esqueleto de red CholoNet — Fase 2
 
-This Go service is the first central-network slice. It currently exposes only liveness/readiness endpoints and a tested transfer state machine. It does **not** write settlement entries, resolve CholoKeys, access bank tables, or claim that a transfer is settled.
+Este servicio Go es el primer corte de la red central. Actualmente solo expone endpoints de actividad/disponibilidad y una máquina de estados de transferencias probada. **No** escribe asientos de liquidación, resuelve CholoKeys, accede a tablas bancarias ni afirma que una transferencia esté liquidada.
 
-Build and test only through Docker from the repository root:
+Construye y prueba únicamente mediante Docker desde la raíz del repositorio:
 
 ```bash
 docker compose --env-file infra/config.env.template -f infra/compose.yaml --profile network-test run --rm network-test
 ```
 
-The runtime image is distroless and communicates only on the Compose network. No host port is published by default.
+La imagen de ejecución es distroless y se comunica únicamente en la red Compose. De forma predeterminada no se publica ningún puerto al host.

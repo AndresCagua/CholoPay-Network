@@ -34,7 +34,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	var req createRequest
 	if json.NewDecoder(r.Body).Decode(&req) != nil || req.IdempotencyKey == "" || req.AmountMinor <= 0 || req.Currency != "USD" {
-		http.Error(w, "invalid transfer instruction", http.StatusBadRequest)
+		http.Error(w, "instrucción de transferencia no válida", http.StatusBadRequest)
 		return
 	}
 	result, err := h.store.Create(r.Context(), Instruction{TransferID: req.TransferID, IdempotencyKey: req.IdempotencyKey, SourceParticipantID: req.SourceParticipantID, DestinationParticipantID: req.DestinationParticipantID, AmountMinor: req.AmountMinor, Currency: req.Currency, CorrelationID: req.CorrelationID})
@@ -43,7 +43,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		http.Error(w, "could not persist transfer instruction", http.StatusInternalServerError)
+		http.Error(w, "no se pudo persistir la instrucción de transferencia", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusAccepted, result)
@@ -52,12 +52,12 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "invalid transfer id", http.StatusBadRequest)
+		http.Error(w, "identificador de transferencia no válido", http.StatusBadRequest)
 		return
 	}
 	result, err := h.store.Get(r.Context(), id)
 	if err != nil {
-		http.Error(w, "transfer not found", http.StatusNotFound)
+		http.Error(w, "transferencia no encontrada", http.StatusNotFound)
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
@@ -66,12 +66,12 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "invalid transfer id", http.StatusBadRequest)
+		http.Error(w, "identificador de transferencia no válido", http.StatusBadRequest)
 		return
 	}
 	var req transitionRequest
 	if json.NewDecoder(r.Body).Decode(&req) != nil || req.State == "" {
-		http.Error(w, "invalid transition", http.StatusBadRequest)
+		http.Error(w, "transición no válida", http.StatusBadRequest)
 		return
 	}
 	if err := h.store.Advance(r.Context(), id, req.State, req.CausationID); err != nil {

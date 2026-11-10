@@ -1,25 +1,25 @@
-# ADR 0009: reconciliation evidence and recovery
+# ADR 0009: evidencia y recuperación de conciliación
 
-- Status: Accepted for the first reconciliation slice
-- Date: 2026-11-09
+- Estado: Aceptado para el primer slice de conciliación
+- Fecha: 2026-11-09
 
-## Context
+## Contexto
 
-Central settlement, receiver delivery, and bank completion are separate durable facts. A service can fail after settlement, messages can be delayed, and state projections can disagree. Reconciliation must detect differences without rewriting financial history.
+La liquidación central, la entrega al receptor y la finalización bancaria son hechos duraderos separados. Un servicio puede fallar después de la liquidación, los mensajes pueden retrasarse y las proyecciones de estado pueden discrepar. La conciliación debe detectar diferencias sin reescribir el historial financiero.
 
-## Decision
+## Decisión
 
-A reconciliation run records its start/end time and immutable difference rows. The runner compares:
+Una ejecución de conciliación registra sus horas de inicio y fin y filas de diferencias inmutables. El ejecutor compara:
 
 - every central journal to its delivery record;
 - every delivery to its instruction state;
 - every completion state to an applied delivery;
 - delivery/settlement identifiers and participant ownership.
 
-Findings use explicit codes such as `SETTLED_WITHOUT_DELIVERY`, `DELIVERY_PENDING`, `APPLIED_WITHOUT_COMPLETED_STATE`, and `COMPLETED_WITHOUT_APPLIED_DELIVERY`. A clean run has zero difference rows. The runner is read-only with respect to financial and transfer state; remediation replays the same delivery ID or opens manual review and never edits a journal.
+Findings use explicit codes such as `SETTLED_WITHOUT_DELIVERY`, `DELIVERY_PENDING`, `APPLIED_WITHOUT_COMPLETED_STATE`, and `COMPLETED_WITHOUT_APPLIED_DELIVERY`. Una ejecución limpia tiene cero filas de diferencias. El ejecutor es de solo lectura respecto del estado financiero y de transferencias; la remediación repite el mismo ID de entrega o abre una revisión manual y nunca edita un journal.
 
-Runs and findings are idempotently queryable by run ID. Reconciliation evidence is append-only for the run. A later run may show that a difference was resolved, but it does not delete the earlier finding.
+Las ejecuciones y los hallazgos se pueden consultar de forma idempotente por ID de ejecución. La evidencia de conciliación es append-only para la ejecución. Una ejecución posterior puede mostrar que una diferencia se resolvió, pero no elimina el hallazgo anterior.
 
-## Consequences
+## Consecuencias
 
-The network can distinguish missing work from financial loss, preserve audit history, and recover by replaying an existing delivery. Bank adapters must later export inbox/ledger evidence with the same transfer, delivery, and event identifiers.
+La red puede distinguir trabajo faltante de pérdida financiera, preservar el historial de auditoría y recuperarse repitiendo una entrega existente. Los adaptadores bancarios deberán exportar posteriormente evidencia de inbox/ledger con los mismos identificadores de transferencia, entrega y evento.

@@ -1,5 +1,5 @@
-# Banco Costa web panel
+# Panel web de Banco Costa
 
-Reads `GET {NEXT_PUBLIC_TRANSFER_API_BASE_URL}/v1/participants/bank-costa/transfers` through `app/transfers.ts`. The synthetic adapter is the default when the base URL is absent; it is read-only and participant-scoped, and exists only to exercise the public API boundary until bank-core exposes this projection. The browser never accesses a database, ledger, or filesystem. Loading, error, and empty responses are explicit.
+Lee `GET {NEXT_PUBLIC_TRANSFER_API_BASE_URL}/v1/participants/bank-costa/transfers` mediante `app/transfers.ts`. El adaptador sintético es el predeterminado cuando falta la URL base; es de solo lectura y está limitado al participante, y existe únicamente para ejercitar el límite de la API pública hasta que bank-core exponga esta proyección. El navegador nunca accede a una base de datos, un libro mayor ni al sistema de archivos. Las respuestas de carga, error y ausencia de datos son explícitas.
 
-Docker check: `docker build -t cholopay-bank-costa-web ./web/bank-costa`.
+Verificación de Docker: `docker build -t cholopay-bank-costa-web ./web/bank-costa`.

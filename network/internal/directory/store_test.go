@@ -45,14 +45,14 @@ func TestPortRequiresAuthorization(t *testing.T) {
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, req)
 	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("expected unauthorized port request, got %d", response.Code)
+		t.Fatalf("se esperaba una solicitud de portabilidad no autorizada, se obtuvo %d", response.Code)
 	}
 }
 
 func TestPostgresDirectoryResolvesWithinOwningNetwork(t *testing.T) {
 	url := os.Getenv("NETWORK_DB_URL")
 	if url == "" {
-		t.Skip("NETWORK_DB_URL is required for the Docker integration test")
+		t.Skip("NETWORK_DB_URL es necesario para la prueba de integración de Docker")
 	}
 	db, err := sql.Open("pgx", url)
 	if err != nil {
@@ -93,7 +93,7 @@ func TestPostgresDirectoryResolvesWithinOwningNetwork(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resolved.Entry.ParticipantID != bankParticipant || resolved.MessageType != "DIRECTORY_KEY_RESOLVED" || resolved.SchemaVersion != "1.0" {
-		t.Fatalf("unexpected resolution: %+v", resolved)
+		t.Fatalf("resolución inesperada: %+v", resolved)
 	}
 	body, _ := json.Marshal(map[string]any{"network_id": banking, "key_type": key.KeyType, "key_value": key.KeyValue, "correlation_id": uuid.New(), "causation_id": uuid.New(), "idempotency_key": "http-directory-test"})
 	mux := http.NewServeMux()
@@ -103,17 +103,17 @@ func TestPostgresDirectoryResolvesWithinOwningNetwork(t *testing.T) {
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, req)
 	if response.Code != http.StatusOK {
-		t.Fatalf("expected HTTP resolution, got %d: %s", response.Code, response.Body.String())
+		t.Fatalf("se esperaba una resolución HTTP, se obtuvo %d: %s", response.Code, response.Body.String())
 	}
 	if _, err := store.Resolve(ctx, fintech, key.KeyType, key.KeyValue, uuid.New(), uuid.New(), "directory-test-2"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("expected network isolation, got %v", err)
+		t.Fatalf("se esperaba aislamiento de red, se obtuvo %v", err)
 	}
 	duplicate := key
 	duplicate.KeyID = uuid.New()
 	duplicate.NetworkID = fintech
 	duplicate.ParticipantID = walletParticipant
 	if err := store.Register(ctx, duplicate); !errors.Is(err, ErrKeyConflict) {
-		t.Fatalf("expected global identity conflict, got %v", err)
+		t.Fatalf("se esperaba un conflicto de identidad global, se obtuvo %v", err)
 	}
 	for index := 0; index < 4; index++ {
 		entry := Entry{KeyID: uuid.New(), NetworkID: banking, ParticipantID: bankParticipant, KeyType: "RANDOM", KeyValue: uuid.NewString(), AccountRef: "costa-account-1", AccountKind: "PERSONAL", Status: "ACTIVE", Version: 1}
@@ -122,13 +122,13 @@ func TestPostgresDirectoryResolvesWithinOwningNetwork(t *testing.T) {
 		}
 	}
 	if err := store.Register(ctx, Entry{KeyID: uuid.New(), NetworkID: banking, ParticipantID: bankParticipant, KeyType: "RANDOM", KeyValue: uuid.NewString(), AccountRef: "costa-account-1", AccountKind: "PERSONAL", Status: "ACTIVE", Version: 1}); !errors.Is(err, ErrKeyLimit) {
-		t.Fatalf("expected personal key limit, got %v", err)
+		t.Fatalf("se esperaba el límite de claves personales, se obtuvo %v", err)
 	}
 	if _, err := db.ExecContext(ctx, "UPDATE directory_key SET status='SUSPENDED' WHERE key_id=$1", key.KeyID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.Resolve(ctx, banking, key.KeyType, key.KeyValue, uuid.New(), uuid.New(), "directory-test-3"); !errors.Is(err, ErrSuspended) {
-		t.Fatalf("expected suspended key, got %v", err)
+		t.Fatalf("se esperaba una clave suspendida, se obtuvo %v", err)
 	}
 	portValue := "+593990000002"
 	portKey := Entry{KeyID: uuid.New(), NetworkID: banking, ParticipantID: bankParticipant, KeyType: "PHONE", KeyValue: portValue, AccountRef: "costa-account-2", AccountKind: "PERSONAL", Status: "ACTIVE", Version: 1}
@@ -140,12 +140,12 @@ func TestPostgresDirectoryResolvesWithinOwningNetwork(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := store.Port(ctx, portRequest); err != nil {
-		t.Fatalf("expected idempotent port replay, got %v", err)
+		t.Fatalf("se esperaba una repetición idempotente de portabilidad, se obtuvo %v", err)
 	}
 	if _, err := store.Resolve(ctx, banking, portKey.KeyType, portValue, uuid.New(), uuid.New(), "directory-port-old"); !errors.Is(err, ErrSuspended) {
-		t.Fatalf("expected old owner suspended, got %v", err)
+		t.Fatalf("se esperaba que el propietario anterior estuviera suspendido, se obtuvo %v", err)
 	}
 	if resolved, err := store.Resolve(ctx, fintech, portKey.KeyType, portValue, uuid.New(), uuid.New(), "directory-port-new"); err != nil || resolved.Entry.ParticipantID != walletParticipant {
-		t.Fatalf("expected new owner resolution, got %+v, %v", resolved, err)
+		t.Fatalf("se esperaba la resolución del nuevo propietario, se obtuvo %+v, %v", resolved, err)
 	}
 }

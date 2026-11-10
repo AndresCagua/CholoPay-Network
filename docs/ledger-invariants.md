@@ -1,13 +1,13 @@
-# Ledger invariants
+# Invariantes del ledger
 
-1. Every journal is balanced: debits plus credits equal zero per currency.
-2. Amounts are integer USD cents (`BIGINT`), never floating point.
-3. Restricted accounts never have negative available balance.
-4. One business instruction cannot create two settlement operations.
-5. Interbank settlement positions conserve value unless an explicit, audited funding operation creates balancing entries.
-6. Published entries are immutable; correction is compensating movement.
-7. Idempotency keys are scoped, bound to a request hash, and reject a different payload with HTTP 409.
-8. Ledger state is authoritative in PostgreSQL; caches and event streams can be rebuilt.
-9. Every financial operation carries transaction, correlation, causation, and audit identifiers.
+1. Cada journal está equilibrado: débitos más créditos suman cero por moneda.
+2. Los importes son centavos enteros de USD (`BIGINT`), nunca números de punto flotante.
+3. Las cuentas restringidas nunca tienen saldo disponible negativo.
+4. Una instrucción de negocio no puede crear dos operaciones de liquidación.
+5. Las posiciones de liquidación interbancaria conservan el valor salvo que una operación de fondeo explícita y auditada cree asientos compensatorios.
+6. Los asientos publicados son inmutables; la corrección es un movimiento compensatorio.
+7. Las claves de idempotencia tienen alcance, están vinculadas a un hash de solicitud y rechazan un payload diferente con HTTP 409.
+8. El estado del ledger es autoritativo en PostgreSQL; las cachés y los streams de eventos pueden reconstruirse.
+9. Cada operación financiera lleva identificadores de transacción, correlación, causación y auditoría.
 
-Tests must assert observable outcomes through public interfaces and include concurrent reservations, duplicate requests, timeout uncertainty, and reconciliation.
+Las pruebas deben afirmar resultados observables mediante interfaces públicas e incluir reservas concurrentes, solicitudes duplicadas, incertidumbre por timeout y conciliación.

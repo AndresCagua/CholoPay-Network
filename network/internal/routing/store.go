@@ -34,7 +34,7 @@ type Route struct {
 	DestinationParticipant Participant
 }
 
-var ErrParticipantUnavailable = errors.New("participant or network is unavailable")
+var ErrParticipantUnavailable = errors.New("el participante o la red no están disponibles")
 
 type Store struct{ db *sql.DB }
 

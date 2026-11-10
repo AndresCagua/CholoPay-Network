@@ -18,7 +18,7 @@ func (h *ReconciliationHandler) Register(mux *http.ServeMux) {
 func (h *ReconciliationHandler) create(w http.ResponseWriter, r *http.Request) {
 	result, err := h.store.Reconcile(r.Context(), uuid.New())
 	if err != nil {
-		http.Error(w, "reconciliation failed", http.StatusInternalServerError)
+		http.Error(w, "falló la conciliación", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusCreated, result)
@@ -26,12 +26,12 @@ func (h *ReconciliationHandler) create(w http.ResponseWriter, r *http.Request) {
 func (h *ReconciliationHandler) get(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "invalid run id", http.StatusBadRequest)
+		http.Error(w, "identificador de ejecución inválido", http.StatusBadRequest)
 		return
 	}
 	result, err := h.store.ReconciliationRun(r.Context(), id)
 	if err != nil {
-		http.Error(w, "reconciliation run not found", http.StatusNotFound)
+		http.Error(w, "ejecución de conciliación no encontrada", http.StatusNotFound)
 		return
 	}
 	writeJSON(w, http.StatusOK, result)

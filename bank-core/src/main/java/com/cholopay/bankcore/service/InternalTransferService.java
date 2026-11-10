@@ -26,8 +26,8 @@ public class InternalTransferService {
     }
 
     public synchronized Journal transfer(UUID sourceId, UUID destinationId, long amountMinor, String idempotencyKey, UUID correlationId) {
-        if (amountMinor <= 0) throw new IllegalArgumentException("amount_minor must be positive");
-        if (sourceId.equals(destinationId)) throw new IllegalArgumentException("source and destination must differ");
+        if (amountMinor <= 0) throw new IllegalArgumentException("amount_minor debe ser positivo");
+        if (sourceId.equals(destinationId)) throw new IllegalArgumentException("el origen y el destino deben ser distintos");
         Journal existing = completedByIdempotency.get(idempotencyKey);
         if (existing != null) {
             if (existing.entries().get(0).amountMinor() != amountMinor) throw new IdempotencyConflictException();
@@ -35,8 +35,8 @@ public class InternalTransferService {
         }
         List<Account> locked = List.of(accounts.get(sourceId), accounts.get(destinationId)).stream()
                 .sorted(Comparator.comparing(a -> a.id().toString())).toList();
-        if (locked.contains(null)) throw new IllegalArgumentException("account not found");
-        for (Account ignored : locked) { /* synchronized service provides deterministic critical section */ }
+        if (locked.contains(null)) throw new IllegalArgumentException("cuenta no encontrada");
+        for (Account ignored : locked) { /* el servicio sincronizado proporciona una sección crítica determinista */ }
         Account source = accounts.get(sourceId), destination = accounts.get(destinationId);
         source.reserve(amountMinor);
         source.debitReserved(amountMinor);
@@ -53,6 +53,6 @@ public class InternalTransferService {
     public List<Journal> journals() { return List.copyOf(journals); }
 
     public static final class IdempotencyConflictException extends RuntimeException {
-        public IdempotencyConflictException() { super("idempotency key was already used with a different request"); }
+        public IdempotencyConflictException() { super("la clave de idempotencia ya se usó con una solicitud diferente"); }
     }
 }

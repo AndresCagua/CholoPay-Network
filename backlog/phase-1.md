@@ -1,12 +1,12 @@
-# Phase 1 backlog preview
+# Vista previa del backlog de la fase 1
 
-1. Define bank schema and migration strategy.
-2. Implement journal and balanced-entry constraints.
-3. Implement account reservations with deterministic lock ordering.
-4. Implement internal transfers with idempotency and payload hash conflict.
-5. Add concurrent tests for insufficient funds and duplicate requests.
-6. Add outbox/inbox tables without treating Kafka as truth.
-7. Document API errors, permissions, and synthetic-data seed.
-8. Run focused integration tests against ephemeral PostgreSQL.
+1. Definir el esquema bancario y la estrategia de migración.
+2. Implementar el journal y las restricciones de asientos equilibrados.
+3. Implementar reservas de cuentas con orden determinista de bloqueos.
+4. Implementar transferencias internas con idempotencia y conflicto de hash del payload.
+5. Agregar pruebas concurrentes para fondos insuficientes y solicitudes duplicadas.
+6. Agregar tablas outbox/inbox sin tratar Kafka como fuente de verdad.
+7. Documentar errores de API, permisos y semilla de datos sintéticos.
+8. Ejecutar pruebas de integración enfocadas contra PostgreSQL efímero.
 
-Interbank settlement is intentionally deferred until the Phase 2 protocol ADRs answer the financial questions in `spec.md` section 19.
+La liquidación interbancaria se difiere deliberadamente hasta que los ADR del protocolo de la fase 2 respondan las preguntas financieras de la sección 19 de `spec.md`.

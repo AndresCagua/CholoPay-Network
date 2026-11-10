@@ -3,54 +3,54 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:cholopay_wallet/main.dart';
 
 void main() {
-  testWidgets('renders the selected synthetic account and read-only sections', (
+  testWidgets('renderiza la cuenta sintética seleccionada y las secciones de solo lectura', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const CholoPayWalletApp());
 
-    expect(find.text('CholoPay Wallet'), findsOneWidget);
-    expect(find.text('Costa Bank · USD account'), findsOneWidget);
+    expect(find.text('Billetera CholoPay'), findsOneWidget);
+    expect(find.text('Banco Costa · cuenta USD'), findsOneWidget);
     expect(find.text('CholoPay QR'), findsOneWidget);
-    expect(find.text('Read-only demo'), findsOneWidget);
+    expect(find.text('Demostración de solo lectura'), findsOneWidget);
     await tester.drag(find.byType(ListView), const Offset(0, -700));
     await tester.pumpAndSettle();
-    expect(find.text('Recent movements'), findsOneWidget);
+    expect(find.text('Movimientos recientes'), findsOneWidget);
   });
 
-  testWidgets('can select another local account fixture', (
+  testWidgets('permite seleccionar otro dato sintético de cuenta local', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const CholoPayWalletApp());
 
     await tester.tap(find.byKey(const Key('account-selector')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Costa Savings · USD account').last);
+    await tester.tap(find.text('Ahorros Costa · cuenta USD').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Costa Savings · USD account'), findsOneWidget);
+    expect(find.text('Ahorros Costa · cuenta USD'), findsOneWidget);
   });
 
-  testWidgets('confirms the synthetic payer and payee transfer once', (
+  testWidgets('confirma una vez la transferencia del pagador y beneficiario sintéticos', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const CholoPayWalletApp());
     await tester.drag(find.byType(ListView), const Offset(0, -350));
     await tester.pumpAndSettle();
 
-    expect(find.text('Confirmation: NOT CONFIRMED'), findsOneWidget);
-    expect(find.text('Payer: Costa Bank · USD account'), findsOneWidget);
-    expect(find.text('Payee: Synthetic Receiver'), findsOneWidget);
+    expect(find.text('Confirmación: NOT CONFIRMED'), findsOneWidget);
+    expect(find.text('Pagador: Banco Costa · cuenta USD'), findsOneWidget);
+    expect(find.text('Beneficiario: Receptor sintético'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('confirm-transfer')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Confirmation: CONFIRMED'), findsOneWidget);
-    expect(find.text('Transfer ID: 00000000-0000-0000-0000-000000000010'), findsOneWidget);
-    expect(find.text('Transfers created: 1'), findsOneWidget);
+    expect(find.text('Confirmación: CONFIRMED'), findsOneWidget);
+    expect(find.text('ID de transferencia: 00000000-0000-0000-0000-000000000010'), findsOneWidget);
+    expect(find.text('Transferencias creadas: 1'), findsOneWidget);
     expect(find.text('Idempotency: wallet-confirm-000000000000001'), findsOneWidget);
   });
 
-  testWidgets('replays duplicate confirmation without creating another transfer', (
+  testWidgets('reproduce la confirmación duplicada sin crear otra transferencia', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const CholoPayWalletApp());
@@ -63,9 +63,9 @@ void main() {
     await tester.tap(confirmButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('Duplicate replay: REUSED_EXISTING_TRANSFER'), findsOneWidget);
-    expect(find.text('Confirmation: CONFIRMED'), findsOneWidget);
-    expect(find.text('Transfers created: 1'), findsOneWidget);
-    expect(find.text('Transfer ID: 00000000-0000-0000-0000-000000000010'), findsOneWidget);
+    expect(find.text('Repetición duplicada: REUSED_EXISTING_TRANSFER'), findsOneWidget);
+    expect(find.text('Confirmación: CONFIRMED'), findsOneWidget);
+    expect(find.text('Transferencias creadas: 1'), findsOneWidget);
+    expect(find.text('ID de transferencia: 00000000-0000-0000-0000-000000000010'), findsOneWidget);
   });
 }

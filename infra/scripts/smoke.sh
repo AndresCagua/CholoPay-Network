@@ -12,10 +12,10 @@ for service in "${services[@]}"; do
     sleep 1
   done
   if (( ! ready )); then
-    echo "ERROR: $service did not become healthy: ${status:-not running}" >&2
+    echo "ERROR: $service no alcanzó un estado saludable: ${status:-no está ejecutándose}" >&2
     exit 1
   fi
-  echo "OK: $service is healthy"
+  echo "OK: $service está saludable"
 done
 
 declare -A expected_db=(
@@ -30,7 +30,7 @@ for service in "${services[@]}"; do
     echo "ERROR: $service owns '$db', expected '${expected_db[$service]}'" >&2
     exit 1
   fi
-  echo "OK: $service owns database $db"
+  echo "OK: $service es propietario de la base de datos $db"
 done
 
-echo 'Smoke test passed inside Docker: four isolated PostgreSQL services are healthy.'
+echo 'La prueba rápida pasó dentro de Docker: los cuatro servicios PostgreSQL aislados están saludables.'

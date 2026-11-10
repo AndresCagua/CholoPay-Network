@@ -1,12 +1,12 @@
-# ADR 0004: Bank-owned customer onboarding
+# ADR 0004: Alta de clientes propiedad del banco
 
-- Status: Accepted
-- Date: 2026-11-09
+- Estado: Aceptado
+- Fecha: 2026-11-09
 
-## Decision
+## Decisión
 
-Customers open synthetic accounts at a participant bank. The central network registers and resolves CholoKeys and coordinates settlement but does not open retail accounts or own customer ledgers.
+Las personas clientes abren cuentas sintéticas en un banco participante. La red central registra y resuelve CholoKeys y coordina la liquidación, pero no abre cuentas minoristas ni es propietaria de los ledgers de clientes.
 
-## Consequences
+## Consecuencias
 
-The operator console supervises institutions and authorized projections, not retail onboarding. A wallet session at one bank cannot authorize another bank.
+La consola del operador supervisa instituciones y proyecciones autorizadas, no el alta minorista. Una sesión de billetera en un banco no puede autorizar otro banco.

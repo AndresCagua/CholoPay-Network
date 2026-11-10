@@ -1,19 +1,19 @@
-# ADR 0008: receiver credit delivery and completion
+# ADR 0008: entrega y finalización del abono al receptor
 
-- Status: Accepted for the first delivery slice
-- Date: 2026-11-09
+- Estado: Aceptado para el primer slice de entrega
+- Fecha: 2026-11-09
 
-## Context
+## Contexto
 
-Central settlement and receiver credit are different commits owned by different systems. CholoNet cannot write a bank's customer ledger. Delivery can be duplicated, delayed, reordered, or interrupted after settlement.
+La liquidación central y el abono al receptor son commits diferentes, propiedad de sistemas distintos. CholoNet no puede escribir en el ledger de clientes de un banco. La entrega puede duplicarse, retrasarse, reordenarse o interrumpirse después de la liquidación.
 
-## Decision
+## Decisión
 
-After a central journal commits, CholoNet creates one durable `CREDIT_PENDING` delivery record keyed by `transfer_id` and receiver participant. An outbox worker may deliver the same command repeatedly. The receiver bank applies the command in its own local transaction and acknowledges with the same `transfer_id`, `delivery_id`, and `event_id`; its inbox/idempotency constraints prevent a second financial effect.
+Después de confirmar un journal central, CholoNet crea un registro de entrega duradero `CREDIT_PENDING` indexado por `transfer_id` y participante receptor. Un worker de outbox puede entregar el mismo comando repetidamente. El banco receptor aplica el comando en su propia transacción local y confirma con los mismos `transfer_id`, `delivery_id` y `event_id`; sus restricciones de inbox/idempotencia impiden un segundo efecto financiero.
 
-CholoNet accepts an acknowledgement only for an existing delivery whose transfer is `SETTLED` or `CREDIT_PENDING`. The first valid acknowledgement marks the delivery `APPLIED` and the transfer `COMPLETED` in one local transaction. Repeated identical acknowledgements return the existing result. A conflicting event or receiver identity is rejected and does not mutate state. Missing acknowledgements remain `CREDIT_PENDING` and are retried with bounded backoff; they are never declared failed by timeout alone.
+CholoNet acepta una confirmación únicamente para una entrega existente cuya transferencia esté en `SETTLED` o `CREDIT_PENDING`. La primera confirmación válida marca la entrega como `APPLIED` y la transferencia como `COMPLETED` en una única transacción local. Las confirmaciones idénticas repetidas devuelven el resultado existente. Un evento o identidad de receptor en conflicto se rechaza y no modifica el estado. Las confirmaciones faltantes permanecen en `CREDIT_PENDING` y se reintentan con backoff acotado; nunca se declaran fallidas solo por timeout.
 
-## Invariants
+## Invariantes
 
 - A settled transfer has at most one delivery record.
 - Delivery transport is at-least-once; receiver financial effect is idempotent by durable identifiers.
@@ -22,6 +22,6 @@ CholoNet accepts an acknowledgement only for an existing delivery whose transfer
 - A duplicate acknowledgement cannot create a second completion or journal.
 - A refund is a new compensating operation and does not erase delivery history.
 
-## Consequences
+## Consecuencias
 
-CholoNet owns delivery intent, attempts, and acknowledgement evidence. Each bank must later implement its own inbox and ledger application transaction. Reconciliation compares central settlement, delivery, receiver inbox, and bank ledger evidence.
+CholoNet es propietario de la intención de entrega, los intentos y la evidencia de confirmación. Cada banco deberá implementar posteriormente su propia transacción de aplicación en inbox y ledger. La conciliación compara la liquidación central, la entrega, el inbox del receptor y la evidencia del ledger bancario.

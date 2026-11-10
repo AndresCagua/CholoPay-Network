@@ -1,14 +1,14 @@
 # CholoPay Network
 
-CholoPay Network is an educational, fully simulated interoperable-payments ecosystem. It does not move real money, connect to Pix/SPI/DICT, represent a bank or public authority, or store real personal data.
+CholoPay Network es un ecosistema educativo y completamente simulado de pagos interoperables. No mueve dinero real, no se conecta con Pix/SPI/DICT, no representa a un banco ni a una autoridad pública y no almacena datos personales reales.
 
-This repository contains Phase 0 architecture and the first Phase 1 bank-core slice. User interfaces are intentionally out of scope until the vertical slice is approved.
+Este repositorio contiene la arquitectura de la fase 0 y el primer slice de núcleo bancario de la fase 1. Las interfaces de usuario están deliberadamente fuera de alcance hasta aprobar el slice vertical.
 
-## Docker-only rule
+## Regla de uso exclusivo de Docker
 
-The project is designed so a fresh checkout needs **Docker Engine and the Compose plugin only**. Do not install Java, Maven, Gradle, Node, Go, PostgreSQL, Redis, Kafka, Python, or database clients on the host to build, test, or run CholoPay. Build and test images contain their own toolchains.
+El proyecto está diseñado para que un checkout nuevo necesite únicamente **Docker Engine y el complemento Compose**. No instales Java, Maven, Gradle, Node, Go, PostgreSQL, Redis, Kafka, Python ni clientes de bases de datos en el host para compilar, probar o ejecutar CholoPay. Las imágenes de compilación y prueba contienen sus propias cadenas de herramientas.
 
-The default Compose stack binds no database, Redis, Kafka, or application port to the host. Services communicate on a private Docker network, so the normal workflow cannot collide with host ports:
+La pila Compose predeterminada no vincula ninguna base de datos, Redis, Kafka ni puerto de aplicación al host. Los servicios se comunican en una red Docker privada, por lo que el flujo normal no puede colisionar con puertos del host:
 
 ```bash
 docker compose --env-file infra/config.env.template -f infra/compose.yaml config
@@ -18,32 +18,32 @@ docker compose --env-file infra/config.env.template -f infra/compose.yaml --prof
 docker compose --env-file infra/config.env.template -f infra/compose.yaml down
 ```
 
-`make` is an optional convenience wrapper only; it is not a project prerequisite. Use `docker compose` directly for a Docker-only checkout. The image build is multi-stage and runs Maven inside `bank-core/Dockerfile`.
+`make` es solamente un envoltorio opcional de conveniencia; no es un prerrequisito del proyecto. Usa `docker compose` directamente en un checkout exclusivo de Docker. La compilación de la imagen usa varias etapas y ejecuta Maven dentro de `bank-core/Dockerfile`.
 
-## Boundaries
+## Límites
 
-- `cholopay-architecture`: this repository: ADRs, diagrams, contracts, threat model, runbooks, and backlog.
-- `cholopay-infra`: local FOSS environment; the first Compose layout is under `infra/` while repository separation is pending.
-- `cholopay-network`: Go central network and settlement ledger (future repository).
-- `cholopay-bank-core`: parametrized Java/Spring Boot bank core, deployed independently for Costa, Sierra, and Oriente (future repository).
+- `cholopay-architecture`: este repositorio: ADR, diagramas, contratos, modelo de amenazas, runbooks y backlog.
+- `cholopay-infra`: entorno FOSS local; el primer diseño Compose está en `infra/` mientras se completa la separación de repositorios.
+- `cholopay-network`: red central en Go y ledger de liquidación (repositorio futuro).
+- `cholopay-bank-core`: núcleo bancario parametrizado en Java/Spring Boot, desplegado de forma independiente para Costa, Sierra y Oriente (repositorio futuro).
 
-The three bank instances have separate PostgreSQL databases, credentials, keys, and ledgers. The network never writes directly to a bank database. Kafka is optional event transport; PostgreSQL ledgers remain the source of truth.
+Las tres instancias bancarias tienen bases PostgreSQL, credenciales, claves y ledgers separados. La red nunca escribe directamente en una base bancaria. Kafka es un transporte opcional de eventos; los ledgers PostgreSQL siguen siendo la fuente de verdad.
 
-## Documentation
+## Documentación
 
-- [Vision and boundaries](docs/vision.md)
-- [C4 context](docs/c4-context.md) and [C4 containers](docs/c4-containers.md)
-- [Transfer protocol and state machine](docs/transfer-protocol.md)
-- [Ledger invariants](docs/ledger-invariants.md)
-- [Threat model](docs/security-threat-model.md)
-- [Testing strategy](docs/testing-strategy.md)
-- [FOSS inventory](sbom/dependencies.spdx.json)
-- [Phase 0 backlog](backlog/phase-0.md)
-- [Phase 1 bank-core](bank-core/README.md)
-- [Interbank state machine](docs/interbank-state-machine.md)
-- [Phase 2 network skeleton](network/README.md)
-- [Phase 2 backlog](backlog/phase-2.md)
+- [Visión y límites](docs/vision.md)
+- [Contexto C4](docs/c4-context.md) y [contenedores C4](docs/c4-containers.md)
+- [Protocolo de transferencias y máquina de estados](docs/transfer-protocol.md)
+- [Invariantes del ledger](docs/ledger-invariants.md)
+- [Modelo de amenazas](docs/security-threat-model.md)
+- [Estrategia de pruebas](docs/testing-strategy.md)
+- [Inventario FOSS](sbom/dependencies.spdx.json)
+- [Backlog de la fase 0](backlog/phase-0.md)
+- [Núcleo bancario de la fase 1](bank-core/README.md)
+- [Máquina de estados interbancaria](docs/interbank-state-machine.md)
+- [Esqueleto de red de la fase 2](network/README.md)
+- [Backlog de la fase 2](backlog/phase-2.md)
 
-## License
+## Licencia
 
-Code is Apache-2.0 unless a future repository states otherwise. Documentation is CC BY 4.0. All demo data must be synthetic. See `LICENSE`, `NOTICE`, and `SECURITY.md`.
+El código está bajo Apache-2.0 salvo que un repositorio futuro indique lo contrario. La documentación está bajo CC BY 4.0. Todos los datos de demostración deben ser sintéticos. Consulta `LICENSE`, `NOTICE` y `SECURITY.md`.

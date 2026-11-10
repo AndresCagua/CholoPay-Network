@@ -1,6 +1,6 @@
 # Phase 7 — Rendimiento, resiliencia y observabilidad reproducible
 Fuente: `spec.md`, secciones 13, 14, 15, 16, 26 y 27.
-Scope: laboratorio Docker-only para escenarios sintéticos; no publicar puertos por defecto, no usar datos reales y no modificar infraestructura externa.
+Alcance: laboratorio exclusivo de Docker para escenarios sintéticos; no publicar puertos por defecto, no usar datos reales y no modificar infraestructura externa.
 
 ## Specs
 
@@ -24,12 +24,12 @@ Scope: laboratorio Docker-only para escenarios sintéticos; no publicar puertos 
    > publicación de metodología, resultados y conciliación completa.
    > Entregables: CholoLab, perfiles de rendimiento del router Go, dashboards, fault injection, informes reproducibles 1k/10k/100k y, si recursos lo permiten, 1M.
 
-## Tasks
+## Tareas
 
-- T1 (S1, S4): Definir CholoLab Docker-only, escenarios sintéticos y formato de evidencia reproducible. Route: inline after bounded exploration. Commit: `4908f08`.
-- T2 (S1, S3): Implementar un escenario mínimo de carga y fault injection contra interfaces públicas, sin escribir directamente en ledgers. Route: delegated only if independent heavy unit emerges. Commit: `4908f08`.
-- T3 (S2, S3): Añadir métricas/logs estructurados y runbook de ejecución/interpretación, sin prometer resultados universales. Route: worker. Commit: `19c9165`.
-- T4 (S1-S5): Ejecutar checks Docker, validar `docker compose config`, registrar metodología, resultados y límites. Route: inline. Commit: `19c9165`.
+- T1 (S1, S4): Definir CholoLab Docker-only, escenarios sintéticos y formato de evidencia reproducible. Ruta: inline después de una exploración acotada. Commit: `4908f08`.
+- T2 (S1, S3): Implementar un escenario mínimo de carga y fault injection contra interfaces públicas, sin escribir directamente en ledgers. Ruta: delegada solo si surge una unidad pesada independiente. Commit: `4908f08`.
+- T3 (S2, S3): Añadir métricas/logs estructurados y runbook de ejecución/interpretación, sin prometer resultados universales. Ruta: worker. Commit: `19c9165`.
+- T4 (S1-S5): Ejecutar checks Docker, validar `docker compose config`, registrar metodología, resultados y límites. Ruta: inline. Commit: `19c9165`.
 
 ## Log
 

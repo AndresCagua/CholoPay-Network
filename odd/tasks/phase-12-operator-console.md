@@ -1,6 +1,6 @@
 # Phase 12 — Consola central de supervisión simulada
 Fuente: `spec.md`, secciones 25, 26.9 y 27.
-Scope: proyecciones agregadas de solo lectura sobre CholoNet, bancos y facturadores; no mutación de cuentas, ledgers, facturas ni multas.
+Alcance: proyecciones agregadas de solo lectura sobre CholoNet, bancos y facturadores; no mutación de cuentas, ledgers, facturas ni multas.
 
 ## Specs
 
@@ -26,12 +26,12 @@ Scope: proyecciones agregadas de solo lectura sobre CholoNet, bancos y facturado
 - Cada proyección muestra origen, última sincronización y estado de conciliación.
 - Fallos de una fuente no deben inventar saldos, estados ni obligaciones.
 
-## Tasks
+## Tareas
 
-- T1 (S1-S5): Inventariar fuentes y contratos read-only existentes, incluyendo autorización y alcance de datos. Route: inline. Commit: pending.
-- T2 (S1-S5): Implementar endpoint/proyección agregada de incidencias y salud de participantes. Route: inline worker. Commit: pending.
-- T3 (S1-S5): Añadir regresiones de aislamiento, enmascaramiento, stale data y no-mutación. Route: inline worker. Commit: pending.
-- T4 (S1-S5): Documentar consola simulada y evidencia Docker. Route: inline. Commit: pending.
+- T1 (S1-S5): Inventariar fuentes y contratos de solo lectura existentes, incluyendo autorización y alcance de datos. Ruta: inline. Commit: pending.
+- T2 (S1-S5): Implementar endpoint/proyección agregada de incidencias y salud de participantes. Ruta: worker inline. Commit: pending.
+- T3 (S1-S5): Añadir regresiones de aislamiento, enmascaramiento, datos obsoletos y no-mutación. Ruta: worker inline. Commit: pending.
+- T4 (S1-S5): Documentar consola simulada y evidencia Docker. Ruta: inline. Commit: pending.
 
 ## Log
 

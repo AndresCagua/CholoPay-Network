@@ -1,6 +1,6 @@
 # Phase 11 — Ciclo de vida y portabilidad de CholoKey
 Fuente: `spec.md`, secciones 23.2, 23.3, 26.2, 26.3, 26.8 y 27.
-Scope: suspensión determinista, resolución durante transición y portabilidad sintética entre participantes; no integra redes reales ni implementa reclamaciones regulatorias.
+Alcance: suspensión determinista, resolución durante transición y portabilidad sintética entre participantes; no integra redes reales ni implementa reclamaciones regulatorias.
 
 ## Specs
 
@@ -28,12 +28,12 @@ Scope: suspensión determinista, resolución durante transición y portabilidad 
 - Una suspensión bloquea nuevas operaciones aplicables, pero no borra historial ni crea movimientos financieros.
 - La portabilidad no escribe directamente en ledgers bancarios.
 
-## Tasks
+## Tareas
 
-- T1 (S1-S2): Definir estados de ciclo de vida y contrato de transición/portabilidad en el directorio. Route: inline after exploration. Commit: pending.
-- T2 (S1-S5): Implementar transición atómica de propietario con idempotencia y resolución durante suspensión/transición. Route: inline. Commit: pending.
-- T3 (S1-S5): Añadir regresiones Docker de doble destino, replay, conflicto y suspensión. Route: inline. Commit: pending.
-- T4 (S1-S5): Actualizar README, contrato y evidencia. Route: inline. Commit: pending.
+- T1 (S1-S2): Definir estados de ciclo de vida y contrato de transición/portabilidad en el directorio. Ruta: inline después de la exploración. Commit: pending.
+- T2 (S1-S5): Implementar transición atómica de propietario con idempotencia y resolución durante suspensión/transición. Ruta: inline. Commit: pending.
+- T3 (S1-S5): Añadir regresiones Docker de doble destino, replay, conflicto y suspensión. Ruta: inline. Commit: pending.
+- T4 (S1-S5): Actualizar README, contrato y evidencia. Ruta: inline. Commit: pending.
 
 ## Log
 

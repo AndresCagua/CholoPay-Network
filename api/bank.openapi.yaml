@@ -1,28 +1,28 @@
 openapi: 3.1.0
-info: {title: CholoPay Bank Core API, version: 0.1.0, description: Synthetic participant bank API; each bank is independently deployed.}
+info: {title: CholoPay Bank Core API, version: 0.1.0, description: API bancaria de participante sintético; cada banco se despliega de forma independiente.}
 servers: [{url: http://localhost:8081}]
 security: [{bearerAuth: []}]
 paths:
-  /health/live: {get: {security: [], responses: {'200': {description: Alive}}}}
-  /health/ready: {get: {security: [], responses: {'200': {description: Ready}, '503': {description: Not ready}}}}
+  /health/live: {get: {security: [], responses: {'200': {description: Activo}}}}
+  /health/ready: {get: {security: [], responses: {'200': {description: Listo}, '503': {description: No está listo}}}}
   /v1/customers:
     post:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CustomerCreate'}}}}
-      responses: {'201': {description: Created}, '422': {description: Invalid synthetic data}}
+      responses: {'201': {description: Creado}, '422': {description: Datos sintéticos inválidos}}
   /v1/accounts:
-    get: {responses: {'200': {description: Accounts owned by authenticated customer}}}
+    get: {responses: {'200': {description: Cuentas pertenecientes al cliente autenticado}}}
   /v1/transfers/internal:
     post:
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TransferInput'}}}}
-      responses: {'202': {description: Accepted}, '409': {description: Idempotency conflict}, '422': {description: Rejected}}
+      responses: {'202': {description: Aceptado}, '409': {description: Conflicto de idempotencia}, '422': {description: Rechazado}}
   /v1/transfers/interbank:
     post:
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TransferInput'}}}}
-      responses: {'202': {description: Accepted; not proof of settlement}, '409': {description: Conflict}}
+      responses: {'202': {description: Aceptado; no es prueba de liquidación}, '409': {description: Conflicto}}
   /v1/keys:
-    post: {responses: {'201': {description: Registration requested}, '409': {description: Key already active}}}
+    post: {responses: {'201': {description: Registro solicitado}, '409': {description: La clave ya está activa}}}
 components:
   securitySchemes: {bearerAuth: {type: http, scheme: bearer}}
   schemas:

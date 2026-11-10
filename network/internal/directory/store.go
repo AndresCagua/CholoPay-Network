@@ -35,10 +35,10 @@ type Resolution struct {
 }
 
 var (
-	ErrNotFound     = errors.New("directory key not found")
-	ErrSuspended    = errors.New("directory key is suspended")
-	ErrAmbiguous    = errors.New("directory key is ambiguous")
-	ErrPortConflict = errors.New("directory key porting conflict")
+	ErrNotFound     = errors.New("clave de directorio no encontrada")
+	ErrSuspended    = errors.New("la clave de directorio está suspendida")
+	ErrAmbiguous    = errors.New("la clave de directorio es ambigua")
+	ErrPortConflict = errors.New("conflicto de portabilidad de la clave de directorio")
 )
 
 type Store struct{ db *sql.DB }
@@ -92,8 +92,8 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return nil
 }
 
-var ErrKeyLimit = errors.New("directory key limit exceeded")
-var ErrKeyConflict = errors.New("directory key already active")
+var ErrKeyLimit = errors.New("se excedió el límite de claves de directorio")
+var ErrKeyConflict = errors.New("la clave de directorio ya está activa")
 
 func (s *Store) Register(ctx context.Context, entry Entry) error {
 	kind := entry.AccountKind
@@ -109,7 +109,7 @@ func (s *Store) Register(ctx context.Context, entry Entry) error {
 		return err
 	}
 	defer tx.Rollback()
-	// Serialize registrations for the same account while retaining concurrency across accounts.
+	// Serializa los registros de la misma cuenta y conserva la concurrencia entre cuentas.
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, entry.AccountRef); err != nil {
 		return err
 	}

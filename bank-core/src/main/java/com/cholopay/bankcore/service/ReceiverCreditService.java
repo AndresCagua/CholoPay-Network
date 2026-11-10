@@ -20,17 +20,17 @@ public class ReceiverCreditService {
 
     @Transactional
     public Receipt apply(UUID deliveryId, UUID eventId, UUID transferId, UUID destinationAccountId, UUID clearingAccountId, long amountMinor) {
-        if (amountMinor <= 0 || destinationAccountId.equals(clearingAccountId)) throw new IllegalArgumentException("invalid receiver credit");
+        if (amountMinor <= 0 || destinationAccountId.equals(clearingAccountId)) throw new IllegalArgumentException("crédito de receptor inválido");
         String hash = hash(deliveryId + ":" + eventId + ":" + transferId + ":" + destinationAccountId + ":" + clearingAccountId + ":" + amountMinor + ":USD");
         Existing existing = jdbc.query("SELECT payload_hash,journal_id FROM receiver_credit_inbox WHERE delivery_id = ?", (rs, row) -> new Existing(rs.getString(1), rs.getObject(2, UUID.class)), deliveryId).stream().findFirst().orElse(null);
         if (existing != null) {
-            if (!existing.payloadHash().equals(hash)) throw new IllegalStateException("receiver delivery payload conflict");
+            if (!existing.payloadHash().equals(hash)) throw new IllegalStateException("conflicto en la carga útil de entrega al receptor");
             return new Receipt(deliveryId, eventId, transferId, existing.journalId(), "APPLIED");
         }
         List<UUID> ordered = List.of(destinationAccountId, clearingAccountId).stream().sorted(Comparator.comparing(UUID::toString)).toList();
         jdbc.query("SELECT id FROM ledger_account WHERE id IN (?, ?) ORDER BY id FOR UPDATE", (rs, row) -> rs.getObject("id", UUID.class), ordered.get(0), ordered.get(1));
         long clearingBalance = jdbc.queryForObject("SELECT posted_balance_minor FROM ledger_account WHERE id = ?", Long.class, clearingAccountId);
-        if (clearingBalance < amountMinor) throw new IllegalStateException("insufficient clearing balance");
+        if (clearingBalance < amountMinor) throw new IllegalStateException("saldo de compensación insuficiente");
         UUID journalId = UUID.randomUUID();
         jdbc.update("UPDATE ledger_account SET posted_balance_minor = posted_balance_minor - ? WHERE id = ?", amountMinor, clearingAccountId);
         jdbc.update("UPDATE ledger_account SET posted_balance_minor = posted_balance_minor + ? WHERE id = ?", amountMinor, destinationAccountId);

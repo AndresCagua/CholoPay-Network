@@ -1,6 +1,6 @@
-# CholoPay Network — Phase 2 protocol and network skeleton
+# CholoPay Network — Protocolo y esqueleto de red de la fase 2
 
-Source of truth for the first central-network slice. Read through `## Log` before working.
+Fuente de verdad del primer slice de red central. Lee hasta `## Log` antes de trabajar.
 
 ## Specs
 
@@ -9,36 +9,36 @@ Source of truth for the first central-network slice. Read through `## Log` befor
 3. **S3 — Finality:** "Solo un asiento confirmado en el ledger central determina `SETTLED`." and uncertain outcomes use `UNKNOWN_PENDING_RECONCILIATION`.
 4. **S4 — Reliability:** "transporte al menos una vez; efectos financieros exactamente una vez por identificador mediante idempotencia, constraints y reconciliación".
 5. **S5 — Boundaries:** "La red no accede a sus tablas internas" for banks; the network maintains its own settlement ledger and participant state.
-6. **S6 — Container rule:** The project must run and test inside Docker; no host toolchains or host database are required.
-7. **S7 — Ingress:** The updated `spec.md` section 28 keeps Traefik future and Cloudflare optional; no ingress is required for the network skeleton.
+6. **S6 — Container rule:** El proyecto debe ejecutarse y probarse dentro de Docker; no se requieren toolchains ni bases de datos del host.
+7. **S7 — Ingress:** La sección 28 actualizada de `spec.md` mantiene Traefik como opción futura y Cloudflare como opcional; el esqueleto de red no requiere ingress.
 
 ## Tasks
 
 - T1 (S2-S5): Record the reservation, settlement, confirmation, timeout, and reconciliation protocol as an ADR and state contract. Commit: `0a69f32`.
 - T2 (S1, S5): Scaffold the Go CholoNet service with health endpoints and PostgreSQL migration layout, without claiming financial settlement. Commit: `0a69f32`.
-- T3 (S3-S5): Add idempotent transfer instruction persistence and explicit state transitions; central settlement ledger behavior remains the next bounded slice. Commit: pending.
-- T4 (S6): Add Docker-only build/test/Compose profile. Commit: `0a69f32`.
-- T5 (S1-S7): Run checks and record evidence. Commit: pending.
+- T3 (S3-S5): Agregar persistencia idempotente de instrucciones de transferencia y transiciones explícitas; el comportamiento del ledger central de liquidación queda como siguiente slice acotado. Commit: pending.
+- T4 (S6): Agregar perfil de compilación/pruebas/Compose exclusivo de Docker. Commit: `0a69f32`.
+- T5 (S1-S7): Ejecutar checks y registrar evidencia. Commit: pending.
 
-Phase 2 persistence evidence is recorded below before the follow-up commit.
+La evidencia de persistencia de la fase 2 se registra abajo antes del commit posterior.
 
-Phase 2 skeleton evidence is recorded below before the commit.
+La evidencia del esqueleto de la fase 2 se registra abajo antes del commit.
 
 ## Log
 
-L1. User requested adding the ingress decision to `spec.md` and continuing development.
-L2. The ingress decision was added as section 28: Traefik is future OSS local ingress; Cloudflare Tunnel is optional and never a core dependency.
-L3. Phase 2 starts with protocol documentation and a network skeleton before implementing interbank settlement effects.
-L4. ADR 0006 defines issuer reservation, central settlement finality, receiver inbox application, at-least-once retry, unknown-state handling, and reconciliation. It explicitly rejects global distributed ACID and new IDs after uncertain outcomes.
-L5. The Go skeleton exposes only liveness/readiness endpoints and a tested state machine; it does not access bank tables, resolve CholoKeys, or claim financial settlement.
-L6. `docker compose ... config --quiet` passed for the default and `network-test` profiles. The first run found a missing `internal_services` network declaration; that configuration defect was fixed before rerunning.
+L1. La persona usuaria solicitó agregar la decisión de ingress a `spec.md` y continuar el desarrollo.
+L2. La decisión de ingress se agregó como sección 28: Traefik es ingress local FOSS futuro; Cloudflare Tunnel es opcional y nunca una dependencia central.
+L3. La fase 2 comienza con documentación del protocolo y un esqueleto de red antes de implementar efectos de liquidación interbancaria.
+L4. El ADR 0006 define la reserva del emisor, la finalidad de la liquidación central, la aplicación en el inbox del receptor, los reintentos al menos una vez, el tratamiento de estados desconocidos y la conciliación. Rechaza explícitamente ACID distribuido global y nuevos ID después de resultados inciertos.
+L5. El esqueleto Go solo expone endpoints de actividad/disponibilidad y una máquina de estados probada; no accede a tablas bancarias, no resuelve CholoKeys ni afirma liquidación financiera.
+L6. `docker compose ... config --quiet` pasó para los perfiles predeterminado y `network-test`. La primera ejecución encontró una declaración faltante de la red `internal_services`; ese defecto de configuración se corrigió antes de repetirla.
 L7. `docker compose --env-file infra/config.env.template -f infra/compose.yaml --profile network-test run --rm network-test` passed with exit code 0. Go tests passed inside the Docker build and the one-off test container. No host ports were published.
-L8. CholoNet transfer instructions now persist in PostgreSQL with UUID identity, request hash, idempotency key, schema version, correlation/causation IDs, state, and timestamps. State transitions lock the instruction row and reject invalid transitions.
-L9. Internal-only HTTP handlers support create, get, and transition operations. They do not expose settlement or write bank tables. The runtime service requires `NETWORK_DB_URL`, runs its local schema bootstrap, and depends on the isolated `network-db` container.
-L10. A forced Docker rebuild initially exposed missing committed Go checksums. `go mod tidy` was run inside `golang:1.24-alpine`, `go.sum` was generated, and the forced Compose build/test then passed. The final test output included `github.com/cholopay/network/internal/instruction` and `internal/transfer` with exit code 0.
-L11. The central settlement slice adds ADR 0007, settlement accounts, immutable journals and entries, canonical participant-row locks, conservation checks, idempotency/advisory locking, duplicate replay, an internal settlement endpoint, and concurrent Docker integration tests. The endpoint reports `SETTLED` only after the central transaction commits.
-L12. The forced Docker verification passed with `internal/settlement` tests, including balance conservation, duplicate replay, insufficient-position protection, concurrent non-overdraw, and HTTP response behavior. The independent verifier was unavailable; the user explicitly chose to proceed without that external verification, so this limitation remains recorded.
-L13. Receiver-credit delivery now has durable `PENDING`/`APPLIED` records, duplicate enqueue replay, receiver-bound acknowledgements, conflicting-event rejection, and `CREDIT_PENDING` → `COMPLETED` updates only after receiver evidence. The forced Docker run passed `internal/settlement` delivery tests. The verifier was unavailable again; the user explicitly authorized closing this new slice without it.
-L14. Reconciliation now records append-only runs and differences, detects `SETTLED_WITHOUT_DELIVERY`, `DELIVERY_PENDING`, and applied/completed mismatches, and exposes internal run/report endpoints without mutating financial history. The forced Docker PostgreSQL run passed missing-delivery, pending-delivery, and clean-run scenarios.
-L15. The bank-core receiver adapter now owns a durable inbox and applies a synthetic clearing-account debit plus customer-account credit in one local transaction. Duplicate delivery replay returns the original journal, conflicting payloads and insufficient clearing are rejected, and the journal remains balanced. The forced Docker Maven/PostgreSQL integration suite passed after tagging all Spring integration tests so the image build remains database-independent.
-L16. ADR 0011 adds the authenticated adapter boundary: mTLS is the deployment requirement and a timestamped HMAC envelope is used for deterministic local Docker tests. The receiver endpoint rejects missing, expired, malformed, and tampered signatures before invoking the inbox transaction. Valid signed MockMvc integration flow and all Docker Maven/PostgreSQL tests passed.
+L8. Las instrucciones de transferencia de CholoNet ahora persisten en PostgreSQL con identidad UUID, hash de solicitud, clave de idempotencia, versión de esquema, ID de correlación/causación, estado y marcas de tiempo. Las transiciones bloquean la fila de instrucción y rechazan transiciones inválidas.
+L9. Los handlers HTTP solo internos admiten operaciones de creación, consulta y transición. No exponen liquidación ni escriben tablas bancarias. El servicio de ejecución requiere `NETWORK_DB_URL`, ejecuta el bootstrap de su esquema local y depende del contenedor aislado `network-db`.
+L10. Una reconstrucción forzada de Docker expuso inicialmente sumas de comprobación de Go faltantes en el repositorio. Se ejecutó `go mod tidy` dentro de `golang:1.24-alpine`, se generó `go.sum` y luego pasaron la compilación/prueba forzadas de Compose. La salida final incluyó `github.com/cholopay/network/internal/instruction` e `internal/transfer` con código de salida 0.
+L11. El slice de liquidación central añade el ADR 0007, cuentas de liquidación, diarios y asientos inmutables, bloqueos canónicos de filas de participantes, comprobaciones de conservación, bloqueo de idempotencia/asesoramiento, replay duplicado, un endpoint interno de liquidación y pruebas de integración concurrentes en Docker. El endpoint informa `SETTLED` solo después de confirmar la transacción central.
+L12. La verificación forzada en Docker pasó con las pruebas de `internal/settlement`, incluida la conservación de saldos, el replay duplicado, la protección ante posición insuficiente, la ausencia de sobregiro concurrente y el comportamiento de respuestas HTTP. El verificador independiente no estaba disponible; el usuario eligió explícitamente continuar sin esa verificación externa, por lo que esta limitación queda registrada.
+L13. La entrega de crédito al receptor ahora tiene registros duraderos `PENDING`/`APPLIED`, replay de encolado duplicado, acuses vinculados al receptor, rechazo de eventos conflictivos y actualizaciones de `CREDIT_PENDING` → `COMPLETED` solo después de obtener evidencia del receptor. La ejecución forzada en Docker pasó las pruebas de entrega de `internal/settlement`. El verificador volvió a no estar disponible; el usuario autorizó explícitamente cerrar este nuevo slice sin él.
+L14. La reconciliación ahora registra ejecuciones y diferencias de solo adición, detecta `SETTLED_WITHOUT_DELIVERY`, `DELIVERY_PENDING` y discrepancias entre aplicado/completado, y expone endpoints internos de ejecución/informe sin mutar el historial financiero. La ejecución forzada de PostgreSQL en Docker pasó los escenarios de entrega ausente, entrega pendiente y ejecución limpia.
+L15. El adaptador receptor de bank-core ahora posee una bandeja de entrada duradera y aplica un débito sintético de la cuenta de compensación junto con un crédito a la cuenta del cliente en una transacción local. El replay de una entrega duplicada devuelve el diario original, se rechazan los payloads conflictivos y la compensación insuficiente, y el diario permanece equilibrado. La suite de integración Maven/PostgreSQL forzada en Docker pasó después de etiquetar todas las pruebas de integración de Spring para que la compilación de la imagen siga siendo independiente de la base de datos.
+L16. El ADR 0011 añade la frontera del adaptador autenticado: mTLS es el requisito de despliegue y se usa una envoltura HMAC con marca de tiempo para las pruebas locales deterministas en Docker. El endpoint receptor rechaza firmas ausentes, expiradas, malformadas o manipuladas antes de invocar la transacción de la bandeja de entrada. El flujo de integración firmado con MockMvc y todas las pruebas Maven/PostgreSQL en Docker pasaron.

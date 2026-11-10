@@ -1,10 +1,10 @@
-# Phase 0 local runbook
+# Runbook local de la fase 0
 
-1. Install Docker Engine and the Compose plugin; no language runtime, build tool, database client, or host service is required.
-2. Render with `docker compose --env-file infra/config.env.template -f infra/compose.yaml config`.
-3. Start the private stack with `docker compose --env-file infra/config.env.template -f infra/compose.yaml up -d network-db costa-db sierra-db oriente-db bank-core`.
-4. Run tests with `docker compose --env-file infra/config.env.template -f infra/compose.yaml --profile test run --rm bank-core-test`.
-5. Run `./infra/scripts/smoke.sh` to verify health and database isolation from Docker.
-6. Stop with `docker compose --env-file infra/config.env.template -f infra/compose.yaml down`; volumes are retained by default.
+1. Instala Docker Engine y el complemento Compose; no se requieren runtimes de lenguajes, herramientas de compilación, clientes de bases de datos ni servicios del host.
+2. Genera la configuración con `docker compose --env-file infra/config.env.template -f infra/compose.yaml config`.
+3. Inicia la pila privada con `docker compose --env-file infra/config.env.template -f infra/compose.yaml up -d network-db costa-db sierra-db oriente-db bank-core`.
+4. Ejecuta las pruebas con `docker compose --env-file infra/config.env.template -f infra/compose.yaml --profile test run --rm bank-core-test`.
+5. Ejecuta `./infra/scripts/smoke.sh` to verify health and database isolation from Docker.
+6. Detén la pila con `docker compose --env-file infra/config.env.template -f infra/compose.yaml down`; volumes are retained by default.
 
-The default Compose environment binds no host ports, so it cannot collide with host services. If a future profile publishes a port, add a Docker-only deployment check and verify availability before enabling it. The Compose environment is for synthetic data only; do not add credentials to Git.
+El entorno Compose predeterminado no vincula puertos del host, por lo que no puede colisionar con servicios del host. Si un perfil futuro publica un puerto, agrega un check de despliegue exclusivo de Docker y verifica su disponibilidad antes de habilitarlo. El entorno Compose es únicamente para datos sintéticos; no agregues credenciales a Git.

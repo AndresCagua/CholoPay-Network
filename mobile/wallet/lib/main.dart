@@ -10,7 +10,7 @@ class CholoPayWalletApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CholoPay Wallet',
+      title: 'Billetera CholoPay',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff185c50)),
         useMaterial3: true,
@@ -136,13 +136,13 @@ const sessionFixture = WalletSession(
 const accountFixtures = [
   WalletAccount(
     id: 'account-costa-001',
-    label: 'Costa Bank · USD account',
+    label: 'Banco Costa · cuenta USD',
     currency: 'USD',
     balanceMinor: 125000,
   ),
   WalletAccount(
     id: 'account-costa-002',
-    label: 'Costa Savings · USD account',
+    label: 'Ahorros Costa · cuenta USD',
     currency: 'USD',
     balanceMinor: 450000,
   ),
@@ -151,7 +151,7 @@ const accountFixtures = [
 const receiverKeyFixture = CholoKey(
   key: 'ck_demo_receiver_001',
   participantId: 'SIERRA',
-  displayName: 'Synthetic Receiver',
+  displayName: 'Receptor sintético',
 );
 
 const qrFixture = CholoQrPayload(
@@ -213,7 +213,7 @@ class _WalletShellState extends State<WalletShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CholoPay Wallet'),
+        title: const Text('Billetera CholoPay'),
         actions: const [Padding(padding: EdgeInsets.all(16), child: Icon(Icons.lock_outline))],
       ),
       body: ListView(
@@ -225,7 +225,7 @@ class _WalletShellState extends State<WalletShell> {
             key: const Key('account-selector'),
             value: selectedAccount,
             decoration: const InputDecoration(
-              labelText: 'Selected account',
+              labelText: 'Cuenta seleccionada',
               border: OutlineInputBorder(),
             ),
             items: [
@@ -266,8 +266,8 @@ class _ReadOnlyBanner extends StatelessWidget {
         color: Theme.of(context).colorScheme.secondaryContainer,
         child: const ListTile(
           leading: Icon(Icons.visibility_outlined),
-          title: Text('Read-only demo'),
-          subtitle: Text('Local synthetic fixtures · no backend or database access'),
+          title: Text('Demostración de solo lectura'),
+          subtitle: Text('Datos sintéticos locales · sin acceso al backend ni a la base de datos'),
         ),
       );
 }
@@ -281,14 +281,14 @@ class _BalanceCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Available balance'),
+            const Text('Saldo disponible'),
             const SizedBox(height: 6),
             Text(
               '\$${(account.balanceMinor / 100).toStringAsFixed(2)} ${account.currency}',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 8),
-            Text('Session ${sessionFixture.sessionId} · ${sessionFixture.participantId}'),
+            Text('Sesión ${sessionFixture.sessionId} · ${sessionFixture.participantId}'),
           ]),
         ),
       );
@@ -336,30 +336,30 @@ class _TransferCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Synthetic confirmation',
+              const Text('Confirmación sintética',
                   style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('Payer: ${payer.label}'),
-              Text('Payee: ${payee.displayName}'),
-              Text('Amount: \$${(transfer.amountMinor / 100).toStringAsFixed(2)} ${transfer.currency}'),
+              Text('Pagador: ${payer.label}'),
+              Text('Beneficiario: ${payee.displayName}'),
+              Text('Importe: \$${(transfer.amountMinor / 100).toStringAsFixed(2)} ${transfer.currency}'),
               const SizedBox(height: 8),
-              Text('Confirmation: $confirmationState'),
+              Text('Confirmación: $confirmationState'),
               if (wasDuplicateReplay)
-                const Text('Duplicate replay: REUSED_EXISTING_TRANSFER'),
-              Text('Transfer ID: ${transfer.transferId}'),
-              Text('Idempotency: ${transfer.idempotencyKey}'),
-              Text('Transfers created: $transfersCreated'),
+                const Text('Repetición duplicada: REUSED_EXISTING_TRANSFER'),
+              Text('ID de transferencia: ${transfer.transferId}'),
+              Text('Idempotencia: ${transfer.idempotencyKey}'),
+              Text('Transferencias creadas: $transfersCreated'),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
                   key: const Key('confirm-transfer'),
                   onPressed: onConfirm,
-                  child: const Text('Confirm synthetic transfer'),
+                  child: const Text('Confirmar transferencia sintética'),
                 ),
               ),
               const SizedBox(height: 4),
-              const Text('Read-only local result; no ledger or backend access.'),
+              const Text('Resultado local de solo lectura; sin acceso al libro mayor ni al backend.'),
             ],
           ),
         ),
@@ -375,7 +375,7 @@ class _MovementsCard extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text('Recent movements', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text('Movimientos recientes', style: TextStyle(fontWeight: FontWeight.bold))
           ),
           for (final movement in movements)
             ListTile(

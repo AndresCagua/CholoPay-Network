@@ -3,11 +3,11 @@ COMPOSE := docker compose --env-file infra/config.env.template -f infra/compose.
 
 .PHONY: help config up test smoke down
 help:
-	@printf '%s\n' 'Docker-only commands (GNU Make is optional):' '  make config - render Compose configuration' '  make up     - start private databases and bank core' '  make test   - run Maven tests in the bank-core container' '  make smoke  - run container health and database isolation checks' '  make down   - stop the Compose project'
+	@printf '%s\n' 'Comandos exclusivos para Docker (GNU Make es opcional):' '  make config - renderiza la configuración Compose' '  make up     - inicia las bases de datos privadas y el núcleo bancario' '  make test   - ejecuta las pruebas Maven en el contenedor bank-core' '  make smoke  - ejecuta comprobaciones de salud y aislamiento de bases de datos' '  make down   - detiene el proyecto Compose'
 
 config:
 	@$(COMPOSE) config --quiet
-	@echo 'Compose configuration is valid'
+	@echo 'La configuración Compose es válida'
 
 up: config
 	@$(COMPOSE) up -d network-db costa-db sierra-db oriente-db bank-core

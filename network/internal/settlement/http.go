@@ -31,7 +31,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	var request settleRequest
 	if json.NewDecoder(r.Body).Decode(&request) != nil || request.TransferID == uuid.Nil || request.SourceParticipantID == uuid.Nil || request.DestinationParticipantID == uuid.Nil || request.AmountMinor <= 0 || request.IdempotencyKey == "" {
-		http.Error(w, "invalid settlement request", http.StatusBadRequest)
+		http.Error(w, "solicitud de liquidación inválida", http.StatusBadRequest)
 		return
 	}
 	journal, err := h.store.Settle(r.Context(), request.TransferID, request.SourceParticipantID, request.DestinationParticipantID, request.AmountMinor, request.IdempotencyKey, request.CorrelationID)

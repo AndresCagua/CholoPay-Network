@@ -1,6 +1,6 @@
 # Phase 9 — Vertical slice de pago de utility
 Fuente: `spec.md`, secciones 23.3, 24.1, 24.3, 24.4, 26 y 27.
-Scope: flujo sintético de una factura de electricidad desde payment intent hasta aplicación idempotente del facturador; no débito bancario real, no escritura directa de ledger y no infraestructura externa.
+Alcance: flujo sintético de una factura de electricidad desde el intent de pago hasta la aplicación idempotente del facturador; sin débito bancario real, escritura directa de ledger ni infraestructura externa.
 
 ## Specs
 
@@ -24,11 +24,11 @@ Scope: flujo sintético de una factura de electricidad desde payment intent hast
 5. **S5 — Aceptación vertical**
    > Implementar **primero** un recorrido vertical completo (Banco Costa paga una factura de luz emitida por CholoServicios) antes de generalizar a los seis tipos de obligaciones.
 
-## Tasks
+## Tareas
 
-- T1 (S1-S4): Extender utilities con estado de obligación, payment intent idempotente y evento interno autenticado sintético. Route: inline after bounded exploration. Commit: pending.
-- T2 (S3-S5): Probar replay, concurrencia y aplicación eventual sin débito ni ledger local. Route: inline. Commit: pending.
-- T3 (S1-S5): Actualizar contrato, README y evidencia Docker. Route: inline. Commit: pending.
+- T1 (S1-S4): Extender utilities con estado de obligación, payment intent idempotente y evento interno autenticado sintético. Ruta: inline después de una exploración acotada. Commit: pendiente.
+- T2 (S3-S5): Probar replay, concurrencia y aplicación eventual sin débito ni ledger local. Ruta: inline. Commit: pendiente.
+- T3 (S1-S5): Actualizar contrato, README y evidencia Docker. Ruta: inline. Commit: pendiente.
 
 ## Log
 

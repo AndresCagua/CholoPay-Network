@@ -1,6 +1,6 @@
 # Phase 8 — Hardening local y recuperación reproducible
 Fuente: `spec.md`, secciones 14, 15, 16, 18, 22 y 27.
-Scope: controles locales Docker-only, backups/restauración de datos sintéticos y runbooks; no Kubernetes, GitOps, publicación externa ni modificación de infraestructura externa.
+Alcance: controles locales exclusivos de Docker, respaldos/restauración de datos sintéticos y runbooks; no Kubernetes, GitOps, publicación externa ni modificación de infraestructura externa.
 
 ## Specs
 
@@ -19,12 +19,12 @@ Scope: controles locales Docker-only, backups/restauración de datos sintéticos
    > No modificar infraestructura externa sin autorización explícita.
    > No procesar dinero real ni almacenar secretos reales.
 
-## Tasks
+## Tareas
 
-- T1 (S1, S4): Añadir comprobaciones locales de configuración segura para Compose, ausencia de puertos publicados no autorizados y secretos reales. Route: inline after exploration. Commit: pending.
-- T2 (S2): Crear backup/restauración reproducible de una base sintética mediante Docker, sin tocar infraestructura externa. Route: inline. Commit: pending.
-- T3 (S1-S3): Escribir runbooks operativos mínimos para backup, restore, caída de participante y rotación de credenciales sintéticas. Route: inline. Commit: pending.
-- T4 (S1-S4): Ejecutar checks Docker-only, validar evidencia y documentar límites. Route: inline. Commit: pending.
+- T1 (S1, S4): Añadir comprobaciones locales de configuración segura para Compose, ausencia de puertos publicados no autorizados y secretos reales. Ruta: inline después de la exploración. Commit: pending.
+- T2 (S2): Crear respaldo/restauración reproducible de una base sintética mediante Docker, sin tocar infraestructura externa. Ruta: inline. Commit: pending.
+- T3 (S1-S3): Escribir runbooks operativos mínimos para respaldo, restauración, caída de participante y rotación de credenciales sintéticas. Ruta: inline. Commit: pending.
+- T4 (S1-S4): Ejecutar checks exclusivos de Docker, validar evidencia y documentar límites. Ruta: inline. Commit: pending.
 
 ## Log
 

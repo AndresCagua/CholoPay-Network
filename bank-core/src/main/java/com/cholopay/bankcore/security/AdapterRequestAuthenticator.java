@@ -34,6 +34,6 @@ public class AdapterRequestAuthenticator {
         try {
             Mac mac = Mac.getInstance("HmacSHA256"); mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             return Base64.getEncoder().encodeToString(mac.doFinal((timestamp + "." + requestId + "." + payload).getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) { throw new IllegalStateException("could not sign adapter request", e); }
+        } catch (Exception e) { throw new IllegalStateException("no se pudo firmar la solicitud del adaptador", e); }
     }
 }

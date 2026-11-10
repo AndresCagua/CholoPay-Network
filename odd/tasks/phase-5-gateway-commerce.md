@@ -1,7 +1,7 @@
 # Phase 5 — Gateway público y comercio sandbox
 
 Fuente: `spec.md`, secciones 8.4 y 9. Incremento autorizado por el usuario: “DALE CONTINUA CON LOS SPECS”.
-Scope: implementar el primer slice ejecutable del gateway público y una tienda sandbox, sin conectar dinero real ni alterar infraestructura externa.
+Alcance: implementar el primer slice ejecutable del gateway público y una tienda sandbox, sin conectar dinero real ni alterar infraestructura externa.
 
 ## Specs
 
@@ -35,19 +35,19 @@ Scope: implementar el primer slice ejecutable del gateway público y una tienda 
 6. **S6 — Datos sintéticos y límites del proyecto**
    > No procesar dinero real, conectarse a SPI/DICT reales, simular cumplimiento regulatorio como certificación, copiar interfaces o marcas registradas, almacenar datos personales reales, operar como banco.
 
-## Tasks
+## Tareas
 
-- T1 (S1, S3, S4): Crear gateway TypeScript Docker-only con contratos HTTP, autenticación sandbox de alcance limitado y almacenamiento local/in-memory explícito. Route: delegated by gateway surface. Commit: `bdcf987`.
-- T2 (S2, S4, S5): Implementar payment intents, consulta y confirmación idempotente con estado simulado; no escribir ledger. Route: delegated by gateway surface. Commit: `bf06cf6`.
-- T3 (S2, S6): Crear tienda sandbox mínima con catálogo, carrito, orden e inventario sintéticos. Route: delegated by commerce surface. Commit: pending.
-- T4 (S2, S3): Implementar webhook HMAC con timestamp, protección de replay, reintentos acotados y DLQ in-memory. Route: delegated by gateway surface. Commit: `d6777eb`.
-- T5 (S2, S4): Añadir pruebas públicas de contrato y comportamiento, documentación OpenAPI y evidencia Docker. Route: inline. Commit: `cd16ac9`.
+- T1 (S1, S3, S4): Crear gateway TypeScript exclusivo de Docker con contratos HTTP, autenticación sandbox de alcance limitado y almacenamiento local/in-memory explícito. Ruta: delegada a la superficie del gateway. Commit: `bdcf987`.
+- T2 (S2, S4, S5): Implementar payment intents, consulta y confirmación idempotente con estado simulado; no escribir ledger. Ruta: delegada a la superficie del gateway. Commit: `bf06cf6`.
+- T3 (S2, S6): Crear tienda sandbox mínima con catálogo, carrito, orden e inventario sintéticos. Ruta: delegada a la superficie de comercio. Commit: pendiente.
+- T4 (S2, S3): Implementar webhook HMAC con timestamp, protección de replay, reintentos acotados y DLQ in-memory. Ruta: delegada a la superficie del gateway. Commit: `d6777eb`.
+- T5 (S2, S4): Añadir pruebas públicas de contrato y comportamiento, documentación OpenAPI y evidencia Docker. Ruta: inline. Commit: `cd16ac9`.
 
 ## Log
 
 L1. DALE CONTINUA CON LOS SPECS
 L2. Se selecciona como siguiente incremento coherente el gateway público y comercio sandbox de `spec.md` secciones 8.4 y 9. Se excluyen por ahora utilities, tránsito, SDK separado, observabilidad avanzada y despliegues externos para mantener el slice revisable.
-L3. T1 implementado en `gateway/`: scaffold Node.js/TypeScript Docker-only, autenticación X-Api-Key sintética con scopes, rutas contractuales placeholder y frontera explícita sin escritura de ledger. Build Docker y 3 tests pasaron. `package-lock.json` queda pendiente para fijar versiones. Commit: `bdcf987`.
+L3. T1 implementado en `gateway/`: estructura inicial Node.js/TypeScript exclusiva de Docker, autenticación X-Api-Key sintética con scopes, rutas contractuales provisionales y frontera explícita sin escritura de ledger. Build Docker y 3 tests pasaron. `package-lock.json` queda pendiente para fijar versiones. Commit: `bdcf987`.
 L4. T2 implementado en `gateway/`: payment intents sintéticos, consulta, confirmación, validación, replay/conflicto de idempotencia y 6 tests HTTP públicos. Docker build pasó y reportó 6 tests sin fallos. Commit: `bf06cf6`.
 L5. T4 implementado en `gateway/`: registro de endpoints webhook, HMAC-SHA256 con timestamp, replay protection, tres intentos máximos y DLQ in-memory limitada a 100 entradas. Docker build pasó y reportó 9 tests sin fallos. Commit: `d6777eb`.
-L6. La verificación final Docker de Phase 5 pasó: gateway build/test con 9 tests, commerce Compose test con 3 tests y validación de `docker compose config`. No se publicaron puertos. Commit de evidencia: `cd16ac9`.
+L6. La verificación final Docker de la fase 5 pasó: gateway build/test con 9 tests, commerce Compose test con 3 tests y validación de `docker compose config`. No se publicaron puertos. Commit de evidencia: `cd16ac9`.

@@ -1,6 +1,6 @@
-# CholoPay Network — Phase 1 bank core
+# CholoPay Network — Núcleo bancario de la fase 1
 
-Source of truth for the first executable financial slice. Read through `## Log` before working.
+Fuente de verdad del primer slice financiero ejecutable. Lee hasta `## Log` antes de trabajar.
 
 ## Specs
 
@@ -9,33 +9,33 @@ Source of truth for the first executable financial slice. Read through `## Log` 
 3. **S3 — Accounting:** "Partida doble en ledger bancario y ledger de liquidación: cada asiento tiene débitos/créditos equilibrados en la misma moneda." Amounts are "enteros en centavos (`BIGINT` ...); nunca `float`/`double` para dinero".
 4. **S4 — Safety:** "Los movimientos publicados son inmutables; correcciones y devoluciones crean movimientos compensatorios." and "una misma instrucción de negocio no produce dos liquidaciones".
 5. **S5 — Internal transfer:** "Intra-banco: débito y crédito en una única transacción del banco, con ledger equilibrado e idempotencia." 
-6. **S6 — Synthetic data:** "Datos exclusivamente sintéticos" and no real financial or identity data.
-7. **S7 — Compatibility:** The user requires commit messages in Spanish, starting with `yyyymmdd`, with a comment describing what was done.
+6. **S6 — Synthetic data:** "Datos exclusivamente sintéticos" y no se usan datos financieros ni de identidad reales.
+7. **S7 — Compatibility:** La persona usuaria requiere mensajes de commit en español, comenzando con `yyyymmdd`, con un comentario que describa lo realizado.
 8. **S8 — Container-only execution:** "compa todo debe ser en los contenedores, no uses nada de la máquina local, el proyecto debe ser de tal forma que alguien se descargue el proyecto y en cualquier maquina lo pueda correr siempre y cuando tenga docker."
 
 ## Tasks
 
 - T1 (S1, S3): Scaffold parametrized Spring Boot bank-core module with PostgreSQL migration layout, domain boundaries, and container-only build instructions. Commit: `667cfc2`.
-- T2 (S3, S4): Implement integer-cent ledger, balanced journals, immutable entries, and account projection. Commit: `667cfc2`.
-- T3 (S2, S5): Implement local reservations and idempotent internal transfers with concurrent invariant tests. Commit: `667cfc2`.
-- T4 (S1, S6): Add API/error documentation and synthetic test fixtures. Commit: `667cfc2`.
-- T5 (S1-S8): Run build/tests, record evidence, enforce Docker-only execution, and select the next network integration decision. Commit: pending.
-- T6 (S8): Remove host-toolchain and host-port requirements from the default workflow; add multi-stage Docker build and Compose test service. Commit: pending.
-- T7 (S1, S3, S5): Replace in-memory transfer state with transactional PostgreSQL persistence. Commit: pending.
+- T2 (S3, S4): Implementar ledger en centavos enteros, journals equilibrados, asientos inmutables y proyección de cuentas. Commit: `667cfc2`.
+- T3 (S2, S5): Implementar reservas locales y transferencias internas idempotentes con pruebas concurrentes de invariantes. Commit: `667cfc2`.
+- T4 (S1, S6): Agregar documentación de API/errores y fixtures de pruebas sintéticos. Commit: `667cfc2`.
+- T5 (S1-S8): Ejecutar compilación/pruebas, registrar evidencia, exigir ejecución exclusiva de Docker y seleccionar la siguiente decisión de integración de red. Commit: pending.
+- T6 (S8): Eliminar requisitos de toolchains y puertos del host del flujo predeterminado; agregar compilación Docker multietapa y servicio de pruebas Compose. Commit: pending.
+- T7 (S1, S3, S5): Reemplazar el estado de transferencias en memoria por persistencia transaccional en PostgreSQL. Commit: pending.
 
-Container-only and PostgreSQL persistence evidence is recorded below before the follow-up commit.
+La evidencia de ejecución exclusiva en contenedores y persistencia PostgreSQL se registra abajo antes del commit posterior.
 
-Implementation evidence is recorded below before the Phase 1 commit is created.
+La evidencia de implementación se registra abajo antes de crear el commit de la fase 1.
 
 ## Log
 
 L1. User request: "los commits son en español, ademas deben tener el siguiente formato yyyymmdd y comentarios de lo hecho, cambia los nombres de los commit y guarda esta regla para el proyecto. Luego de eso continua con la fase 1"
-L2. Phase 0 commits were rewritten to `20261109: establece la arquitectura de la fase 0` and `20261109: registra la evidencia de la fase 0`.
-L3. Phase 1 starts with the bank-core ledger and internal-transfer slice; no interbank protocol or user interfaces are being implemented yet.
-L4. The bank core uses Spring Boot 3.4.5, Java 21, Flyway, PostgreSQL, and synthetic data only. Amounts are integer USD cents.
+L2. Los commits de la fase 0 se reescribieron como `20261109: establece la arquitectura de la fase 0` and `20261109: registra la evidencia de la fase 0`.
+L3. La fase 1 comienza con el ledger del núcleo bancario y el slice de transferencias internas; todavía no se implementan el protocolo interbancario ni las interfaces de usuario.
+L4. El núcleo bancario usa Spring Boot 3.4.5, Java 21, Flyway, PostgreSQL y únicamente datos sintéticos. Los importes son centavos enteros de USD.
 L5. `docker run --rm -v "$PWD/bank-core:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn -q test` passed with exit code 0. `git diff --check` passed. Maven was executed in a container because Maven and Gradle are not installed on the host.
-L6. The tests cover balanced journal rejection, same-key idempotent replay, different-payload conflict, concurrent transfers against a limited balance, non-negative availability, and exactly ten successful 100-cent transfers from a 1,000-cent account.
-L7. The user then required that all project work run inside containers and that a fresh checkout require Docker only. The default Compose stack now publishes no host ports; build and tests use the multi-stage `bank-core/Dockerfile` and `bank-core-test` Compose profile. The next step is transactional PostgreSQL persistence, also built and tested only inside containers.
+L6. Las pruebas cubren rechazo de journals desequilibrados, replay idempotente con la misma clave, conflicto de payload diferente, transferencias concurrentes contra un saldo limitado, disponibilidad no negativa y exactamente diez transferencias exitosas de 100 centavos desde una cuenta de 1.000 centavos.
+L7. Luego la persona usuaria requirió que todo el trabajo del proyecto se ejecutara dentro de contenedores y que un checkout nuevo requiriera únicamente Docker. La pila Compose predeterminada ahora no publica puertos del host; la compilación y las pruebas usan `bank-core/Dockerfile` multietapa y el perfil Compose `bank-core-test`. El siguiente paso es la persistencia transaccional en PostgreSQL, también compilada y probada únicamente dentro de contenedores.
 L8. `docker compose ... config --quiet` passed for the default and test profiles. `./ci/phase-0.sh` passed using a Python validation container and Docker Compose; no host language runtime was used for project checks.
-L9. `docker compose --env-file infra/config.env.template -f infra/compose.yaml --profile test run --rm bank-core-test` passed with exit code 0. The Compose test profile started PostgreSQL inside Docker, applied Flyway migrations, and passed the JDBC integration test for persistence, balanced entries, and idempotent replay.
-L10. Added Flyway V2 account projections and request hashes, transactional `JdbcInternalTransferService`, controller wiring, and an integration test. The default stack publishes no host ports; therefore no port preflight was required for this run. The next step is to expose the persisted bank API only through an explicitly reviewed internal network route before interbank integration.
+L9. `docker compose --env-file infra/config.env.template -f infra/compose.yaml --profile test run --rm bank-core-test` pasó con código de salida 0. El perfil de pruebas Compose inició PostgreSQL dentro de Docker, aplicó las migraciones Flyway y superó la prueba de integración JDBC de persistencia, asientos equilibrados y replay idempotente.
+L10. Se agregaron proyecciones de cuentas Flyway V2 y hashes de solicitudes, `JdbcInternalTransferService` transaccional, cableado del controlador y una prueba de integración. La pila predeterminada no publica puertos del host; por lo tanto, no se requirió preflight de puertos en esta ejecución. El siguiente paso es exponer la API bancaria persistente únicamente mediante una ruta de red interna revisada explícitamente antes de la integración interbancaria.

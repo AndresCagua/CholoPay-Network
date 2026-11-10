@@ -33,8 +33,8 @@ type AcceptedMessage struct {
 }
 
 var (
-	ErrConflict = errors.New("message idempotency key conflicts with a different envelope")
-	ErrBoundary = errors.New("message network boundary is invalid")
+	ErrConflict = errors.New("la clave de idempotencia del mensaje entra en conflicto con otro sobre")
+	ErrBoundary = errors.New("el límite de red del mensaje no es válido")
 )
 
 type Store struct{ db *sql.DB }

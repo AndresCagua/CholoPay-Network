@@ -21,8 +21,8 @@ public class JdbcInternalTransferService {
 
     @Transactional
     public Journal transfer(UUID sourceId, UUID destinationId, long amountMinor, String idempotencyKey, UUID correlationId) {
-        if (amountMinor <= 0) throw new IllegalArgumentException("amount_minor must be positive");
-        if (sourceId.equals(destinationId)) throw new IllegalArgumentException("source and destination must differ");
+        if (amountMinor <= 0) throw new IllegalArgumentException("amount_minor debe ser positivo");
+        if (sourceId.equals(destinationId)) throw new IllegalArgumentException("el origen y el destino deben ser distintos");
         String requestHash = hash(sourceId + ":" + destinationId + ":" + amountMinor + ":USD");
 
         List<ExistingJournal> previous = jdbc.query(
@@ -39,14 +39,14 @@ public class JdbcInternalTransferService {
                 (org.springframework.jdbc.core.RowMapper<UUID>) (rs, row) -> rs.getObject("id", UUID.class), ordered.get(0), ordered.get(1));
         Balance source = balance(sourceId);
         Balance destination = balance(destinationId);
-        if (source == null || destination == null) throw new IllegalArgumentException("account not found");
-        if (source.postedMinor() - source.reservedMinor() < amountMinor) throw new IllegalStateException("insufficient available funds");
+        if (source == null || destination == null) throw new IllegalArgumentException("cuenta no encontrada");
+        if (source.postedMinor() - source.reservedMinor() < amountMinor) throw new IllegalStateException("fondos disponibles insuficientes");
 
         UUID transactionId = UUID.randomUUID();
         UUID journalId = UUID.randomUUID();
         int debited = jdbc.update("UPDATE ledger_account SET posted_balance_minor = posted_balance_minor - ? WHERE id = ? AND posted_balance_minor - reserved_balance_minor >= ?",
                 amountMinor, sourceId, amountMinor);
-        if (debited != 1) throw new IllegalStateException("insufficient available funds");
+        if (debited != 1) throw new IllegalStateException("fondos disponibles insuficientes");
         jdbc.update("UPDATE ledger_account SET posted_balance_minor = posted_balance_minor + ? WHERE id = ?", amountMinor, destinationId);
         jdbc.update("INSERT INTO balance_reservation(id, account_id, transfer_id, amount_minor, status) VALUES (?, ?, ?, ?, 'CAPTURED')",
                 UUID.randomUUID(), sourceId, transactionId, amountMinor);

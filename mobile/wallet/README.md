@@ -1,14 +1,14 @@
-# CholoPay Wallet scaffold
+# Estructura de la billetera CholoPay
 
-This is a minimal Flutter wallet shell for Phase 4 T2/T3. It uses typed, local synthetic fixtures for a wallet session, accounts, CholoKeys, CholoPay QR payloads, transfers, movements, and payer/payee confirmation.
+Esta es una estructura mínima de billetera Flutter para la Fase 4 T2/T3. Usa datos sintéticos locales y tipados para una sesión de billetera, cuentas, CholoKeys, cargas útiles QR de CholoPay, transferencias, movimientos y confirmación de pagador/beneficiario.
 
-The QR format is CholoPay-owned and versioned. It is **not Pix-compatible**, and this scaffold makes no external-network compatibility claim.
+El formato QR es propiedad de CholoPay y está versionado. **No es compatible con Pix**, y esta estructura no afirma compatibilidad con redes externas.
 
-The app does not access databases, call a backend, or contain secrets. Confirmation is local-only: repeated confirmation replays the existing transfer using its contract idempotency key without creating a second transfer identifier. Results are read-only UI projections.
+La aplicación no accede a bases de datos, llama a un backend ni contiene secretos. La confirmación es únicamente local: una confirmación repetida reproduce la transferencia existente usando su clave de idempotencia contractual sin crear un segundo identificador de transferencia. Los resultados son proyecciones de UI de solo lectura.
 
-## Docker-only checks
+## Comprobaciones únicamente mediante Docker
 
-Run from `mobile/wallet` (the host does not need a Flutter SDK):
+Ejecutá desde `mobile/wallet` (el equipo anfitrión no necesita un SDK de Flutter):
 
 ```sh
 docker build -t cholopay-wallet:test .
@@ -16,4 +16,4 @@ docker run --rm cholopay-wallet:test flutter test
 docker run --rm cholopay-wallet:test flutter analyze
 ```
 
-The image uses `ghcr.io/cirruslabs/flutter:3.24.5` and runs all Flutter commands inside Docker.
+La imagen usa `ghcr.io/cirruslabs/flutter:3.24.5` y ejecuta todos los comandos de Flutter dentro de Docker.

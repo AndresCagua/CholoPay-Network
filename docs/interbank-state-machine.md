@@ -1,4 +1,4 @@
-# Interbank transfer state contract
+# Contrato de estados de transferencias interbancarias
 
 ```mermaid
 stateDiagram-v2
@@ -10,7 +10,7 @@ stateDiagram-v2
     FUNDS_RESERVED --> EXPIRED: deadline before settlement
     READY_FOR_SETTLEMENT --> SETTLED: central journal committed
     READY_FOR_SETTLEMENT --> UNKNOWN_PENDING_RECONCILIATION: outcome unavailable
-    SETTLED --> CREDIT_PENDING: receiver command pending
+    SETTLED --> CREDIT_PENDING: comando al receptor pendiente
     SETTLED --> UNKNOWN_PENDING_RECONCILIATION: acknowledgement incomplete
     CREDIT_PENDING --> COMPLETED: receiver inbox + credit committed
     CREDIT_PENDING --> CREDIT_PENDING: retry same transfer ID
@@ -19,9 +19,9 @@ stateDiagram-v2
     SETTLED --> REFUNDED: compensating return operation
 ```
 
-## State ownership
+## Propiedad de los estados
 
-| State | Authority | Meaning |
+| Estado | Autoridad | Significado |
 |---|---|---|
 | `CREATED`, `VALIDATING` | Network instruction store | Request accepted for validation; no financial effect |
 | `FUNDS_RESERVED` | Issuer bank plus instruction store | Issuer has a durable local reservation |
@@ -32,4 +32,4 @@ stateDiagram-v2
 | `UNKNOWN_PENDING_RECONCILIATION` | Reconciliation subsystem | Outcome cannot safely be inferred; no new transfer may be created |
 | `REFUNDED` | Derived view | A separate compensating return settled |
 
-Every transition carries `schema_version`, `transfer_id`, `correlation_id`, `causation_id`, UTC timestamp, and actor/service identity. Invalid transitions are rejected without changing stored state.
+Cada transición contiene `schema_version`, `transfer_id`, `correlation_id`, `causation_id`, una marca de tiempo UTC y la identidad del actor/servicio. Las transiciones inválidas se rechazan sin cambiar el estado almacenado.

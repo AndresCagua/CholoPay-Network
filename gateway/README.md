@@ -1,53 +1,53 @@
 # CholoPay gateway sandbox
 
-Docker-only Node.js/TypeScript public gateway (`cholopay-gateway`). It provides synthetic scoped API keys and an in-memory payment-intent flow for sandbox behavior only.
+Pasarela pública de Node.js/TypeScript exclusiva para Docker (`cholopay-gateway`). Proporciona claves API sintéticas con alcances y un flujo de intenciones de pago en memoria, únicamente para el comportamiento del entorno aislado.
 
-## Run
+## Ejecución
 
-Build and run the image from the repository root:
+Construye y ejecuta la imagen desde la raíz del repositorio:
 
 ```sh
 docker build -f gateway/Dockerfile -t cholopay-gateway ./gateway
 docker run --rm -p 8090:8090 cholopay-gateway
 ```
 
-The Docker build runs the focused test suite before producing the runtime stage. No host Node.js installation is required.
+La compilación de Docker ejecuta la suite de pruebas focalizadas antes de producir la etapa de ejecución. No se requiere instalar Node.js en el host.
 
-## Synthetic authentication
+## Autenticación sintética
 
-Send `X-Api-Key` on every protected route. These development-only keys are intentionally synthetic and are not credentials:
+Envía `X-Api-Key` en cada ruta protegida. Estas claves, exclusivas de desarrollo, son deliberadamente sintéticas y no son credenciales:
 
 | Key | Scopes |
 | --- | --- |
 | `sk_sandbox_merchant_rw` | `payment:read`, `payment:write`, `webhook:write` |
 | `sk_sandbox_merchant_ro` | `payment:read` |
 
-Missing or unknown keys return `401`; a known key without the route scope returns `403`. Keys are kept in memory and must not be used outside the sandbox.
+Las claves ausentes o desconocidas devuelven `401`; una clave conocida sin el alcance de la ruta devuelve `403`. Las claves se conservan en memoria y no deben usarse fuera del entorno aislado.
 
-## Synthetic payment intents
+## Intenciones de pago sintéticas
 
-`POST /v1/payment-intents` (`payment:write`) creates an in-memory intent from `amount_minor`, three-letter uppercase `currency`, `merchant_order_id`, and optional `description`. New intents start in `requires_confirmation` and receive a synthetic `pi_sandbox_...` identifier.
+`POST /v1/payment-intents` (`payment:write`) crea en memoria una intención a partir de `amount_minor`, la `currency` en mayúsculas de tres letras, `merchant_order_id` y `description` opcional. Las intenciones nuevas comienzan en `requires_confirmation` y reciben el identificador sintético `pi_sandbox_...`.
 
-Every create and confirm request requires an `Idempotency-Key`. Repeating the same key with the same JSON payload replays the original response; reusing it with a different payload returns `409 idempotency_key_conflict`.
+Cada solicitud de creación y confirmación requiere an `Idempotency-Key`. Repetir la misma clave con la misma carga JSON reproduce la respuesta original; reutilizarla con una carga diferente devuelve `409 idempotency_key_conflict`.
 
-- `GET /v1/payment-intents/{id}` (`payment:read`) queries the current synthetic state.
-- `POST /v1/payment-intents/{id}/confirm` (`payment:write`) transitions `requires_confirmation` to `succeeded`.
-- `POST /v1/refunds` (`payment:write`) accepts `{ "payment_intent_id": "pi_sandbox_...", "amount_minor": 2500, "currency": "USD" }` only after the intent is `succeeded`. This bounded sandbox supports one full refund per intent, returns `201` with `status: succeeded`, and never writes a ledger. Reusing an idempotency key with another payload returns `409`; a second refund for the same intent returns `409 refund_conflict`.
+- `GET /v1/payment-intents/{id}` (`payment:read`) consulta el estado sintético actual.
+- `POST /v1/payment-intents/{id}/confirm` (`payment:write`) transiciona de `requires_confirmation` a `succeeded`.
+- `POST /v1/refunds` (`payment:write`) acepta `{ "payment_intent_id": "pi_sandbox_...", "amount_minor": 2500, "currency": "USD"` }` solo después de que la intención esté en `succeeded`. Este entorno aislado acotado admite un reembolso completo por intención, devuelve `201` con `status: succeeded`, y nunca escribe un diario. Reutilizar una clave de idempotencia con otra carga devuelve `409`; un segundo reembolso para la misma intención devuelve `409 refund_conflict`.
 
-## Banco Costa electricity bill flow
+## Flujo de facturación eléctrica de Banco Costa
 
-`POST /v1/bill-payments` is the bounded public vertical slice. It requires the merchant write key, an `Idempotency-Key`, and `{ "participant_id": "BANCO_COSTA", "invoice_id": "invoice-elec-2025-001", "service": "electricity", "amount": "42.50", "currency": "USD" }`. The gateway validates the explicit Banco Costa caller boundary, asks CholoServicios for a pending intent, and submits a signed `payment.settled` event for idempotent application. `201 APPLIED` means the synthetic biller application completed; `202 PENDING_BILLER` or `PENDING_APPLICATION` is not settlement proof. `POST /v1/bill-payments/{id}/apply` retries eventual application and `GET /v1/bill-payments/{id}` reads status.
+`POST /v1/bill-payments` es el corte vertical público acotado. Requiere la clave de escritura del comerciante, una `Idempotency-Key` y `{ "participant_id": "BANCO_COSTA", "invoice_id": "invoice-elec-2025-001", "service": "electricity", "amount": "42.50", "currency": "USD" }`. La pasarela valida el límite explícito del llamador de Banco Costa, solicita a CholoServicios una intención pendiente y envía un evento `payment.settled` firmado para su aplicación idempotente. `201 APPLIED` significa que terminó la aplicación del facturador sintético; `202 PENDING_BILLER` o `PENDING_APPLICATION` no es prueba de liquidación. `POST /v1/bill-payments/{id}/apply` reintenta la aplicación eventual y `GET /v1/bill-payments/{id}` lee el estado.
 
-This is Docker-only synthetic traffic: no real money, external infrastructure, gateway ledger writes, or utility ledger writes occur.
+Este es tráfico sintético exclusivo para Docker: no intervienen dinero real, infraestructura externa ni escrituras en los diarios de la pasarela o de servicios públicos.
 
-## Synthetic webhooks
+## Webhooks sintéticos
 
-`POST /v1/webhook-endpoints` (`webhook:write`) registers an in-memory endpoint from a synthetic HTTP(S) URL and returns a sandbox-only `whsec_...` signing secret. No network delivery is performed. The returned secret signs the exact request body with HMAC-SHA256 using the format `${timestamp}.${raw_body}`; send it as `Webhook-Signature: t=<unix_seconds>,v1=<hex_digest>` to `POST /v1/webhook-endpoints/{id}/events`. Timestamps older than five minutes, malformed signatures, and mismatches return `401`; an already accepted timestamp/signature pair returns `409 replay_detected`.
+`POST /v1/webhook-endpoints` (`webhook:write`) registra en memoria un endpoint a partir de una URL HTTP(S) sintética y devuelve un secreto de firma exclusivo del entorno aislado `whsec_...`. No se realiza ninguna entrega de red. El secreto devuelto firma el cuerpo exacto de la solicitud con HMAC-SHA256 usando el formato `${timestamp}.${raw_body}`; envíalo como `Webhook-Signature: t=<unix_seconds>,v1=<hex_digest>` a `POST /v1/webhook-endpoints/{id}/events`. Las marcas de tiempo de más de cinco minutos, las firmas malformadas y las discrepancias devuelven `401`; un par de marca de tiempo y firma ya aceptado devuelve `409 replay_detected`.
 
-For local delivery simulation, `POST /v1/webhook-endpoints/{id}/deliveries` (`webhook:write`) accepts `{ "event": { "id": "..." }, "outcome": "success" | "fail" }`. Failures are bounded to three attempts: the first two return `retry_scheduled`, and the third is admitted to an in-memory dead-letter queue. The queue is capped at 100 entries and all state is process-local.
+Para simular entregas locales, `POST /v1/webhook-endpoints/{id}/deliveries` (`webhook:write`) accepts `{ "event": { "id": "..." }, "outcome": "success" | "fail" }`. Los fallos se limitan a tres intentos: los dos primeros devuelven `retry_scheduled`, y el tercero se admite en una cola de mensajes muertos en memoria. La cola está limitada a 100 entradas y todo el estado es local al proceso.
 
-`GET /health/live` is unauthenticated and returns `200`.
+`GET /health/live` no requiere autenticación y devuelve `200`.
 
-## Explicit ledger boundary
+## Límite explícito del diario
 
-Payment intents are stored only in the gateway process memory. This service has no ledger client, database, balance store, payment processor, commerce state, or webhook delivery, and never reads or modifies balances. Confirmation is synthetic and does not create ledger entries or move money.
+Las intenciones de pago solo se almacenan en la memoria del proceso de la pasarela. Este servicio no tiene cliente de diario, base de datos, almacén de saldos, procesador de pagos, estado comercial ni entrega de webhooks, y nunca lee ni modifica saldos. La confirmación es sintética y no crea asientos ni mueve dinero.

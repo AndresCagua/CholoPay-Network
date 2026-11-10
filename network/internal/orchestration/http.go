@@ -41,7 +41,7 @@ type intakeResponse struct {
 func (h *Handler) intake(w http.ResponseWriter, r *http.Request) {
 	var request intakeRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.IdempotencyKey == "" || request.AmountMinor <= 0 || request.Currency != "USD" || request.SourceParticipantID == uuid.Nil || request.DestinationParticipantID == uuid.Nil || request.CorrelationID == uuid.Nil {
-		http.Error(w, "invalid inter-network transfer", http.StatusBadRequest)
+		http.Error(w, "transferencia entre redes inválida", http.StatusBadRequest)
 		return
 	}
 	result, err := h.service.Intake(r.Context(), Intake{TransferID: request.TransferID, IdempotencyKey: request.IdempotencyKey, SourceParticipantID: request.SourceParticipantID, DestinationParticipantID: request.DestinationParticipantID, AmountMinor: request.AmountMinor, Currency: request.Currency, CorrelationID: request.CorrelationID})

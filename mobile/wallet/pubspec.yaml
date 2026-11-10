@@ -1,6 +1,6 @@
 name: cholopay_wallet
 publish_to: "none"
-description: Minimal read-only CholoPay wallet scaffold with synthetic fixtures.
+description: Estructura mínima de billetera CholoPay de solo lectura con fixtures sintéticos.
 version: 0.1.0+1
 
 environment:

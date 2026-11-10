@@ -13,7 +13,7 @@ func TestStateMachineAllowsSettlementPath(t *testing.T) {
 
 func TestStateMachineRejectsCreditBeforeSettlement(t *testing.T) {
 	if err := Advance(FundsReserved, Completed); err == nil {
-		t.Fatal("expected invalid transition")
+		t.Fatal("se esperaba una transición no válida")
 	}
 }
 
@@ -25,6 +25,6 @@ func TestUnknownStateCanOnlyReconcileOrReview(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := Advance(UnknownPendingReconciliation, Completed); err == nil {
-		t.Fatal("expected completion to require receiver evidence")
+		t.Fatal("se esperaba que la finalización requiriera evidencia del receptor")
 	}
 }

@@ -1,12 +1,12 @@
-# ADR 0003: Settlement finality and unknown state
+# ADR 0003: Finalidad de liquidación y estado desconocido
 
-- Status: Accepted for Phase 0; protocol detail deferred to Phase 2
-- Date: 2026-11-09
+- Estado: Aceptado para la fase 0; el detalle del protocolo se difiere a la fase 2
+- Fecha: 2026-11-09
 
-## Decision
+## Decisión
 
-Only an atomic central settlement-ledger commit establishes `SETTLED`. A timeout with uncertain outcome becomes `UNKNOWN_PENDING_RECONCILIATION`; clients must not create a second transfer ID. `REFUNDED` is a compensating operation, never deletion or desettlement.
+Solo un commit atómico del ledger central de liquidación establece `SETTLED`. Un timeout con resultado incierto se convierte en `UNKNOWN_PENDING_RECONCILIATION`; los clientes no deben crear un segundo ID de transferencia. `REFUNDED` es una operación compensatoria, nunca una eliminación o desliquidación.
 
-## Consequences
+## Consecuencias
 
-The system needs durable correlation IDs, reconciliation jobs, recoverable intermediate states, and explicit user-facing uncertainty. The exact reservation/commit recovery choreography requires a later ADR before implementation.
+El sistema necesita IDs de correlación duraderos, trabajos de conciliación, estados intermedios recuperables e incertidumbre explícita para la persona usuaria. La coreografía exacta de recuperación de reserva/commit requiere un ADR posterior antes de implementarse.

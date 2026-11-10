@@ -112,4 +112,4 @@ func (s *Store) Get(ctx context.Context, id uuid.UUID) (Instruction, error) {
 	return result, err
 }
 
-var ErrIdempotencyConflict = errors.New("idempotency key was already used with a different request")
+var ErrIdempotencyConflict = errors.New("la clave de idempotencia ya se usó con una solicitud diferente")

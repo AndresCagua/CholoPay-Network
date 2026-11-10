@@ -1,26 +1,26 @@
-# ADR 0007: central settlement ledger
+# ADR 0007: ledger central de liquidación
 
-- Status: Accepted for the first settlement slice
-- Date: 2026-11-09
+- Estado: Aceptado para el primer slice de liquidación
+- Fecha: 2026-11-09
 
-## Context
+## Contexto
 
-The three bank ledgers are independent. CholoNet needs a central ledger that records participant position changes without accessing bank tables. A transfer must not be considered settled because an HTTP request was accepted.
+Los tres ledgers bancarios son independientes. CholoNet necesita un ledger central que registre cambios de posición de participantes sin acceder a tablas bancarias. Una transferencia no debe considerarse liquidada porque se aceptó una solicitud HTTP.
 
-## Decision
+## Decisión
 
-Create one settlement account per participant and an immutable double-entry settlement journal. A settlement operation:
+Crear una cuenta de liquidación por participante y un journal inmutable de liquidación de partida doble. Una operación de liquidación:
 
-1. Locks source and destination settlement accounts in canonical UUID order.
-2. Verifies the source available position covers the amount.
-3. Creates exactly one journal identified by `transfer_id` and request hash.
-4. Writes one debit entry for the source and one credit entry for the destination in USD cents.
-5. Updates both position projections in the same PostgreSQL transaction.
-6. Returns `SETTLED` only after the transaction commits.
+1. Bloquea las cuentas de liquidación de origen y destino en orden canónico de UUID.
+2. Verifica que la posición disponible de origen cubra el importe.
+3. Crea exactamente un journal identificado por `transfer_id` y el hash de la solicitud.
+4. Escribe un asiento de débito para el origen y uno de crédito para el destino en centavos de USD.
+5. Actualiza ambas proyecciones de posición en la misma transacción de PostgreSQL.
+6. Devuelve `SETTLED` solo después de confirmar la transacción.
 
-A duplicate `transfer_id` or idempotency key returns the original journal. Reusing the key with a different request hash is rejected. Published journals and entries are immutable; returns are separate compensating journals. The network never writes a bank's customer ledger.
+Un `transfer_id` o una clave de idempotencia duplicados devuelven el journal original. Reutilizar la clave con un hash de solicitud diferente se rechaza. Los journals y asientos publicados son inmutables; las devoluciones son journals compensatorios separados. La red nunca escribe en el ledger de clientes de un banco.
 
-## Invariants
+## Invariantes
 
 - Every journal has exactly two entries for this slice and their signed sum is zero.
 - Source and destination positions conserve their aggregate sum.
@@ -29,6 +29,6 @@ A duplicate `transfer_id` or idempotency key returns the original journal. Reusi
 - A failed transaction leaves accounts and journal tables unchanged.
 - `SETTLED` is derived only from the committed central journal.
 
-## Consequences
+## Consecuencias
 
-The central ledger is authoritative only for interparticipant settlement positions, not customer balances. Receiver credit remains a later at-least-once bank operation. This slice does not implement liquidity funding, reversals, reconciliation jobs, or bank adapters; those require their own tests and evidence.
+El ledger central es autoritativo únicamente para las posiciones de liquidación entre participantes, no para los saldos de clientes. El abono al receptor sigue siendo una operación bancaria posterior, al menos una vez. Este slice no implementa fondeo de liquidez, reversiones, trabajos de conciliación ni adaptadores bancarios; requieren sus propias pruebas y evidencias.

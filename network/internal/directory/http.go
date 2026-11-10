@@ -61,16 +61,16 @@ type resolveResponse struct {
 
 func (h *Handler) port(w http.ResponseWriter, r *http.Request) {
 	if !authorizedBearer(r, os.Getenv("DIRECTORY_PORT_TOKEN")) {
-		http.Error(w, "authorization required", http.StatusUnauthorized)
+		http.Error(w, "se requiere autorización", http.StatusUnauthorized)
 		return
 	}
 	var request portRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		http.Error(w, "solicitud no válida", http.StatusBadRequest)
 		return
 	}
 	if request.SchemaVersion == "" || request.CorrelationID == uuid.Nil || request.CausationID == uuid.Nil || request.IdempotencyKey == "" || request.NewKeyID == uuid.Nil || request.RequestedAt.IsZero() {
-		http.Error(w, "schema_version, correlation_id, causation_id, requested_at, idempotency_key and new_key_id are required", http.StatusBadRequest)
+		http.Error(w, "se requieren schema_version, correlation_id, causation_id, requested_at, idempotency_key y new_key_id", http.StatusBadRequest)
 		return
 	}
 	err := h.store.Port(r.Context(), PortRequest{SchemaVersion: request.SchemaVersion, CorrelationID: request.CorrelationID, CausationID: request.CausationID, TraceID: request.TraceID, RequestedAt: request.RequestedAt, IdempotencyKey: request.IdempotencyKey, KeyType: request.KeyType, KeyValue: request.KeyValue, AccountRef: request.AccountRef, AccountKind: request.AccountKind, FromNetworkID: request.FromNetworkID, FromParticipantID: request.FromParticipantID, ToNetworkID: request.ToNetworkID, ToParticipantID: request.ToParticipantID, NewKeyID: request.NewKeyID})
@@ -96,7 +96,7 @@ func authorizedBearer(r *http.Request, expected string) bool {
 func (h *Handler) resolve(w http.ResponseWriter, r *http.Request) {
 	var request resolveRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		http.Error(w, "solicitud no válida", http.StatusBadRequest)
 		return
 	}
 	resolution, err := h.store.Resolve(r.Context(), request.NetworkID, request.KeyType, request.KeyValue, request.CorrelationID, request.CausationID, request.IdempotencyKey)

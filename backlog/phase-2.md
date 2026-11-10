@@ -1,12 +1,12 @@
-# Phase 2 backlog
+# Backlog de la fase 2
 
 | ID | Ticket | Depends on | Acceptance |
 |---|---|---|---|
-| P2-01 | Adopt reservation/settlement/reconciliation protocol | Phase 1 | ADR 0006 and state contract reviewed |
-| P2-02 | Scaffold Go network service and Docker build | P2-01 | health endpoint and container test pass |
-| P2-03 | Persist transfer instructions and transitions | P2-02 | invalid transitions and duplicate IDs rejected |
-| P2-04 | Add participant and settlement-account schema | P2-03 | no bank-table access; isolated migration |
-| P2-05 | Implement central balanced settlement journal | P2-04 | one journal per transfer and conserved positions |
-| P2-06 | Add bank adapter contracts and outbox/inbox | P2-05 | at-least-once replay with one financial effect |
-| P2-07 | Fault/reconciliation scenarios | P2-06 | issuer/receiver crash states recover without duplicates |
-| P2-08 | Integrate CholoKey directory | P2-03 | minimized resolution and uniqueness constraints |
+| P2-01 | Adoptar protocolo de reserva/liquidación/conciliación | Fase 1 | ADR 0006 y contrato de estados revisados |
+| P2-02 | Crear esqueleto del servicio de red Go y compilación Docker | P2-01 | el endpoint de salud y la prueba del contenedor pasan |
+| P2-03 | Persistir instrucciones y transiciones de transferencia | P2-02 | las transiciones inválidas y los ID duplicados se rechazan |
+| P2-04 | Agregar esquema de participantes y cuentas de liquidación | P2-03 | sin acceso a tablas bancarias; migración aislada |
+| P2-05 | Implementar journal central equilibrado de liquidación | P2-04 | un journal por transferencia y posiciones conservadas |
+| P2-06 | Agregar contratos de adaptador bancario y outbox/inbox | P2-05 | replay al menos una vez con un único efecto financiero |
+| P2-07 | Escenarios de fallos/conciliación | P2-06 | los estados de caída del emisor/receptor se recuperan sin duplicados |
+| P2-08 | Integrar directorio CholoKey | P2-03 | resolución minimizada y restricciones de unicidad |

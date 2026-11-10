@@ -1,12 +1,12 @@
-# ADR 0002: Double-entry and authoritative ledgers
+# ADR 0002: Partida doble y ledgers autoritativos
 
-- Status: Accepted for Phase 0
-- Date: 2026-11-09
+- Estado: Aceptado para la fase 0
+- Fecha: 2026-11-09
 
-## Decision
+## Decisión
 
-Bank and network settlement ledgers use immutable double-entry journals with integer USD cents. PostgreSQL is authoritative. Balances are validated projections; Redis and Kafka are never authoritative. Corrections use compensating entries.
+Los ledgers bancarios y de liquidación de la red usan journals inmutables de partida doble con centavos enteros de USD. PostgreSQL es autoritativo. Los saldos son proyecciones validadas; Redis y Kafka nunca son autoritativos. Las correcciones usan asientos compensatorios.
 
-## Consequences
+## Consecuencias
 
-Every financial operation must be transactional locally, idempotent, auditable, and reconciliable. This favors correctness over pretending that distributed ACID exists.
+Toda operación financiera debe ser transaccional localmente, idempotente, auditable y conciliable. Esto prioriza la corrección frente a fingir que existe ACID distribuido.

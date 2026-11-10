@@ -18,7 +18,7 @@ import (
 func TestPostgresInterNetworkMessageIsIdempotentAndBounded(t *testing.T) {
 	url := os.Getenv("NETWORK_DB_URL")
 	if url == "" {
-		t.Skip("NETWORK_DB_URL is required for the Docker integration test")
+		t.Skip("NETWORK_DB_URL es necesario para la prueba de integración de Docker")
 	}
 	db, err := sql.Open("pgx", url)
 	if err != nil {
@@ -49,24 +49,24 @@ func TestPostgresInterNetworkMessageIsIdempotentAndBounded(t *testing.T) {
 		t.Fatal(err)
 	}
 	if accepted.Replayed || accepted.Status != "ACCEPTED" || accepted.PayloadHash == "" {
-		t.Fatalf("unexpected acceptance: %+v", accepted)
+		t.Fatalf("aceptación inesperada: %+v", accepted)
 	}
 	replayed, err := store.Accept(ctx, envelope)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !replayed.Replayed || replayed.Envelope.MessageID != envelope.MessageID {
-		t.Fatalf("unexpected replay: %+v", replayed)
+		t.Fatalf("repetición inesperada: %+v", replayed)
 	}
 	metadataConflict := envelope
 	metadataConflict.MessageType = "TRANSFER_CANCELLED"
 	if _, err := store.Accept(ctx, metadataConflict); !errors.Is(err, ErrConflict) {
-		t.Fatalf("expected metadata conflict, got %v", err)
+		t.Fatalf("se esperaba un conflicto de metadatos, se obtuvo %v", err)
 	}
 	metadataConflict = envelope
 	metadataConflict.CorrelationID = uuid.New()
 	if _, err := store.Accept(ctx, metadataConflict); !errors.Is(err, ErrConflict) {
-		t.Fatalf("expected correlation conflict, got %v", err)
+		t.Fatalf("se esperaba un conflicto de correlación, se obtuvo %v", err)
 	}
 	if _, err := db.ExecContext(ctx, "UPDATE payment_network SET status='SUSPENDED' WHERE network_id=$1", banking); err != nil {
 		t.Fatal(err)
@@ -76,19 +76,19 @@ func TestPostgresInterNetworkMessageIsIdempotentAndBounded(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !suspendedReplay.Replayed {
-		t.Fatalf("expected replay after suspension, got %+v", suspendedReplay)
+		t.Fatalf("se esperaba una repetición tras la suspensión, se obtuvo %+v", suspendedReplay)
 	}
 	conflict := envelope
 	conflict.Payload = json.RawMessage(`{"transfer_id":"synthetic-transfer","amount_minor":101}`)
 	if _, err := store.Accept(ctx, conflict); !errors.Is(err, ErrConflict) {
-		t.Fatalf("expected conflicting replay, got %v", err)
+		t.Fatalf("se esperaba una repetición conflictiva, se obtuvo %v", err)
 	}
 	invalid := envelope
 	invalid.MessageID = uuid.New()
 	invalid.IdempotencyKey = "message-test-inactive"
 	invalid.SenderNetworkID = suspended
 	if _, err := store.Accept(ctx, invalid); !errors.Is(err, ErrBoundary) {
-		t.Fatalf("expected inactive boundary rejection, got %v", err)
+		t.Fatalf("se esperaba el rechazo del límite inactivo, se obtuvo %v", err)
 	}
 	body, _ := json.Marshal(envelope)
 	mux := http.NewServeMux()
@@ -98,6 +98,6 @@ func TestPostgresInterNetworkMessageIsIdempotentAndBounded(t *testing.T) {
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, req)
 	if response.Code != http.StatusOK {
-		t.Fatalf("expected HTTP replay, got %d: %s", response.Code, response.Body.String())
+		t.Fatalf("se esperaba una repetición HTTP, se obtuvo %d: %s", response.Code, response.Body.String())
 	}
 }

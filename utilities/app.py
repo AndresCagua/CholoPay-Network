@@ -1,4 +1,4 @@
-"""Synthetic utilities biller API; standard library only."""
+"""API sintética de facturación de servicios; solo biblioteca estándar."""
 from __future__ import annotations
 
 import hashlib

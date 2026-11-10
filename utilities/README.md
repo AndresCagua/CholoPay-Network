@@ -1,38 +1,38 @@
 # CholoPay synthetic utilities biller
 
-Docker-only synthetic API for the fictional multi-service utility company (electricity, water, internet, and mobile telephony). It uses only Python's standard library and stores its small fixture set in process memory.
+API sintética exclusiva para Docker de la empresa ficticia de servicios públicos múltiples (electricidad, agua, internet y telefonía móvil). Solo usa la biblioteca estándar de Python y almacena su pequeño conjunto de datos de prueba en la memoria del proceso.
 
 ## Boundary
 
-This service is a simulator, not a bank or a payment processor. It uses synthetic identifiers and amounts only. It never connects to SPI, DICT, a bank, a wallet, a customer account, or external infrastructure. It never debits an account, settles money, or writes a ledger. `POST /api/v1/payment-intents` creates an idempotent **pending intent** only, for a future integration boundary.
+Este servicio es un simulador, no un banco ni un procesador de pagos. Solo usa identificadores y cantidades sintéticos. Nunca se conecta a SPI, DICT, un banco, una cartera, una cuenta de cliente ni infraestructura externa. Nunca adeuda una cuenta, liquida dinero ni escribe un diario. `POST /api/v1/payment-intents` solo crea una **intención pendiente** idempotente para un límite de integración futuro.
 
-The Docker configuration exposes port 8080 only to the Docker network; it has no host `ports` mapping by default. To call it from a local host, use an explicitly authorized temporary port mapping rather than changing the default compose file.
+La configuración de Docker expone el puerto 8080 únicamente a la red de Docker; de forma predeterminada no tiene un mapeo `ports` al host. Para llamarla desde un host local, usa un mapeo temporal de puerto autorizado explícitamente en lugar de cambiar el archivo compose predeterminado.
 
-## Run
+## Ejecución
 
 ```sh
 docker compose up --build
 ```
 
-The API is available to other containers at `http://utilities:8080`.
+La API está disponible para otros contenedores en `http://utilities:8080`.
 
 ## Contract
 
-- `GET /health` — synthetic health response.
-- `GET /api/v1/contracts` — list synthetic service contracts.
-- `GET /api/v1/contracts/{contract_id}` — retrieve a contract.
-- `GET /api/v1/invoices?contract_id={contract_id}` — query invoices, optionally by contract.
-- `GET /api/v1/invoices/{invoice_id}` — retrieve an invoice.
-- `GET /api/v1/invoices/{invoice_id}/collection-status` — query synthetic collection state.
-- `GET /api/v1/invoices/{invoice_id}/payment-status` — query application state for a synthetic settlement.
-- `POST /api/v1/payment-intents` — create an intent with `Idempotency-Key` and JSON `{ "invoice_id": "...", "amount": "...", "currency": "USD" }`.
-- `POST /api/v1/internal/payment-events` — apply a signed synthetic `payment.settled` event with event-id replay protection. This endpoint does not debit accounts or write a ledger.
+- `GET /health` — respuesta sintética de salud.
+- `GET /api/v1/contracts` — lista contratos sintéticos de servicios.
+- `GET /api/v1/contracts/{contract_id}` — recupera un contrato.
+- `GET /api/v1/invoices?contract_id={contract_id}` — consulta facturas, opcionalmente por contrato.
+- `GET /api/v1/invoices/{invoice_id}` — recupera una factura.
+- `GET /api/v1/invoices/{invoice_id}/collection-status` — consulta el estado sintético de cobro.
+- `GET /api/v1/invoices/{invoice_id}/payment-status` — consulta el estado de aplicación de una liquidación sintética.
+- `POST /api/v1/payment-intents` — crea una intención con `Idempotency-Key` y JSON `{ "invoice_id": "...", "amount": "...", "currency": "USD" }`.
+- `POST /api/v1/internal/payment-events` — aplica un evento sintético `payment.settled` firmado con protección contra repetición por identificador de evento. Este endpoint no adeuda cuentas ni escribe un diario.
 
-A repeated idempotency key and identical request returns the original intent. Reusing the key with a different request returns `409`. Every new intent remains `pending` and explicitly reports `debit_performed: false` and `ledger_entry_created: false`.
+Una clave de idempotencia repetida y una solicitud idéntica devuelven la intención original. Reutilizar la clave con una solicitud diferente devuelve `409`. Toda intención nueva permanece en `pending` e informa explícitamente de `debit_performed: false` y `ledger_entry_created: false`.
 
-## HTTP behavior tests
+## Pruebas de comportamiento HTTP
 
-The tests use the public HTTP interface and the same standard-library handler used by the container:
+Las pruebas usan la interfaz HTTP pública y el mismo controlador de la biblioteca estándar que usa el contenedor:
 
 ```sh
 PYTHONPATH=utilities python -m unittest discover -s utilities/tests -v

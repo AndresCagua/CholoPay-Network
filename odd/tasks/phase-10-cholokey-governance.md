@@ -1,6 +1,6 @@
 # Phase 10 — Gobernanza de CholoKey
 Fuente: `spec.md`, secciones 7, 23.2, 23.3, 26 y 27.
-Scope: registro atómico y límites sintéticos del directorio; no portabilidad completa, reclamaciones ni datos personales reales en este slice.
+Alcance: registro atómico y límites sintéticos del directorio; no portabilidad completa, reclamaciones ni datos personales reales en este slice.
 
 ## Specs
 
@@ -21,11 +21,11 @@ Scope: registro atómico y límites sintéticos del directorio; no portabilidad 
 5. **S5 — Aceptación**
    > rechazar duplicados globales y excesos de 5/20 por cuenta.
 
-## Tasks
+## Tareas
 
-- T1 (S1-S4): Añadir límites y unicidad global sintética a la migración/store del directorio, con registro idempotente. Route: inline after exploration. Commit: pending.
-- T2 (S1-S5): Añadir pruebas de concurrencia, duplicado, límite y replay por interfaz pública. Route: inline. Commit: pending.
-- T3 (S1-S5): Actualizar documentación y evidencia Docker. Route: inline. Commit: pending.
+- T1 (S1-S4): Añadir límites y unicidad global sintética a la migración/store del directorio, con registro idempotente. Ruta: inline después de la exploración. Commit: pending.
+- T2 (S1-S5): Añadir pruebas de concurrencia, duplicado, límite y replay por interfaz pública. Ruta: inline. Commit: pending.
+- T3 (S1-S5): Actualizar documentación y evidencia Docker. Ruta: inline. Commit: pending.
 
 ## Log
 

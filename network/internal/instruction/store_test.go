@@ -13,7 +13,7 @@ import (
 func TestPostgresInstructionStore(t *testing.T) {
 	url := os.Getenv("NETWORK_DB_URL")
 	if url == "" {
-		t.Skip("NETWORK_DB_URL is required for the Docker integration test")
+		t.Skip("NETWORK_DB_URL es necesario para la prueba de integración de Docker")
 	}
 	db, err := sql.Open("pgx", url)
 	if err != nil {
@@ -41,15 +41,15 @@ func TestPostgresInstructionStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	if created.TransferID != replayed.TransferID || replayed.State != transfer.Created {
-		t.Fatalf("unexpected replay: %+v", replayed)
+		t.Fatalf("repetición inesperada: %+v", replayed)
 	}
 	if err := store.Advance(ctx, created.TransferID, transfer.Validating, uuid.New()); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.Advance(ctx, created.TransferID, transfer.Completed, uuid.New()); err == nil {
-		t.Fatal("expected invalid transition")
+		t.Fatal("se esperaba una transición no válida")
 	}
 	if _, err := store.Create(ctx, Instruction{IdempotencyKey: "network-test-key", SourceParticipantID: source, DestinationParticipantID: &destination, AmountMinor: 501, Currency: "USD", CorrelationID: uuid.New()}); err != ErrIdempotencyConflict {
-		t.Fatalf("expected conflict, got %v", err)
+		t.Fatalf("se esperaba un conflicto, se obtuvo %v", err)
 	}
 }

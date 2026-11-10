@@ -1,7 +1,7 @@
-"""Synthetic transit authority API for Docker-only CholoPay demos.
+"""API sintética de autoridad de tránsito para demostraciones Docker de CholoPay.
 
-This process-local service is not a real authority. It uses synthetic records only,
-never accesses accounts, debits money, or writes a payment ledger.
+Este servicio local al proceso no es una autoridad real. Solo usa registros sintéticos;
+nunca accede a cuentas, debita dinero ni escribe en un libro mayor de pagos.
 """
 from __future__ import annotations
 

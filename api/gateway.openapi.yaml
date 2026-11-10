@@ -1,44 +1,44 @@
 openapi: 3.1.0
-info: {title: CholoPay Gateway API, version: 0.1.0, description: Sandbox merchant API; gateway never writes a ledger.}
+info: {title: CholoPay Gateway API, version: 0.1.0, description: API sandbox para comercios; el gateway nunca escribe en un ledger.}
 servers: [{url: http://localhost:8090}]
 security: [{apiKey: []}]
 paths:
-  /health/live: {get: {security: [], responses: {'200': {description: Alive}}}}
+  /health/live: {get: {security: [], responses: {'200': {description: Activo}}}}
   /v1/bill-payments:
     post:
-      summary: Banco Costa synthetic electricity bill payment
+      summary: Pago sintético de factura de electricidad del Banco Costa
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BillPaymentCreate'}}}}
-      responses: {'201': {description: Applied by CholoServicios}, '202': {description: Biller unavailable or application pending}, '409': {description: Payload differs for key}, '422': {description: Unsupported participant or bill}}
+      responses: {'201': {description: Aplicado por CholoServicios}, '202': {description: Facturador no disponible o aplicación pendiente}, '409': {description: El payload difiere para la clave}, '422': {description: Participante o factura no compatibles}}
   /v1/bill-payments/{id}:
     get:
       parameters: [{in: path, name: id, required: true, schema: {type: string}}]
-      responses: {'200': {description: Current synthetic bill payment}}
+      responses: {'200': {description: Pago sintético actual de la factura}}
   /v1/bill-payments/{id}/apply:
     post:
       parameters: [{in: path, name: id, required: true, schema: {type: string}}, {in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
-      responses: {'201': {description: Applied}, '202': {description: Still unavailable}}
+      responses: {'201': {description: Aplicado}, '202': {description: Sigue no disponible}}
   /v1/payment-intents:
     post:
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PaymentIntentCreate'}}}}
-      responses: {'201': {description: Created}, '409': {description: Payload differs for key}}
+      responses: {'201': {description: Creado}, '409': {description: El payload difiere para la clave}}
   /v1/payment-intents/{id}:
     get:
       parameters: [{in: path, name: id, required: true, schema: {type: string, format: uuid}}]
-      responses: {'200': {description: Current intent and settlement-derived state}}
+      responses: {'200': {description: Intent actual y estado derivado de la liquidación}}
   /v1/payment-intents/{id}/confirm:
     post:
       parameters: [{in: path, name: id, required: true, schema: {type: string}}, {in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
-      responses: {'200': {description: Synthetic confirmation; browser redirect is not proof}, '409': {description: Invalid state}}
+      responses: {'200': {description: Confirmación sintética; la redirección del navegador no es prueba}, '409': {description: Estado inválido}}
   /v1/refunds:
     post:
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RefundCreate'}}}}
-      responses: {'201': {description: Full synthetic refund}, '400': {description: Invalid request}, '409': {description: Intent is not succeeded or key/refund conflicts}, '422': {description: Partial or mismatched currency refund}}
+      responses: {'201': {description: Reembolso sintético total}, '400': {description: Solicitud inválida}, '409': {description: El intent no tuvo éxito o hay conflictos de clave/reembolso}, '422': {description: Reembolso parcial o con moneda incompatible}}
 
   /v1/webhook-endpoints:
-    post: {responses: {'201': {description: Endpoint registered with secret shown once}}}
+    post: {responses: {'201': {description: Endpoint registrado con secreto mostrado una sola vez}}}
 components:
   securitySchemes: {apiKey: {type: apiKey, in: header, name: X-Api-Key}}
   schemas:
@@ -64,5 +64,5 @@ components:
       required: [payment_intent_id, amount_minor, currency]
       properties:
         payment_intent_id: {type: string}
-        amount_minor: {type: integer, format: int64, minimum: 1, description: Must equal the succeeded intent amount}
+        amount_minor: {type: integer, format: int64, minimum: 1, description: Debe ser igual al importe del intent exitoso}
         currency: {type: string, const: USD}

@@ -33,5 +33,5 @@ func Advance(from, to State) error {
 	if transitions[from][to] {
 		return nil
 	}
-	return fmt.Errorf("invalid transfer transition: %s -> %s", from, to)
+	return fmt.Errorf("transición de transferencia no válida: %s -> %s", from, to)
 }

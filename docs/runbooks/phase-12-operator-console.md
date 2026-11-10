@@ -13,7 +13,7 @@ La consola central de CholoPay es una proyección educativa, agregada y de solo 
 
 | Campo | Significado |
 |---|---|
-| `source` | Read model propiedad de CholoNet; no es una lectura directa de un banco o facturador. |
+| `source` | Modelo de lectura propiedad de CholoNet; no es una lectura directa de un banco o facturador. |
 | `last_synchronized_at` | Momento en que la red generó la proyección. |
 | `reconciliation_status` | Estado agregado de conciliación; `UNKNOWN` no significa que no existan diferencias. |
 | `health` | Totales y estados agregados de redes, participantes y CholoKeys. |

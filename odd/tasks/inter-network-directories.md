@@ -1,6 +1,6 @@
-# CholoPay Inter-Network directories
+# Directorios interredes de CholoPay
 
-Source of truth for the distributed-directory slice. Read through `## Log` before working.
+Fuente de verdad del slice de directorios distribuidos. Lee hasta `## Log` antes de trabajar.
 
 ## Specs
 
@@ -13,12 +13,12 @@ Source of truth for the distributed-directory slice. Read through `## Log` befor
 
 ## Tasks
 
-- T1 (S1-S3): Add isolated directory/key records and deterministic lookup API. Route: inline. Commit: pending.
-- T2 (S4-S5): Add versioned directory resolution evidence and explicit non-real-network documentation. Route: inline. Commit: pending.
-- T3 (S6): Run Docker PostgreSQL tests and record evidence. Route: inline. Commit: pending.
+- T1 (S1-S3): Agregar registros aislados de directorio/clave y API de consulta determinista. Ruta: inline. Commit: pending.
+- T2 (S4-S5): Agregar evidencia versionada de resolución del directorio y documentación explícita de no conexión con redes reales. Ruta: inline. Commit: pending.
+- T3 (S6): Ejecutar pruebas de PostgreSQL en Docker y registrar la evidencia. Ruta: inline. Commit: pending.
 
 ## Log
 
-L1. User authorized continuation after the two-network CholoPay Inter-Network slice.
-L2. The previous slice established banking and fintech network domains, participant membership, and same-network/cross-network route selection. This slice adds simulated distributed directory resolution without claiming BCE SIP/RPI integration or ISO 20022 compatibility.
-L3. Added per-network CholoKey records with participant ownership, account reference, status, version, and a uniqueness boundary scoped to each network. The resolver emits `DIRECTORY_KEY_RESOLVED` evidence with schema version, message type, correlation/causation IDs, idempotency key, and UTC resolution time. Docker network tests cover successful lookup, network isolation, suspension rejection, and the public HTTP resolver.
+L1. La persona usuaria autorizó continuar después del slice interredes de dos redes de CholoPay.
+L2. El slice anterior estableció los dominios de red bancaria y fintech, la pertenencia de participantes y la selección de rutas dentro y fuera de la red. Este slice agrega resolución simulada de directorios distribuidos sin afirmar integración con SIP/RPI del BCE ni compatibilidad con ISO 20022.
+L3. Se agregaron registros de CholoKey por red con propiedad del participante, referencia de cuenta, estado, versión y un límite de unicidad delimitado por red. El resolvedor emite evidencia `DIRECTORY_KEY_RESOLVED` con versión de esquema, tipo de mensaje, ID de correlación/causación, clave de idempotencia y hora de resolución UTC. Las pruebas de red en Docker cubren consulta exitosa, aislamiento de redes, rechazo por suspensión y el resolvedor HTTP público.

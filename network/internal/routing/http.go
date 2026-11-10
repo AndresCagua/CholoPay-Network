@@ -28,15 +28,15 @@ type routeResponse struct {
 func (h *Handler) resolve(w http.ResponseWriter, r *http.Request) {
 	var request routeRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		http.Error(w, "solicitud inválida", http.StatusBadRequest)
 		return
 	}
 	route, err := h.store.Route(r.Context(), request.SourceParticipantID, request.DestinationParticipantID)
 	if err != nil {
 		if errors.Is(err, ErrParticipantUnavailable) {
-			http.Error(w, "participant unavailable", http.StatusConflict)
+			http.Error(w, "participante no disponible", http.StatusConflict)
 		} else {
-			http.Error(w, "route unavailable", http.StatusNotFound)
+			http.Error(w, "ruta no disponible", http.StatusNotFound)
 		}
 		return
 	}

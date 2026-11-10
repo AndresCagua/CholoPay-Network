@@ -1,8 +1,8 @@
-# Security threat model (STRIDE)
+# Modelo de amenazas de seguridad (STRIDE)
 
-Scope: Phase 0 architecture and local development environment. All identities and money are synthetic.
+Alcance: arquitectura de la fase 0 y entorno de desarrollo local. Todas las identidades y el dinero son sintéticos.
 
-| Threat | Asset / boundary | Mitigations | Evidence required |
+| Amenaza | Activo / límite | Mitigaciones | Evidencia requerida |
 |---|---|---|---|
 | Double spend / tampered amount | Bank ledger and settlement ledger | Integer cents, row locks or conditional updates, balanced entries, unique instruction IDs, reconciliation | Concurrent invariant tests |
 | Replay / duplicate event | Transfer and webhook inboxes | Idempotency key + payload hash, unique event IDs, TTL only for cache hints, durable inbox | Duplicate delivery tests |
@@ -15,6 +15,6 @@ Scope: Phase 0 architecture and local development environment. All identities an
 | Event loss/reordering | Outbox/Kafka | Transactional outbox, inbox idempotency, versioned events, replay and reconciliation | Restart/reordering tests |
 | Clock/replay edge cases | Tokens, signatures, expiry | UTC timestamps, bounded clock skew, monotonic state transitions | Time-boundary tests |
 
-## Assumptions and non-claims
+## Supuestos y no afirmaciones
 
-TLS, identity issuance, secret storage, and production operations are not delivered by Phase 0. No compliance certification is claimed. Docker/Compose is local development infrastructure, not a production security boundary.
+La fase 0 no entrega TLS, emisión de identidades, almacenamiento de secretos ni operaciones de producción. No se afirma ninguna certificación de cumplimiento. Docker/Compose es infraestructura de desarrollo local, no un límite de seguridad de producción.

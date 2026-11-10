@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: CholoNet Network API
   version: 0.1.0
-  description: Simulated participant, CholoKey, transfer, and settlement coordination API.
+  description: API simulada de coordinación de participantes, CholoKey, transferencias y liquidación.
 servers:
   - url: http://localhost:8080
 security:
@@ -12,62 +12,62 @@ paths:
     get:
       security: []
       responses:
-        '200': {description: Process is alive}
+        '200': {description: El proceso está activo}
   /health/ready:
     get:
       security: []
       responses:
-        '200': {description: Dependencies are ready}
-        '503': {description: Dependencies are unavailable}
+        '200': {description: Las dependencias están listas}
+        '503': {description: Las dependencias no están disponibles}
   /internal/v1/operator/overview:
     get:
-      summary: Read the aggregated simulated operator projection
+      summary: Leer la proyección agregada del operador simulado
       security:
         - serviceBearer: []
       responses:
         '200':
-          description: Aggregated read-only simulated operator projection
+          description: Proyección agregada simulada de solo lectura del operador
           content:
             application/json:
               schema: {$ref: '#/components/schemas/OperatorOverview'}
-        '401': {description: Authorization required}
-        '503': {description: Projection unavailable; no source-derived values are returned}
+        '401': {description: Se requiere autorización}
+        '503': {description: Proyección no disponible; no se devuelven valores derivados de fuentes}
   /internal/v1/directory/port:
     post:
-      summary: Port a synthetic CholoKey between participants
+      summary: Portar una CholoKey sintética entre participantes
       security:
         - serviceBearer: []
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PortRequest'}}}}
       responses:
-        '202': {description: Port accepted}
-        '400': {description: Missing contract metadata}
-        '401': {description: Authorization required}
+        '202': {description: Portabilidad aceptada}
+        '400': {description: Faltan metadatos contractuales}
+        '401': {description: Se requiere autorización}
         '409': {$ref: '#/components/responses/Conflict'}
   /v1/participants:
     post:
-      summary: Register a simulated participant
+      summary: Registrar un participante simulado
       responses:
-        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Participant'}}}}
+        '201': {description: Creado, content: {application/json: {schema: {$ref: '#/components/schemas/Participant'}}}}
         '409': {$ref: '#/components/responses/Conflict'}
   /v1/keys/resolve:
     get:
       parameters: [{name: key, in: query, required: true, schema: {type: string}}]
       responses:
-        '200': {description: Minimal destination reference}
-        '404': {description: Not found or intentionally minimized}
+        '200': {description: Referencia mínima de destino}
+        '404': {description: No encontrado o minimizado intencionalmente}
         '429': {$ref: '#/components/responses/RateLimited'}
   /v1/transfers:
     post:
       parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 16}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TransferRequest'}}}}
       responses:
-        '202': {description: Accepted for processing}
+        '202': {description: Aceptado para procesamiento}
         '409': {$ref: '#/components/responses/Conflict'}
-        '422': {description: Validation failed}
+        '422': {description: Falló la validación}
   /v1/transfers/{id}:
     get:
       parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
-      responses: {'200': {description: Transfer status, content: {application/json: {schema: {$ref: '#/components/schemas/Transfer'}}}}}
+      responses: {'200': {description: Estado de la transferencia, content: {application/json: {schema: {$ref: '#/components/schemas/Transfer'}}}}}
 components:
   securitySchemes:
     serviceBearer: {type: http, scheme: bearer}
@@ -102,17 +102,17 @@ components:
         correlation_id: {type: string, format: uuid}
     OperatorOverview:
       type: object
-      description: Aggregated participant-health and incident projection from CholoNet-owned read models only.
+      description: Proyección agregada de salud de participantes e incidentes, únicamente desde modelos de lectura propiedad de CholoNet.
       required: [schema_version, source, last_synchronized_at, reconciliation_status, health, incidents]
       properties:
         schema_version: {type: string}
         source: {type: string, const: cholonet-network-read-model}
         last_synchronized_at: {type: string, format: date-time}
         reconciliation_status: {type: string, enum: [UNKNOWN, CLEAN, DIFFERENCES]}
-        networks: {type: integer, minimum: 0, description: Legacy aggregate count retained for compatibility}
-        participants: {type: integer, minimum: 0, description: Legacy aggregate count retained for compatibility}
-        active_keys: {type: integer, minimum: 0, description: Legacy aggregate count retained for compatibility}
-        suspended_keys: {type: integer, minimum: 0, description: Legacy aggregate count retained for compatibility}
+        networks: {type: integer, minimum: 0, description: Conteo agregado heredado conservado por compatibilidad}
+        participants: {type: integer, minimum: 0, description: Conteo agregado heredado conservado por compatibilidad}
+        active_keys: {type: integer, minimum: 0, description: Conteo agregado heredado conservado por compatibilidad}
+        suspended_keys: {type: integer, minimum: 0, description: Conteo agregado heredado conservado por compatibilidad}
         health: {$ref: '#/components/schemas/OperatorHealth'}
         incidents:
           type: array
@@ -148,5 +148,5 @@ components:
             settled_at: {type: string, format: date-time, nullable: true}
     Problem: {type: object, required: [type, title, status], properties: {type: {type: string, format: uri}, title: {type: string}, status: {type: integer}, detail: {type: string}, trace_id: {type: string}}}
   responses:
-    Conflict: {description: Conflict, content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}}
-    RateLimited: {description: Too many requests, headers: {Retry-After: {schema: {type: integer}}}}
+    Conflict: {description: Conflicto, content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}}
+    RateLimited: {description: Demasiadas solicitudes, headers: {Retry-After: {schema: {type: integer}}}}

@@ -42,7 +42,7 @@ func TestDeliveryIsAtLeastOnceAndAcknowledgementIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	if first.DeliveryID != replay.DeliveryID || first.State != "PENDING" {
-		t.Fatalf("unexpected delivery replay: %+v %+v", first, replay)
+		t.Fatalf("repetición de entrega inesperada: %+v %+v", first, replay)
 	}
 	eventID := uuid.New()
 	applied, err := store.AcknowledgeDelivery(ctx, first.DeliveryID, receiver, eventID)
@@ -54,10 +54,10 @@ func TestDeliveryIsAtLeastOnceAndAcknowledgementIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	if applied.State != "APPLIED" || duplicate.State != "APPLIED" {
-		t.Fatalf("unexpected acknowledgement: %+v %+v", applied, duplicate)
+		t.Fatalf("confirmación inesperada: %+v %+v", applied, duplicate)
 	}
 	if _, err := store.AcknowledgeDelivery(ctx, first.DeliveryID, receiver, uuid.New()); err != ErrDeliveryConflict {
-		t.Fatalf("expected conflicting event rejection, got %v", err)
+		t.Fatalf("se esperaba el rechazo del evento conflictivo, se obtuvo %v", err)
 	}
 	if _, err := instructions.Get(ctx, transferID); err != nil {
 		t.Fatal(err)
@@ -96,6 +96,6 @@ func TestDeliveryRejectsWrongReceiver(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := store.AcknowledgeDelivery(ctx, delivery.DeliveryID, wrong, uuid.New()); err != ErrDeliveryConflict {
-		t.Fatalf("expected wrong receiver rejection, got %v", err)
+		t.Fatalf("se esperaba el rechazo del receptor incorrecto, se obtuvo %v", err)
 	}
 }

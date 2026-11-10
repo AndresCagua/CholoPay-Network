@@ -143,7 +143,7 @@ export function createServer(options: GatewayOptions = {}): Server {
   const webhookEndpoints = new Map<string, WebhookEndpoint>();
   const webhookDeliveries = new Map<string, WebhookDelivery>();
   const deadLetterQueue: WebhookDelivery[] = [];
-  const ledgerBoundary = 'This gateway never writes balances or any ledger.';
+  const ledgerBoundary = 'Esta pasarela nunca escribe saldos ni diarios.';
 
   return createHttpServer(async (request, response) => {
     const method = request.method ?? 'GET';
@@ -156,18 +156,18 @@ export function createServer(options: GatewayOptions = {}): Server {
 
     const route = placeholderRoutes.find((candidate) => candidate.method === method && candidate.pattern.test(pathname));
     if (!route) {
-      sendJson(response, 404, errorBody('not_found', 'Route not found'));
+      sendJson(response, 404, errorBody('not_found', 'Ruta no encontrada'));
       return;
     }
 
     if (route.authRequired !== false) {
       const authorization = authorize(request, route.scope);
       if (authorization === 'missing') {
-        sendJson(response, 401, errorBody('unauthorized', 'A valid sandbox API key is required'));
+        sendJson(response, 401, errorBody('unauthorized', 'Se requiere una clave API válida del entorno aislado'));
         return;
       }
       if (authorization === 'forbidden') {
-        sendJson(response, 403, errorBody('forbidden', `API key lacks scope ${route.scope}`));
+        sendJson(response, 403, errorBody('forbidden', `La clave API no tiene el alcance ${route.scope}`));
         return;
       }
     }
@@ -177,7 +177,7 @@ export function createServer(options: GatewayOptions = {}): Server {
     const endpoint = webhookEndpoints.get(endpointId);
     if (route.route === 'GET /v1/bill-payments/{id}') {
       const payment = billPayments.get(segments[3] ?? '');
-      if (!payment) return sendJson(response, 404, errorBody('not_found', 'Bill payment not found'));
+      if (!payment) return sendJson(response, 404, errorBody('not_found', 'Pago de factura no encontrado'));
       sendJson(response, 200, payment);
       return;
     }
@@ -185,27 +185,27 @@ export function createServer(options: GatewayOptions = {}): Server {
     if (route.route === 'POST /v1/bill-payments' || route.route === 'POST /v1/bill-payments/{id}/apply') {
       const isApply = route.route.endsWith('/apply');
       const key = idempotencyKeyFrom(request);
-      if (!key) return sendJson(response, 400, errorBody('invalid_request', 'Idempotency-Key header is required'));
+      if (!key) return sendJson(response, 400, errorBody('invalid_request', 'Se requiere la cabecera Idempotency-Key'));
       let body: unknown;
-      try { body = await readJsonBody(request); } catch { return sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON')); }
+      try { body = await readJsonBody(request); } catch { return sendJson(response, 400, errorBody('invalid_request', 'El cuerpo de la solicitud debe ser JSON válido')); }
       let payment: BillPayment;
       let input: Record<string, unknown>;
       if (isApply) {
         const existing = billPayments.get(segments[3] ?? '');
         const saved = existing && [...billPaymentRequests.values()].find((entry) => entry.payment.id === existing.id);
-        if (!existing || !saved) return sendJson(response, 404, errorBody('not_found', 'Bill payment not found'));
+        if (!existing || !saved) return sendJson(response, 404, errorBody('not_found', 'Pago de factura no encontrado'));
         payment = existing;
         input = saved.request;
       } else {
-        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJson(response, 400, errorBody('invalid_request', 'Request body must be an object'));
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJson(response, 400, errorBody('invalid_request', 'El cuerpo de la solicitud debe ser un objeto'));
         input = body as Record<string, unknown>;
         if (input.participant_id !== 'BANCO_COSTA' || input.invoice_id !== 'invoice-elec-2025-001' || input.service !== 'electricity' || typeof input.amount !== 'string' || input.currency !== 'USD') {
-          return sendJson(response, 422, errorBody('invalid_request', 'Only Banco Costa electricity invoice payments are supported'));
+          return sendJson(response, 422, errorBody('invalid_request', 'Solo se admiten pagos de facturas eléctricas de Banco Costa'));
         }
         const payload = canonicalize(input);
         const previous = billPaymentRequests.get(key);
         if (previous) {
-          if (previous.payload !== payload) return sendJson(response, 409, errorBody('idempotency_key_conflict', 'Idempotency-Key was already used with a different payload'));
+          if (previous.payload !== payload) return sendJson(response, 409, errorBody('idempotency_key_conflict', 'Idempotency-Key ya se usó con una carga diferente'));
           return sendJson(response, previous.payment.status === 'APPLIED' ? 201 : 202, previous.payment);
         }
         payment = { id: `bp_sandbox_${String(nextBillPaymentId++).padStart(8, '0')}`, object: 'bill_payment', participant_id: 'BANCO_COSTA', invoice_id: input.invoice_id as string, amount: input.amount as string, currency: 'USD', status: 'PENDING_BILLER', ledger_boundary: ledgerBoundary };
@@ -233,7 +233,7 @@ export function createServer(options: GatewayOptions = {}): Server {
     if (route.route === 'GET /v1/payment-intents/{id}') {
       const intent = intents.get(segments[3] ?? '');
       if (!intent) {
-        sendJson(response, 404, errorBody('not_found', 'Payment intent not found'));
+        sendJson(response, 404, errorBody('not_found', 'Intención de pago no encontrada'));
         return;
       }
       sendJson(response, 200, intent);
@@ -243,12 +243,12 @@ export function createServer(options: GatewayOptions = {}): Server {
     if (route.route === 'POST /v1/webhook-endpoints') {
       let body: unknown;
       try { body = await readJsonBody(request); } catch {
-        sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON'));
+        sendJson(response, 400, errorBody('invalid_request', 'El cuerpo de la solicitud debe ser JSON válido'));
         return;
       }
       const input = body as Record<string, unknown>;
       if (!body || typeof body !== 'object' || Array.isArray(body) || typeof input.url !== 'string' || !/^https?:\/\/[^\s]+$/.test(input.url)) {
-        sendJson(response, 400, errorBody('invalid_request', 'url must be a valid synthetic HTTP(S) endpoint'));
+        sendJson(response, 400, errorBody('invalid_request', 'url debe ser un endpoint HTTP(S) sintético válido'));
         return;
       }
       const id = `we_sandbox_${String(nextWebhookEndpointId).padStart(8, '0')}`;
@@ -260,28 +260,28 @@ export function createServer(options: GatewayOptions = {}): Server {
 
     if (route.route === 'POST /v1/webhook-endpoints/{id}/events') {
       if (!endpoint) {
-        sendJson(response, 404, errorBody('not_found', 'Webhook endpoint not found'));
+        sendJson(response, 404, errorBody('not_found', 'Endpoint de webhook no encontrado'));
         return;
       }
       const rawBody = await readRawBody(request);
       const verified = verifyWebhookSignature(webhookSignatureFrom(request), endpoint.secret, rawBody);
       if (!verified) {
-        sendJson(response, 401, errorBody('invalid_signature', 'Webhook signature is invalid or expired'));
+        sendJson(response, 401, errorBody('invalid_signature', 'La firma del webhook no es válida o ha caducado'));
         return;
       }
       const replayKey = `${verified.timestamp}:${verified.signature}`;
       if (endpoint.replayedSignatures.has(replayKey)) {
-        sendJson(response, 409, errorBody('replay_detected', 'Webhook signature was already accepted'));
+        sendJson(response, 409, errorBody('replay_detected', 'La firma del webhook ya fue aceptada'));
         return;
       }
       let body: unknown;
       try { body = rawBody.trim() ? JSON.parse(rawBody) : {}; } catch {
-        sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON'));
+        sendJson(response, 400, errorBody('invalid_request', 'El cuerpo de la solicitud debe ser JSON válido'));
         return;
       }
       const eventId = body && typeof body === 'object' && !Array.isArray(body) && typeof (body as Record<string, unknown>).id === 'string' ? (body as Record<string, unknown>).id as string : undefined;
       if (!eventId) {
-        sendJson(response, 400, errorBody('invalid_request', 'Webhook event id is required'));
+        sendJson(response, 400, errorBody('invalid_request', 'Se requiere el identificador del evento del webhook'));
         return;
       }
       endpoint.replayedSignatures.add(replayKey);
@@ -291,19 +291,19 @@ export function createServer(options: GatewayOptions = {}): Server {
 
     if (route.route === 'POST /v1/webhook-endpoints/{id}/deliveries') {
       if (!endpoint) {
-        sendJson(response, 404, errorBody('not_found', 'Webhook endpoint not found'));
+        sendJson(response, 404, errorBody('not_found', 'Endpoint de webhook no encontrado'));
         return;
       }
       let body: unknown;
       try { body = await readJsonBody(request); } catch {
-        sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON'));
+        sendJson(response, 400, errorBody('invalid_request', 'El cuerpo de la solicitud debe ser JSON válido'));
         return;
       }
       const input = body as Record<string, unknown>;
       const event = input.event as Record<string, unknown> | undefined;
       const eventId = event && typeof event.id === 'string' ? event.id : undefined;
       if (!event || Array.isArray(event) || !eventId || (input.outcome !== 'success' && input.outcome !== 'fail')) {
-        sendJson(response, 400, errorBody('invalid_request', 'event.id and outcome (success|fail) are required'));
+        sendJson(response, 400, errorBody('invalid_request', 'Se requieren event.id y outcome (success|fail)'));
         return;
       }
       const deliveryKey = `${endpoint.id}:${eventId}`;
@@ -323,7 +323,7 @@ export function createServer(options: GatewayOptions = {}): Server {
         return;
       }
       if (deadLetterQueue.length >= MAX_DLQ_ENTRIES) {
-        sendJson(response, 503, errorBody('dlq_full', 'Webhook dead-letter queue is full'));
+        sendJson(response, 503, errorBody('dlq_full', 'La cola de mensajes muertos del webhook está llena'));
         return;
       }
       delivery.deadLettered = true;
@@ -334,29 +334,29 @@ export function createServer(options: GatewayOptions = {}): Server {
 
     if (route.route === 'POST /v1/refunds') {
       const key = idempotencyKeyFrom(request);
-      if (!key) return sendJson(response, 400, errorBody('invalid_request', 'Idempotency-Key header is required'));
+      if (!key) return sendJson(response, 400, errorBody('invalid_request', 'Se requiere la cabecera Idempotency-Key'));
       let body: unknown;
       try { body = await readJsonBody(request); } catch {
-        return sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON'));
+        return sendJson(response, 400, errorBody('invalid_request', 'El cuerpo de la solicitud debe ser JSON válido'));
       }
       const payload = canonicalize(body);
       const idempotencyId = `refund:${key}`;
       const previous = idempotency.get(idempotencyId);
       if (previous) {
-        if (previous.payload !== payload) return sendJson(response, 409, errorBody('idempotency_key_conflict', 'Idempotency-Key was already used with a different payload'));
+        if (previous.payload !== payload) return sendJson(response, 409, errorBody('idempotency_key_conflict', 'Idempotency-Key ya se usó con una carga diferente'));
         return sendJson(response, previous.status, previous.body);
       }
       const input = body as Record<string, unknown>;
       if (!body || typeof body !== 'object' || Array.isArray(body) || typeof input.payment_intent_id !== 'string' || !Number.isSafeInteger(input.amount_minor) || (input.amount_minor as number) <= 0 || typeof input.currency !== 'string') {
-        return sendJson(response, 400, errorBody('invalid_request', 'payment_intent_id, amount_minor, and currency are required'));
+        return sendJson(response, 400, errorBody('invalid_request', 'Se requieren payment_intent_id, amount_minor y currency'));
       }
       const intent = intents.get(input.payment_intent_id);
-      if (!intent) return sendJson(response, 404, errorBody('not_found', 'Payment intent not found'));
-      if (intent.status !== 'succeeded') return sendJson(response, 409, errorBody('invalid_state', 'Only succeeded payment intents can be refunded'));
+      if (!intent) return sendJson(response, 404, errorBody('not_found', 'Intención de pago no encontrada'));
+      if (intent.status !== 'succeeded') return sendJson(response, 409, errorBody('invalid_state', 'Solo se pueden reembolsar intenciones de pago con estado succeeded'));
       if (input.currency !== intent.currency || input.amount_minor !== intent.amount_minor) {
-        return sendJson(response, 422, errorBody('invalid_request', 'Only a full refund in the payment intent currency is supported'));
+        return sendJson(response, 422, errorBody('invalid_request', 'Solo se admite un reembolso completo en la moneda de la intención de pago'));
       }
-      if (refundByIntent.has(intent.id)) return sendJson(response, 409, errorBody('refund_conflict', 'Payment intent has already been refunded'));
+      if (refundByIntent.has(intent.id)) return sendJson(response, 409, errorBody('refund_conflict', 'La intención de pago ya tiene un reembolso'));
       const refund: Refund = {
         id: `re_sandbox_${String(nextRefundId++).padStart(8, '0')}`,
         object: 'refund', payment_intent_id: intent.id, amount_minor: intent.amount_minor,
@@ -373,25 +373,25 @@ export function createServer(options: GatewayOptions = {}): Server {
     if (route.route === 'POST /v1/payment-intents') {
       const key = idempotencyKeyFrom(request);
       if (!key) {
-        sendJson(response, 400, errorBody('invalid_request', 'Idempotency-Key header is required'));
+        sendJson(response, 400, errorBody('invalid_request', 'Se requiere la cabecera Idempotency-Key'));
         return;
       }
       let body: unknown;
       try { body = await readJsonBody(request); } catch {
-        sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON'));
+        sendJson(response, 400, errorBody('invalid_request', 'El cuerpo de la solicitud debe ser JSON válido'));
         return;
       }
       const payload = canonicalize(body);
       const idempotencyId = `create:${key}`;
       const previous = idempotency.get(idempotencyId);
       if (previous) {
-        if (previous.payload !== payload) sendJson(response, 409, errorBody('idempotency_key_conflict', 'Idempotency-Key was already used with a different payload'));
+        if (previous.payload !== payload) sendJson(response, 409, errorBody('idempotency_key_conflict', 'Idempotency-Key ya se usó con una carga diferente'));
         else sendJson(response, previous.status, previous.body);
         return;
       }
       const input = body as Record<string, unknown>;
       if (!body || typeof body !== 'object' || Array.isArray(body) || !Number.isSafeInteger(input.amount_minor) || (input.amount_minor as number) <= 0 || typeof input.currency !== 'string' || !/^[A-Z]{3}$/.test(input.currency) || typeof input.merchant_order_id !== 'string' || input.merchant_order_id.length === 0 || (input.description !== undefined && typeof input.description !== 'string')) {
-        sendJson(response, 400, errorBody('invalid_request', 'amount_minor, currency, and merchant_order_id are required'));
+        sendJson(response, 400, errorBody('invalid_request', 'Se requieren amount_minor, currency y merchant_order_id'));
         return;
       }
       const intent: PaymentIntent = {
@@ -414,29 +414,29 @@ export function createServer(options: GatewayOptions = {}): Server {
     if (route.route === 'POST /v1/payment-intents/{id}/confirm') {
       const key = idempotencyKeyFrom(request);
       if (!key) {
-        sendJson(response, 400, errorBody('invalid_request', 'Idempotency-Key header is required'));
+        sendJson(response, 400, errorBody('invalid_request', 'Se requiere la cabecera Idempotency-Key'));
         return;
       }
       const intent = intents.get(segments[3] ?? '');
       if (!intent) {
-        sendJson(response, 404, errorBody('not_found', 'Payment intent not found'));
+        sendJson(response, 404, errorBody('not_found', 'Intención de pago no encontrada'));
         return;
       }
       let body: unknown;
       try { body = await readJsonBody(request); } catch {
-        sendJson(response, 400, errorBody('invalid_request', 'Request body must be valid JSON'));
+        sendJson(response, 400, errorBody('invalid_request', 'El cuerpo de la solicitud debe ser JSON válido'));
         return;
       }
       const payload = canonicalize(body);
       const idempotencyId = `confirm:${intent.id}:${key}`;
       const previous = idempotency.get(idempotencyId);
       if (previous) {
-        if (previous.payload !== payload) sendJson(response, 409, errorBody('idempotency_key_conflict', 'Idempotency-Key was already used with a different payload'));
+        if (previous.payload !== payload) sendJson(response, 409, errorBody('idempotency_key_conflict', 'Idempotency-Key ya se usó con una carga diferente'));
         else sendJson(response, previous.status, previous.body);
         return;
       }
       if (intent.status !== 'requires_confirmation') {
-        sendJson(response, 409, errorBody('invalid_state', 'Payment intent cannot be confirmed from its current state'));
+        sendJson(response, 409, errorBody('invalid_state', 'La intención de pago no se puede confirmar desde su estado actual'));
         return;
       }
       intent.status = 'succeeded';
@@ -448,7 +448,7 @@ export function createServer(options: GatewayOptions = {}): Server {
 
     sendJson(response, 501, {
       error: 'not_implemented',
-      message: `${route.route} is reserved for a later Phase 5 task`,
+      message: `${route.route} está reservada para una tarea posterior de la Fase 5`,
       route: route.route,
       ledger_boundary: ledgerBoundary,
     });
@@ -458,6 +458,6 @@ export function createServer(options: GatewayOptions = {}): Server {
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
   const port = Number.parseInt(process.env.PORT ?? '8090', 10);
   createServer().listen(port, '0.0.0.0', () => {
-    console.log(`cholopay-gateway listening on :${port}`);
+    console.log(`cholopay-gateway escuchando en :${port}`);
   });
 }

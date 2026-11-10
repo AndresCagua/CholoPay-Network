@@ -1,12 +1,12 @@
-# Phase 4 — contrato de wallet, CholoKey y QR
+# Fase 4 — contrato de billetera, CholoKey y QR
 
-## Boundary
+## Límite
 
 La wallet Flutter es un cliente de demostración. Consulta APIs del banco autenticado y CholoNet mediante contratos HTTP; nunca accede a PostgreSQL ni escribe directamente en ledgers.
 
-## Wallet session
+## Sesión de billetera
 
-A synthetic Docker-only session contains:
+Una sesión sintética exclusiva de Docker contiene:
 
 ```json
 {
@@ -23,11 +23,11 @@ A synthetic Docker-only session contains:
 }
 ```
 
-A session is scoped to one participant and cannot authorize Sierra, Oriente, or central operator resources.
+Una sesión está delimitada a un participante y no puede autorizar recursos de Sierra, Oriente ni del operador central.
 
-## CholoKey resolution
+## Resolución de CholoKey
 
-The wallet displays a minimized destination reference returned by the authorized directory API:
+La billetera muestra una referencia de destino minimizada devuelta por la API de directorio autorizada:
 
 ```json
 {
@@ -42,11 +42,11 @@ The wallet displays a minimized destination reference returned by the authorized
 }
 ```
 
-The wallet must not expose private bank data beyond the minimized display fields.
+La billetera no debe exponer datos bancarios privados más allá de los campos de visualización minimizados.
 
-## CholoPay QR payload
+## Payload QR de CholoPay
 
-This is a CholoPay-owned format and is not Pix-compatible:
+Este es un formato propio de CholoPay y no es compatible con Pix:
 
 ```json
 {
@@ -65,11 +65,11 @@ This is a CholoPay-owned format and is not Pix-compatible:
 }
 ```
 
-Dynamic QR uses a positive `amount_minor` and an expiry. The wallet validates format, version, participant, amount, currency, expiry, and destination before showing confirmation.
+El QR dinámico usa un `amount_minor` positivo y una caducidad. La billetera valida el formato, la versión, el participante, el importe, la moneda, la caducidad y el destino antes de mostrar la confirmación.
 
-## Transfer confirmation
+## Confirmación de transferencia
 
-Every confirmation creates or reuses one idempotency key. UI retries never generate a new transfer identifier:
+Cada confirmación crea o reutiliza una única clave de idempotencia. Los reintentos de la interfaz nunca generan un identificador nuevo de transferencia:
 
 ```json
 {
@@ -87,12 +87,12 @@ Every confirmation creates or reuses one idempotency key. UI retries never gener
 }
 ```
 
-The UI renders `CREATED`, `VALIDATING`, `FUNDS_RESERVED`, `READY_FOR_SETTLEMENT`, `SETTLED`, `CREDIT_PENDING`, `COMPLETED`, `REJECTED`, and `UNKNOWN_PENDING_RECONCILIATION` distinctly. `SETTLED` is not `COMPLETED`.
+La interfaz representa `CREATED`, `VALIDATING`, `FUNDS_RESERVED`, `READY_FOR_SETTLEMENT`, `SETTLED`, `CREDIT_PENDING`, `COMPLETED`, `REJECTED` y `UNKNOWN_PENDING_RECONCILIATION` de forma diferenciada. `SETTLED` no equivale a `COMPLETED`.
 
-## Movement read model
+## Modelo de lectura de movimientos
 
-Movements are read-only projections from the authenticated bank API and include `transaction_id`, `account_id`, `amount_minor`, `currency`, `direction`, `state`, `created_at`, `settled_at`, `correlation_id`, and `trace_id`. Reconnection revalidates the server projection before updating the UI.
+Los movimientos son proyecciones de solo lectura de la API bancaria autenticada e incluyen `transaction_id`, `account_id`, `amount_minor`, `currency`, `direction`, `state`, `created_at`, `settled_at`, `correlation_id` y `trace_id`. La reconexión vuelve a validar la proyección del servidor antes de actualizar la interfaz.
 
-## Required contract metadata
+## Metadatos contractuales obligatorios
 
-New requests and events include `schema_version`, `correlation_id`, `idempotency_key` where applicable, UTC timestamps, and traceability. QR payloads are synthetic and versioned; no external network compatibility is claimed.
+Las solicitudes y los eventos nuevos incluyen `schema_version`, `correlation_id`, `idempotency_key` cuando corresponda, marcas de tiempo UTC y trazabilidad. Los payloads QR son sintéticos y versionados; no se afirma compatibilidad con redes externas.

@@ -1,15 +1,15 @@
-# Vision and boundaries
+# Visión y límites
 
-CholoPay demonstrates interoperable instant-payment workflows with three independent simulated banks, a central network, a directory of CholoKeys, and a settlement ledger. All money, identities, accounts, obligations, and balances are synthetic.
+CholoPay demuestra flujos interoperables de pagos instantáneos con tres bancos simulados independientes, una red central, un directorio de CholoKeys y un ledger de liquidación. Todo el dinero, las identidades, las cuentas, las obligaciones y los saldos son sintéticos.
 
-## Non-goals
+## Fuera de alcance
 
-No real banking, Pix/SPI/DICT interoperability, regulatory certification, real personal data, card PAN/CVV infrastructure, or paid/closed dependency is in scope.
+No forman parte del alcance la banca real, la interoperabilidad con Pix/SPI/DICT, la certificación regulatoria, los datos personales reales, la infraestructura de tarjetas PAN/CVV ni las dependencias pagas o cerradas.
 
-## Phase 0 boundary
+## Límite de la fase 0
 
-Phase 0 establishes written architecture, contracts, threat model, local FOSS infrastructure, health checks, and reproducible smoke verification. It does not implement customer-facing interfaces or financial behavior.
+La fase 0 establece la arquitectura escrita, los contratos, el modelo de amenazas, la infraestructura FOSS local, los checks de salud y una verificación smoke reproducible. No implementa interfaces orientadas a clientes ni comportamiento financiero.
 
-## Trust boundaries
+## Límites de confianza
 
-Banks own customer accounts and bank ledgers. The network owns participant registration, CholoKey directory, settlement accounts, and settlement state. Facturadores own obligations. The gateway never writes a ledger. Operator projections are read-only unless an explicitly audited administrative operation is introduced by ADR.
+Los bancos son propietarios de las cuentas de clientes y de sus ledgers. La red es propietaria del registro de participantes, el directorio de CholoKeys, las cuentas de liquidación y el estado de liquidación. Los facturadores son propietarios de las obligaciones. El gateway nunca escribe en un ledger. Las proyecciones del operador son de solo lectura, salvo que un ADR introduzca una operación administrativa explícitamente auditada.

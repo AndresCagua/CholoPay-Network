@@ -1,10 +1,10 @@
-# Contributing
+# Contribuir
 
-1. Use synthetic data only.
-2. Read `spec.md` and the relevant ADR before changing a boundary or financial invariant.
-3. Keep services independently runnable with FOSS tooling.
-4. Add tests and update contracts/docs with behavior changes.
-5. Never claim a payment is settled before the central settlement ledger confirms it.
-6. Run `make config` and `make smoke` for infrastructure changes.
+1. Usa únicamente datos sintéticos.
+2. Lee `spec.md` y el ADR correspondiente antes de cambiar un límite o una invariante financiera.
+3. Mantén los servicios ejecutables de forma independiente con herramientas FOSS.
+4. Agrega pruebas y actualiza los contratos y la documentación cuando cambie el comportamiento.
+5. Nunca afirmes que un pago está liquidado antes de que lo confirme el ledger central.
+6. Ejecuta `make config` y `make smoke` para cambios de infraestructura.
 
-Use conventional commit messages when commits are requested. Do not add secrets, real identifiers, proprietary SDKs, or paid-service requirements.
+Usa mensajes de commit convencionales cuando se soliciten commits. No agregues secretos, identificadores reales, SDK propietarios ni requisitos de servicios pagos.

@@ -37,7 +37,7 @@ func TestReconciliationDetectsAndClearsDeliveryDifferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !hasCode(missing, "SETTLED_WITHOUT_DELIVERY") {
-		t.Fatalf("expected missing delivery, got %+v", missing)
+		t.Fatalf("se esperaba una entrega ausente, se obtuvo %+v", missing)
 	}
 	delivery, err := store.EnqueueDelivery(ctx, transferID, receiver)
 	if err != nil {
@@ -48,7 +48,7 @@ func TestReconciliationDetectsAndClearsDeliveryDifferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !hasCode(pending, "DELIVERY_PENDING") {
-		t.Fatalf("expected pending delivery, got %+v", pending)
+		t.Fatalf("se esperaba una entrega pendiente, se obtuvo %+v", pending)
 	}
 	if _, err := store.AcknowledgeDelivery(ctx, delivery.DeliveryID, receiver, uuid.New()); err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestReconciliationDetectsAndClearsDeliveryDifferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	if clean.DifferenceCount != 0 {
-		t.Fatalf("expected clean reconciliation, got %+v", clean)
+		t.Fatalf("se esperaba una reconciliación limpia, se obtuvo %+v", clean)
 	}
 }
 

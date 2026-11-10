@@ -20,7 +20,7 @@ import (
 func TestPostgresOrchestrationRoutesAndReplaysWithoutSettlement(t *testing.T) {
 	url := os.Getenv("NETWORK_DB_URL")
 	if url == "" {
-		t.Skip("NETWORK_DB_URL is required for the Docker integration test")
+		t.Skip("NETWORK_DB_URL es necesario para la prueba de integración de Docker")
 	}
 	db, err := sql.Open("pgx", url)
 	if err != nil {
@@ -66,7 +66,7 @@ func TestPostgresOrchestrationRoutesAndReplaysWithoutSettlement(t *testing.T) {
 		t.Fatal(err)
 	}
 	if intra.Route.Kind != routing.IntraNetwork || intra.Message != nil {
-		t.Fatalf("unexpected intra result: %+v", intra)
+		t.Fatalf("resultado intrared inesperado: %+v", intra)
 	}
 	interRequest := Intake{IdempotencyKey: "orch-inter", SourceParticipantID: costa, DestinationParticipantID: wallet, AmountMinor: 200, Currency: "USD", CorrelationID: uuid.New()}
 	first, err := service.Intake(ctx, interRequest)
@@ -74,28 +74,28 @@ func TestPostgresOrchestrationRoutesAndReplaysWithoutSettlement(t *testing.T) {
 		t.Fatal(err)
 	}
 	if first.Route.Kind != routing.InterNetwork || first.Message == nil || first.Message.Replayed {
-		t.Fatalf("unexpected first inter result: %+v", first)
+		t.Fatalf("primer resultado interred inesperado: %+v", first)
 	}
 	second, err := service.Intake(ctx, interRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if second.Instruction.TransferID != first.Instruction.TransferID || second.Message == nil || !second.Message.Replayed {
-		t.Fatalf("unexpected replay result: %+v", second)
+		t.Fatalf("repetición inesperada result: %+v", second)
 	}
 	var messageCount int
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM inter_network_message").Scan(&messageCount); err != nil {
 		t.Fatal(err)
 	}
 	if messageCount != 1 {
-		t.Fatalf("expected one cross-network message, got %d", messageCount)
+		t.Fatalf("se esperaba un mensaje interred, se obtuvo %d", messageCount)
 	}
 	var settlementCount int
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM transfer_instruction WHERE state='SETTLED'").Scan(&settlementCount); err != nil {
 		t.Fatal(err)
 	}
 	if settlementCount != 0 {
-		t.Fatalf("intake must not settle, got %d", settlementCount)
+		t.Fatalf("la recepción no debe liquidar, se obtuvo %d", settlementCount)
 	}
 	body, _ := json.Marshal(map[string]any{"idempotency_key": "orch-http", "source_participant_id": costa, "destination_participant_id": wallet, "amount_minor": 300, "currency": "USD", "correlation_id": uuid.New()})
 	mux := http.NewServeMux()
@@ -104,6 +104,6 @@ func TestPostgresOrchestrationRoutesAndReplaysWithoutSettlement(t *testing.T) {
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, req)
 	if response.Code != http.StatusAccepted {
-		t.Fatalf("expected HTTP accepted, got %d: %s", response.Code, response.Body.String())
+		t.Fatalf("se esperaba HTTP aceptado, se obtuvo %d: %s", response.Code, response.Body.String())
 	}
 }

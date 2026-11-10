@@ -1,4 +1,4 @@
-# C4 context
+# Contexto C4
 
 ```mermaid
 C4Context
@@ -20,4 +20,4 @@ C4Context
     Rel(operator, network, "Supervises participants and reconciliation")
 ```
 
-The central operator is a technical simulator and must not be described as a real central bank or retail account provider.
+El operador central es un simulador técnico y no debe describirse como un banco central real ni como un proveedor de cuentas minoristas.

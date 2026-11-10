@@ -39,7 +39,7 @@ async function withBiller(run: (baseUrl: string, setAvailable: () => void, setUn
   finally { await new Promise<void>((resolve, reject) => biller.close((error) => error ? reject(error) : resolve())); }
 }
 
-test('health is public and reports the gateway scaffold', async () => {
+test('la salud es pública e informa del esqueleto de la pasarela', async () => {
   await withServer(async (baseUrl) => {
     const response = await fetch(`${baseUrl}/health/live`);
     assert.equal(response.status, 200);
@@ -47,7 +47,7 @@ test('health is public and reports the gateway scaffold', async () => {
   });
 });
 
-test('protected contract routes reject missing and insufficient credentials', async () => {
+test('las rutas contractuales protegidas rechazan credenciales ausentes e insuficientes', async () => {
   await withServer(async (baseUrl) => {
     const missing = await fetch(`${baseUrl}/v1/payment-intents`, { method: 'POST' });
     assert.equal(missing.status, 401);
@@ -60,7 +60,7 @@ test('protected contract routes reject missing and insufficient credentials', as
   });
 });
 
-test('creates and queries a synthetic payment intent without ledger writes', async () => {
+test('crea y consulta una intención de pago sintética sin escribir diarios', async () => {
   await withServer(async (baseUrl) => {
     const headers = {
       'X-Api-Key': 'sk_sandbox_merchant_rw',
@@ -84,7 +84,7 @@ test('creates and queries a synthetic payment intent without ledger writes', asy
     assert.equal(created.amount_minor, 2500);
     assert.equal(created.currency, 'USD');
     assert.match(String(created.id), /^pi_sandbox_/);
-    assert.match(String(created.ledger_boundary), /never writes balances or any ledger/);
+    assert.match(String(created.ledger_boundary), /nunca escribe saldos ni diarios/);
 
     const queried = await fetch(`${baseUrl}/v1/payment-intents/${created.id}`, {
       headers: { 'X-Api-Key': 'sk_sandbox_merchant_ro' },
@@ -94,7 +94,7 @@ test('creates and queries a synthetic payment intent without ledger writes', asy
   });
 });
 
-test('replays an idempotent create and rejects a conflicting payload', async () => {
+test('reproduce una creación idempotente y rechaza una carga conflictiva', async () => {
   await withServer(async (baseUrl) => {
     const headers = {
       'X-Api-Key': 'sk_sandbox_merchant_rw',
@@ -119,12 +119,12 @@ test('replays an idempotent create and rejects a conflicting payload', async () 
     assert.equal(conflict.status, 409);
     assert.deepEqual(await conflict.json(), {
       error: 'idempotency_key_conflict',
-      message: 'Idempotency-Key was already used with a different payload',
+      message: 'Idempotency-Key ya se usó con una carga diferente',
     });
   });
 });
 
-test('confirms an intent through explicit synthetic state transitions', async () => {
+test('confirma una intención mediante transiciones de estado sintéticas explícitas', async () => {
   await withServer(async (baseUrl) => {
     const create = await fetch(`${baseUrl}/v1/payment-intents`, {
       method: 'POST',
@@ -157,7 +157,7 @@ test('confirms an intent through explicit synthetic state transitions', async ()
   });
 });
 
-test('completes Banco Costa electricity payment through the biller and preserves replay/conflict semantics', async () => {
+test('completa un pago eléctrico de Banco Costa mediante el facturador y conserva la semántica de repetición/conflicto', async () => {
   await withBiller(async (billerUrl) => {
     await withServer(async () => {
       const headers = { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Idempotency-Key': 'costa-elec-001', 'Content-Type': 'application/json' };
@@ -182,7 +182,7 @@ test('completes Banco Costa electricity payment through the biller and preserves
   });
 });
 
-test('keeps bill payment pending while biller is unavailable and applies it on retry', async () => {
+test('mantiene pendiente el pago de factura mientras el facturador no está disponible y lo aplica al reintentar', async () => {
   await withBiller(async (billerUrl, setAvailable, setUnavailable) => {
     await withServer(async () => {
       setUnavailable();
@@ -205,7 +205,7 @@ test('keeps bill payment pending while biller is unavailable and applies it on r
   });
 });
 
-test('refunds only succeeded intents and rejects conflicting idempotency reuse', async () => {
+test('reembolsa solo intenciones exitosas y rechaza la reutilización conflictiva de idempotencia', async () => {
   await withServer(async (baseUrl) => {
     const create = await fetch(`${baseUrl}/v1/payment-intents`, {
       method: 'POST',
@@ -231,7 +231,7 @@ test('refunds only succeeded intents and rejects conflicting idempotency reuse',
     const refund = await first.json() as Record<string, unknown>;
     assert.equal(refund.status, 'succeeded');
     assert.equal(refund.payment_intent_id, intent.id);
-    assert.match(String(refund.ledger_boundary), /never writes balances or any ledger/);
+    assert.match(String(refund.ledger_boundary), /nunca escribe saldos ni diarios/);
     const replay = await fetch(`${baseUrl}/v1/refunds`, { method: 'POST', headers, body: JSON.stringify(body) });
     assert.equal(replay.status, 201);
     assert.deepEqual(await replay.json(), refund);
@@ -240,7 +240,7 @@ test('refunds only succeeded intents and rejects conflicting idempotency reuse',
   });
 });
 
-test('validates payment intent input and keeps read scope unchanged', async () => {
+test('valida la entrada de la intención de pago y mantiene sin cambios el alcance de lectura', async () => {
   await withServer(async (baseUrl) => {
     const invalid = await fetch(`${baseUrl}/v1/payment-intents`, {
       method: 'POST',
@@ -258,7 +258,7 @@ test('validates payment intent input and keeps read scope unchanged', async () =
   });
 });
 
-test('registers a synthetic webhook and accepts a valid timestamped HMAC signature once', async () => {
+test('registra un webhook sintético y acepta una vez una firma HMAC válida con marca de tiempo', async () => {
   await withServer(async (baseUrl) => {
     const registration = await fetch(`${baseUrl}/v1/webhook-endpoints`, {
       method: 'POST',
@@ -280,7 +280,7 @@ test('registers a synthetic webhook and accepts a valid timestamped HMAC signatu
   });
 });
 
-test('rejects a replayed webhook signature', async () => {
+test('rechaza una firma de webhook repetida', async () => {
   await withServer(async (baseUrl) => {
     const registration = await fetch(`${baseUrl}/v1/webhook-endpoints`, {
       method: 'POST', headers: { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Content-Type': 'application/json' },
@@ -296,11 +296,11 @@ test('rejects a replayed webhook signature', async () => {
     assert.equal(first.status, 202);
     const replay = await fetch(`${baseUrl}/v1/webhook-endpoints/${endpoint.id}/events`, { method: 'POST', headers, body: payload });
     assert.equal(replay.status, 409);
-    assert.deepEqual(await replay.json(), { error: 'replay_detected', message: 'Webhook signature was already accepted' });
+    assert.deepEqual(await replay.json(), { error: 'replay_detected', message: 'La firma del webhook ya fue aceptada' });
   });
 });
 
-test('progresses bounded synthetic retries and admits a final failure to the in-memory DLQ', async () => {
+test('avanza reintentos sintéticos acotados y admite un fallo final en la DLQ en memoria', async () => {
   await withServer(async (baseUrl) => {
     const registration = await fetch(`${baseUrl}/v1/webhook-endpoints`, {
       method: 'POST', headers: { 'X-Api-Key': 'sk_sandbox_merchant_rw', 'Content-Type': 'application/json' },

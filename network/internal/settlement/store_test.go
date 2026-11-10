@@ -15,7 +15,7 @@ func testStore(t *testing.T) (*sql.DB, *Store) {
 	t.Helper()
 	url := os.Getenv("NETWORK_DB_URL")
 	if url == "" {
-		t.Skip("NETWORK_DB_URL is required for the Docker integration test")
+		t.Skip("NETWORK_DB_URL es necesario para la prueba de integración de Docker")
 	}
 	db, err := sql.Open("pgx", url)
 	if err != nil {
@@ -58,7 +58,7 @@ func TestSettlementIsBalancedAndIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	if first.TransferID != second.TransferID || !first.Balanced() {
-		t.Fatalf("unexpected journals: %+v %+v", first, second)
+		t.Fatalf("diarios inesperados: %+v %+v", first, second)
 	}
 	var sourceBalance, destinationBalance int64
 	if err := db.QueryRowContext(ctx, "SELECT balance_minor FROM settlement_account WHERE participant_id=$1", source).Scan(&sourceBalance); err != nil {
@@ -68,7 +68,7 @@ func TestSettlementIsBalancedAndIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	if sourceBalance != 750 || destinationBalance != 250 {
-		t.Fatalf("unexpected positions: %d/%d", sourceBalance, destinationBalance)
+		t.Fatalf("posiciones inesperadas: %d/%d", sourceBalance, destinationBalance)
 	}
 }
 
@@ -100,7 +100,7 @@ func TestConcurrentSettlementsCannotOverdraw(t *testing.T) {
 	}
 	wg.Wait()
 	if successful != 10 {
-		t.Fatalf("expected 10 successful settlements, got %d", successful)
+		t.Fatalf("se esperaban 10 liquidaciones exitosas, se obtuvieron %d", successful)
 	}
 	var sourceBalance, destinationBalance int64
 	if err := db.QueryRowContext(ctx, "SELECT balance_minor FROM settlement_account WHERE participant_id=$1", source).Scan(&sourceBalance); err != nil {

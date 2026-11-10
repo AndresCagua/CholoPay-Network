@@ -1,4 +1,4 @@
-"""Deterministic Docker-only HTTP load and fault-injection runner."""
+"""Ejecutor Docker de carga HTTP e inyección de fallos determinista."""
 from __future__ import annotations
 
 import concurrent.futures
@@ -33,7 +33,7 @@ def request_once(target_url: str, index: int, failure_every: int) -> Result:
 
 def run(target_url: str, requests: int, concurrency: int, failure_every: int) -> dict[str, object]:
     if requests < 1 or concurrency < 1 or failure_every < 0:
-        raise ValueError("requests and concurrency must be positive; failure_every cannot be negative")
+        raise ValueError("requests y concurrency deben ser positivos; failure_every no puede ser negativo")
     started = time.perf_counter()
     with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
         results = list(pool.map(lambda i: request_once(target_url, i, failure_every), range(requests)))
@@ -70,7 +70,7 @@ def run(target_url: str, requests: int, concurrency: int, failure_every: int) ->
 
 
 def emit_log(event: str, **fields: object) -> None:
-    """Emit one machine-readable record without adding credentials or request data."""
+    """Emite un registro legible por máquina sin agregar credenciales ni datos de solicitudes."""
     print(json.dumps({"event": event, **fields}, sort_keys=True))
 
 

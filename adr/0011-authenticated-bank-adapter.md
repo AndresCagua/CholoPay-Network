@@ -1,21 +1,21 @@
-# ADR 0011: authenticated CholoNet-to-bank adapter
+# ADR 0011: adaptador autenticado de CholoNet al banco
 
-- Status: Accepted for the local adapter slice; mTLS remains the deployment boundary
-- Date: 2026-11-09
+- Estado: Aceptado para el slice del adaptador local; mTLS sigue siendo el límite de despliegue
+- Fecha: 2026-11-09
 
-## Context
+## Contexto
 
-CholoNet must deliver receiver-credit commands to a specific bank without allowing an unauthenticated caller to credit customer accounts. The production-like boundary requires mTLS, while the first Docker-only integration needs a deterministic application-level replay and signature check.
+CholoNet debe entregar comandos de abono al receptor a un banco específico sin permitir que una persona llamadora no autenticada abone cuentas de clientes. El límite similar a producción requiere mTLS, mientras que la primera integración exclusiva de Docker necesita una comprobación determinista de replay y firma a nivel de aplicación.
 
-## Decision
+## Decisión
 
-The bank receiver endpoint requires both:
+El endpoint del banco receptor requiere ambos elementos:
 
-1. **Transport identity:** the deployment boundary is mTLS between CholoNet and each bank instance. Certificate issuance, rotation, and trust bundles remain deployment work.
-2. **Message authentication:** every local adapter command carries `X-CholoPay-Request-Timestamp`, `X-CholoPay-Request-Id`, and `X-CholoPay-Signature`. The signature is HMAC-SHA256 over `timestamp + "." + request_id + "." + canonical payload`, using a per-bank secret supplied through Docker runtime configuration. The receiver rejects missing, malformed, wrong, or expired signatures and remembers request IDs for the replay window.
+1. **Identidad de transporte:** el límite de despliegue es mTLS entre CholoNet y cada instancia bancaria. La emisión y rotación de certificados y los paquetes de confianza quedan como trabajo de despliegue.
+2. **Autenticación de mensajes:** cada comando local del adaptador contiene `X-CholoPay-Request-Timestamp`, `X-CholoPay-Request-Id` y `X-CholoPay-Signature`. La firma es HMAC-SHA256 sobre `timestamp + "." + request_id + "." + canonical payload`, usando un secreto por banco suministrado mediante la configuración de ejecución de Docker. El receptor rechaza firmas ausentes, malformadas, incorrectas o expiradas y recuerda los ID de solicitud durante la ventana de replay.
 
-The receiver verifies the envelope before invoking the local inbox transaction. A valid duplicate delivery may replay its existing receipt, but a duplicate request ID with a different payload is rejected. Secrets never appear in logs or repository files. The HMAC layer is not a replacement for mTLS; it protects message integrity and supports deterministic local tests.
+El receptor verifica la envoltura antes de invocar la transacción local del inbox. Una entrega duplicada válida puede repetir su recibo existente, pero un ID de solicitud duplicado con un payload diferente se rechaza. Los secretos nunca aparecen en logs ni archivos del repositorio. La capa HMAC no reemplaza mTLS; protege la integridad de los mensajes y permite pruebas locales deterministas.
 
-## Consequences
+## Consecuencias
 
-The adapter can be tested without external identity providers. Production deployment must add certificate validation, rotation, and network policy. The default Docker stack uses synthetic secrets only in test configuration and does not publish the endpoint to the host.
+El adaptador puede probarse sin proveedores externos de identidad. El despliegue de producción debe agregar validación y rotación de certificados y políticas de red. La pila Docker predeterminada usa secretos sintéticos únicamente en la configuración de pruebas y no publica el endpoint al host.

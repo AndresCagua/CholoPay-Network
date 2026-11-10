@@ -13,7 +13,7 @@ import (
 func TestPostgresRouteSeparatesNetworkDomains(t *testing.T) {
 	url := os.Getenv("NETWORK_DB_URL")
 	if url == "" {
-		t.Skip("NETWORK_DB_URL is required for the Docker integration test")
+		t.Skip("NETWORK_DB_URL es necesario para la prueba de integración de Docker")
 	}
 	db, err := sql.Open("pgx", url)
 	if err != nil {
@@ -52,19 +52,19 @@ func TestPostgresRouteSeparatesNetworkDomains(t *testing.T) {
 		t.Fatal(err)
 	}
 	if intra.Kind != IntraNetwork {
-		t.Fatalf("expected intra-network route, got %s", intra.Kind)
+		t.Fatalf("se esperaba una ruta intrared, se obtuvo %s", intra.Kind)
 	}
 	inter, err := store.Route(ctx, costa.ID, walletA.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if inter.Kind != InterNetwork || inter.DestinationNetwork.ID != fintech.ID {
-		t.Fatalf("unexpected inter-network route: %+v", inter)
+		t.Fatalf("ruta interred inesperada: %+v", inter)
 	}
 	if _, err := db.ExecContext(ctx, "UPDATE network_participant SET status='SUSPENDED' WHERE participant_id=$1", walletA.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.Route(ctx, costa.ID, walletA.ID); err != ErrParticipantUnavailable {
-		t.Fatalf("expected unavailable participant, got %v", err)
+		t.Fatalf("se esperaba un participante no disponible, se obtuvo %v", err)
 	}
 }

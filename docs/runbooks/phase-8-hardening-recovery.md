@@ -1,46 +1,46 @@
-# Phase 8 — Hardening and recovery runbook
+# Fase 8 — Runbook de endurecimiento y recuperación
 
-All commands use Docker Compose and synthetic local data. Do not use this runbook against a production or external environment.
+Todos los comandos usan Docker Compose y datos locales sintéticos. No uses este runbook contra un entorno de producción o externo.
 
-## Local hardening check
+## Check local de endurecimiento
 
 ```bash
 ./infra/scripts/hardening-check.sh
 ./infra/scripts/check-ports.sh
 ```
 
-The default configuration must publish no host ports. Any optional published-port profile requires an explicit review and free-port check.
+La configuración predeterminada no debe publicar puertos del host. Cualquier perfil opcional que publique puertos requiere una revisión explícita y un check de puertos libres.
 
-## Start isolated databases
+## Iniciar bases de datos aisladas
 
 ```bash
 docker compose --env-file infra/config.env.template -f infra/compose.yaml up -d network-db costa-db sierra-db oriente-db
 ```
 
-## Backup
+## Respaldo
 
 ```bash
 ./infra/scripts/backup-restore.sh backup
 ```
 
-Backups are written under `.artifacts/backups/`, which is local evidence and must not contain real personal or financial data.
+Los respaldos se escriben en `.artifacts/backups/`, que contiene evidencia local y no debe contener datos personales o financieros reales.
 
-## Restore a synthetic network database
+## Restaurar una base de datos de red sintética
 
 ```bash
 RESTORE_SERVICE=network-db ./infra/scripts/backup-restore.sh restore .artifacts/backups/network-db-<timestamp>.sql
 ```
 
-Restore is destructive for the selected synthetic database. `RESTORE_SERVICE` and the dump filename must refer to the same database: `network-db` → `cholopay_network`, `costa-db` → `cholopay_costa`, `sierra-db` → `cholopay_sierra`, `oriente-db` → `cholopay_oriente`. Run it only against disposable local volumes and verify the service health afterward.
+La restauración es destructiva para la base de datos sintética seleccionada. `RESTORE_SERVICE` y el nombre del volcado deben referirse a la misma base de datos: `network-db` → `cholopay_network`, `costa-db` → `cholopay_costa`, `sierra-db` → `cholopay_sierra`, `oriente-db` → `cholopay_oriente`. Ejecútala únicamente contra volúmenes locales desechables y verifica después la salud del servicio.
 
-## Participant outage and credential rotation
+## Caída de participante y rotación de credenciales
 
 1. Stop only the affected synthetic service with `docker compose ... stop <service>`.
-2. Keep the network and bank ledgers untouched; reconcile pending messages before restart.
+2. Mantener intactos los ledgers de la red y de los bancos; reconciliar los mensajes pendientes antes de reiniciar.
 3. Restart the service and run the relevant Docker test profile.
 4. Rotate only synthetic environment values in an ignored local config; never commit real credentials.
 5. Record the incident, command output, and resulting commit in the phase task log.
 
-## Limits
+## Límites
 
-This phase does not provide production backup guarantees, Kubernetes deployment, GitOps, external publication, or real secret management.
+Esta fase no proporciona garantías de respaldo de producción, despliegue en Kubernetes, GitOps, publicación externa ni gestión real de secretos.

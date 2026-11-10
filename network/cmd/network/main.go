@@ -57,11 +57,11 @@ type operatorOverview struct {
 func operatorOverviewHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !authorizedBearer(r, os.Getenv("OPERATOR_CONSOLE_TOKEN")) {
-			http.Error(w, "authorization required", http.StatusUnauthorized)
+			http.Error(w, "se requiere autorización", http.StatusUnauthorized)
 			return
 		}
 		if db == nil {
-			http.Error(w, "operator projection unavailable", http.StatusServiceUnavailable)
+			http.Error(w, "la proyección del operador no está disponible", http.StatusServiceUnavailable)
 			return
 		}
 		var overview operatorOverview
@@ -89,7 +89,7 @@ func operatorOverviewHandler(db *sql.DB) http.HandlerFunc {
 			&overview.Health.ActiveKeys,
 			&overview.Health.SuspendedKeys,
 		); err != nil {
-			http.Error(w, "operator projection unavailable", http.StatusServiceUnavailable)
+			http.Error(w, "la proyección del operador no está disponible", http.StatusServiceUnavailable)
 			return
 		}
 		overview.Networks = overview.Health.NetworksTotal
@@ -109,20 +109,20 @@ func operatorOverviewHandler(db *sql.DB) http.HandlerFunc {
 			ORDER BY 1
 		`)
 		if err != nil {
-			http.Error(w, "operator projection unavailable", http.StatusServiceUnavailable)
+			http.Error(w, "la proyección del operador no está disponible", http.StatusServiceUnavailable)
 			return
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var incident operatorIncident
 			if err := rows.Scan(&incident.Code, &incident.Count, &incident.Source); err != nil {
-				http.Error(w, "operator projection unavailable", http.StatusServiceUnavailable)
+				http.Error(w, "la proyección del operador no está disponible", http.StatusServiceUnavailable)
 				return
 			}
 			overview.Incidents = append(overview.Incidents, incident)
 		}
 		if err := rows.Err(); err != nil {
-			http.Error(w, "operator projection unavailable", http.StatusServiceUnavailable)
+			http.Error(w, "la proyección del operador no está disponible", http.StatusServiceUnavailable)
 			return
 		}
 		overview.LastSynchronizedAt = time.Now().UTC().Format(time.RFC3339Nano)
@@ -142,31 +142,31 @@ func authorizedBearer(r *http.Request, expected string) bool {
 func main() {
 	dbURL := os.Getenv("NETWORK_DB_URL")
 	if dbURL == "" {
-		slog.Error("NETWORK_DB_URL is required")
+		slog.Error("se requiere NETWORK_DB_URL")
 		os.Exit(1)
 	}
 	db, err := sql.Open("pgx", dbURL)
 	if err != nil {
-		slog.Error("open network database", "error", err)
+		slog.Error("abrir la base de datos de red", "error", err)
 		os.Exit(1)
 	}
 	defer db.Close()
 	ctx := context.Background()
 	if err := db.PingContext(ctx); err != nil {
-		slog.Error("connect network database", "error", err)
+		slog.Error("conectar con la base de datos de red", "error", err)
 		os.Exit(1)
 	}
 	if err := instruction.Migrate(ctx, db); err != nil {
-		slog.Error("migrate network database", "error", err)
+		slog.Error("migrar la base de datos de red", "error", err)
 		os.Exit(1)
 	}
 	if err := settlement.Migrate(ctx, db); err != nil {
-		slog.Error("migrate settlement database", "error", err)
+		slog.Error("migrar la base de datos de liquidación", "error", err)
 		os.Exit(1)
 	}
 	routingStore := routing.NewStore(db)
 	if err := routingStore.Migrate(ctx); err != nil {
-		slog.Error("migrate routing database", "error", err)
+		slog.Error("migrar la base de datos de enrutamiento", "error", err)
 		os.Exit(1)
 	}
 
@@ -178,13 +178,13 @@ func main() {
 	routing.NewHandler(routingStore).Register(mux)
 	directoryStore := directory.NewStore(db)
 	if err := directoryStore.Migrate(ctx); err != nil {
-		slog.Error("migrate directory database", "error", err)
+		slog.Error("migrar la base de datos de directorio", "error", err)
 		os.Exit(1)
 	}
 	directory.NewHandler(directoryStore).Register(mux)
 	messageStore := message.NewStore(db)
 	if err := messageStore.Migrate(ctx); err != nil {
-		slog.Error("migrate message database", "error", err)
+		slog.Error("migrar la base de datos de mensajes", "error", err)
 		os.Exit(1)
 	}
 	message.NewHandler(messageStore).Register(mux)
@@ -203,9 +203,9 @@ func main() {
 		port = "8080"
 	}
 	server := &http.Server{Addr: ":" + port, Handler: mux}
-	slog.Info("cholonet skeleton listening", "port", port)
+	slog.Info("esqueleto de cholonet escuchando", "port", port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		slog.Error("server stopped", "error", err)
+		slog.Error("el servidor se detuvo", "error", err)
 		os.Exit(1)
 	}
 }

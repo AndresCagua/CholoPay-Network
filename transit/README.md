@@ -1,8 +1,8 @@
-# Synthetic transit authority API
+# API sintética de autoridad de tránsito
 
-`cholopay-transit` is a Docker-only, process-local API for educational CholoPay flows. It uses synthetic registrations, fines, obligations, statuses, and constancias. **This is not a real authority, does not issue legal certificates, and must not be used with real personal or vehicle data.** It does not connect to banks, accounts, SPI/DICT, or external infrastructure.
+`cholopay-transit` es una API exclusiva para Docker y local al proceso para flujos educativos de CholoPay. Usa registros, multas, obligaciones, estados y constancias sintéticos. **No es una autoridad real, no emite certificados legales y no debe usarse con datos personales o de vehículos reales.** No se conecta a bancos, cuentas, SPI/DICT ni infraestructura externa.
 
-## Docker-only usage
+## Uso exclusivo para Docker
 
 ```sh
 docker compose -f compose.yaml --profile test run --rm transit-test
@@ -10,19 +10,19 @@ docker compose -f compose.yaml up --build transit
 docker compose -f compose.yaml down
 ```
 
-No host port is exposed by default. Data is process-local and disappears when the container stops. To connect from another container on the same Compose network, use `http://transit:8082`.
+De forma predeterminada no se expone ningún puerto al host. Los datos son locales al proceso y desaparecen cuando se detiene el contenedor. Para conectarte desde otro contenedor de la misma red Compose, usa `http://transit:8082`.
 
-## HTTP surface
+## Superficie HTTP
 
 - `GET /health/live`
 - `POST /v1/registrations` — `{ "plate": "SYN-001", "vehicle_type": "synthetic-car" }`
 - `GET /v1/registrations/{id-or-plate}`
-- `POST /v1/fines` — creates a synthetic fine and its unpaid obligation.
+- `POST /v1/fines` — crea una multa sintética y su obligación impagada.
 - `GET /v1/fines/{id}`
-- `GET /v1/obligations/{id}` and `GET /v1/obligations?registration_id=...&status=unpaid`
+- `GET /v1/obligations/{id}` y `GET /v1/obligations?registration_id=...&status=unpaid`
 - `GET /v1/status?registration_id=...`
-- `POST /v1/constancias` — creates a synthetic status constancia; it is not an official certificate.
-- `POST /v1/payment-intents` — requires `Idempotency-Key`; creates a pending intent only.
+- `POST /v1/constancias` — crea una constancia de estado sintética; no es un certificado oficial.
+- `POST /v1/payment-intents` — requiere `Idempotency-Key`; solo crea una intención pendiente.
 - `GET /v1/payment-intents/{id}`
 
-Payment intents are an explicit integration boundary. Repeating the same key and payload returns the same intent; a payload mismatch returns `409`. The service never debits an account, changes an obligation to paid, or writes a ledger. All state is in memory.
+Las intenciones de pago son un límite explícito de integración. Repetir la misma clave y carga devuelve la misma intención; una discrepancia de carga devuelve `409`. El servicio nunca adeuda una cuenta, cambia una obligación a pagada ni escribe un diario. Todo el estado está en memoria.

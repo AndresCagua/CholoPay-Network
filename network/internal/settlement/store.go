@@ -41,7 +41,7 @@ func NewStore(db *sql.DB) *Store { return &Store{db: db} }
 
 func (s *Store) CreateAccount(ctx context.Context, participantID uuid.UUID, balanceMinor int64) error {
 	if balanceMinor < 0 {
-		return errors.New("settlement balance must not be negative")
+		return errors.New("el saldo de liquidación no puede ser negativo")
 	}
 	_, err := s.db.ExecContext(ctx, `INSERT INTO settlement_account(participant_id,balance_minor,currency) VALUES ($1,$2,'USD')`, participantID, balanceMinor)
 	return err
@@ -49,10 +49,10 @@ func (s *Store) CreateAccount(ctx context.Context, participantID uuid.UUID, bala
 
 func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID uuid.UUID, amountMinor int64, idempotencyKey string, correlationID uuid.UUID) (Journal, error) {
 	if amountMinor <= 0 {
-		return Journal{}, errors.New("settlement amount must be positive")
+		return Journal{}, errors.New("el importe de liquidación debe ser positivo")
 	}
 	if sourceID == destinationID {
-		return Journal{}, errors.New("settlement participants must differ")
+		return Journal{}, errors.New("los participantes de la liquidación deben ser distintos")
 	}
 	requestHash := instruction.RequestHash(sourceID, &destinationID, amountMinor, "USD")
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -99,10 +99,10 @@ func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID 
 	}
 	rows.Close()
 	if len(balances) != 2 {
-		return Journal{}, errors.New("settlement participant account not found")
+		return Journal{}, errors.New("no se encontró la cuenta del participante de liquidación")
 	}
 	if balances[sourceID] < amountMinor {
-		return Journal{}, errors.New("insufficient settlement position")
+		return Journal{}, errors.New("posición de liquidación insuficiente")
 	}
 
 	journalID := uuid.New()
@@ -152,4 +152,4 @@ func (j Journal) Balanced() bool {
 	return j.Entries[0].AmountMinor == j.Entries[1].AmountMinor && j.Entries[0].Direction == Debit && j.Entries[1].Direction == Credit
 }
 
-var ErrIdempotencyConflict = fmt.Errorf("settlement idempotency key was already used with a different request")
+var ErrIdempotencyConflict = fmt.Errorf("la clave de idempotencia de liquidación ya se usó con una solicitud diferente")

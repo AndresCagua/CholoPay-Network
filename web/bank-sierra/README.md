@@ -1,5 +1,5 @@
-# Banco Sierra web panel
+# Panel web de Banco Sierra
 
-Reads `GET {TRANSFER_API_BASE_URL}/v1/participants/bank-sierra/transfers` through the participant-scoped client in `src/app/transfer-read-model.ts`. The default synthetic adapter is read-only and enforces the participant in its contract; configure the HTTP base at runtime through the injected `globalThis.__env.TRANSFER_API_BASE_URL`. No browser database, ledger, or filesystem access is used. Loading, error, and empty states are rendered explicitly.
+Lee `GET {TRANSFER_API_BASE_URL}/v1/participants/bank-sierra/transfers` mediante el cliente limitado al participante en `src/app/transfer-read-model.ts`. El adaptador sintético predeterminado es de solo lectura e impone el participante en su contrato; configurá la base HTTP en tiempo de ejecución mediante `globalThis.__env.TRANSFER_API_BASE_URL`, inyectado. El navegador no accede a bases de datos, libros mayores ni al sistema de archivos. Los estados de carga, error y ausencia de datos se renderizan explícitamente.
 
-Docker check: `docker build -t cholopay-bank-sierra-web ./web/bank-sierra`.
+Verificación de Docker: `docker build -t cholopay-bank-sierra-web ./web/bank-sierra`.

@@ -15,7 +15,7 @@ type Delivery struct {
 	LastEventID           *uuid.UUID
 }
 
-var ErrDeliveryConflict = errors.New("receiver acknowledgement conflicts with existing delivery evidence")
+var ErrDeliveryConflict = errors.New("la confirmación del receptor entra en conflicto con la evidencia de entrega existente")
 
 func (s *Store) EnqueueDelivery(ctx context.Context, transferID, receiverID uuid.UUID) (Delivery, error) {
 	tx, err := s.db.BeginTx(ctx, nil)

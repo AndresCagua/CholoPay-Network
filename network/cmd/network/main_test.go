@@ -20,7 +20,7 @@ func TestOperatorOverviewRequiresAuthorization(t *testing.T) {
 	response := httptest.NewRecorder()
 	operatorOverviewHandler(nil)(response, req)
 	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("expected unauthorized operator request, got %d", response.Code)
+		t.Fatalf("se esperaba una solicitud de operador no autorizada, se obtuvo %d", response.Code)
 	}
 }
 
@@ -31,7 +31,7 @@ func TestOperatorOverviewDoesNotInventProjectionWhenNetworkSourceUnavailable(t *
 	response := httptest.NewRecorder()
 	operatorOverviewHandler(nil)(response, req)
 	if response.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected unavailable projection, got %d", response.Code)
+		t.Fatalf("se esperaba una proyección no disponible, se obtuvo %d", response.Code)
 	}
 }
 
@@ -45,7 +45,7 @@ func TestOperatorOverviewReadsAggregatesWithoutExposingSecretsOrMutatingSources(
 	operatorOverviewHandler(db)(response, req)
 
 	if response.Code != http.StatusOK {
-		t.Fatalf("expected operator projection, got %d: %s", response.Code, response.Body)
+		t.Fatalf("se esperaba una proyección del operador, se obtuvo %d: %s", response.Code, response.Body)
 	}
 	body := response.Body.String()
 	for _, forbidden := range []string{"participant_id", "secret", "token", "account_number", "wallet_address"} {
@@ -58,34 +58,34 @@ func TestOperatorOverviewReadsAggregatesWithoutExposingSecretsOrMutatingSources(
 		t.Fatal(err)
 	}
 	if overview.Participants != 3 || overview.ActiveKeys != 2 || overview.SuspendedKeys != 1 {
-		t.Fatalf("expected aggregate counts, got %+v", overview)
+		t.Fatalf("se esperaban recuentos agregados, se obtuvo %+v", overview)
 	}
 	if len(overview.Incidents) != 1 || overview.Incidents[0].Count != 2 {
-		t.Fatalf("expected aggregate incident count, got %+v", overview.Incidents)
+		t.Fatalf("se esperaba el recuento agregado de incidentes, se obtuvo %+v", overview.Incidents)
 	}
 	if len(state.queries) != 2 || state.execs != 0 {
-		t.Fatalf("operator projection must be read-only: queries=%v execs=%d", state.queries, state.execs)
+		t.Fatalf("la proyección del operador debe ser de solo lectura: queries=%v execs=%d", state.queries, state.execs)
 	}
 	for _, query := range state.queries {
 		if !strings.HasPrefix(strings.TrimSpace(strings.ToUpper(query)), "SELECT") {
-			t.Fatalf("operator projection issued non-read query: %s", query)
+			t.Fatalf("la proyección del operador emitió una consulta no destinada a lectura: %s", query)
 		}
 	}
 }
 
 func TestOperatorOverviewReturnsUnavailableWhenSourceQueryFails(t *testing.T) {
 	t.Setenv("OPERATOR_CONSOLE_TOKEN", "expected-token")
-	state := &operatorTestDBState{queryErr: errors.New("source unavailable")}
+	state := &operatorTestDBState{queryErr: errors.New("origen no disponible")}
 	db := openOperatorTestDB(t, state)
 	req := httptest.NewRequest(http.MethodGet, "/internal/v1/operator/overview", nil)
 	req.Header.Set("Authorization", "Bearer expected-token")
 	response := httptest.NewRecorder()
 	operatorOverviewHandler(db)(response, req)
 	if response.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected unavailable projection, got %d: %s", response.Code, response.Body)
+		t.Fatalf("se esperaba una proyección no disponible, se obtuvo %d: %s", response.Code, response.Body)
 	}
 	if strings.Contains(response.Body.String(), "0") || strings.Contains(response.Body.String(), "stale") {
-		t.Fatalf("source failure must not return invented or stale projection: %s", response.Body)
+		t.Fatalf("un fallo de origen no debe devolver una proyección inventada u obsoleta: %s", response.Body)
 	}
 }
 
@@ -110,10 +110,10 @@ func TestOperatorOverviewProjectionContractIsAggregated(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, ok := decoded["participant_id"]; ok {
-		t.Fatal("operator projection must not expose participant identifiers")
+		t.Fatal("la proyección del operador no debe exponer identificadores de participantes")
 	}
 	if decoded["source"] != "cholonet-network-read-model" || decoded["reconciliation_status"] != "UNKNOWN" {
-		t.Fatalf("missing projection metadata: %s", payload)
+		t.Fatalf("faltan metadatos de la proyección: %s", payload)
 	}
 	if decoded["participants"] != float64(2) || decoded["active_keys"] != float64(1) {
 		t.Fatalf("legacy aggregate fields changed: %s", payload)

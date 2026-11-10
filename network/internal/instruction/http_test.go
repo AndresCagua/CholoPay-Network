@@ -13,10 +13,10 @@ import (
 	"testing"
 )
 
-func TestInternalInstructionHTTP(t *testing.T) {
+func TestHTTPDeInstruccionInterna(t *testing.T) {
 	url := os.Getenv("NETWORK_DB_URL")
 	if url == "" {
-		t.Skip("NETWORK_DB_URL is required for the Docker integration test")
+		t.Skip("NETWORK_DB_URL es necesario para la prueba de integración de Docker")
 	}
 	db, err := sql.Open("pgx", url)
 	if err != nil {
@@ -42,6 +42,6 @@ func TestInternalInstructionHTTP(t *testing.T) {
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d", response.StatusCode)
+		t.Fatalf("se esperaba 202, se obtuvo %d", response.StatusCode)
 	}
 }

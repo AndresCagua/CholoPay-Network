@@ -49,12 +49,12 @@ func (s *Store) Reconcile(ctx context.Context, runID uuid.UUID) (ReconciliationR
 			return ReconciliationRun{}, err
 		}
 		if deliveryID == nil {
-			if err := add(&transferID, nil, "SETTLED_WITHOUT_DELIVERY", "central journal has no durable receiver delivery"); err != nil {
+			if err := add(&transferID, nil, "SETTLED_WITHOUT_DELIVERY", "el diario central no tiene una entrega receptora persistente"); err != nil {
 				rows.Close()
 				return ReconciliationRun{}, err
 			}
 		} else if *state == "PENDING" {
-			if err := add(&transferID, deliveryID, "DELIVERY_PENDING", "receiver delivery has not been acknowledged"); err != nil {
+			if err := add(&transferID, deliveryID, "DELIVERY_PENDING", "la entrega receptora no ha sido confirmada"); err != nil {
 				rows.Close()
 				return ReconciliationRun{}, err
 			}
@@ -78,7 +78,7 @@ func (s *Store) Reconcile(ctx context.Context, runID uuid.UUID) (ReconciliationR
 			rows.Close()
 			return ReconciliationRun{}, err
 		}
-		if err := add(&transferID, &deliveryID, "APPLIED_WITHOUT_COMPLETED_STATE", "delivery evidence is applied but instruction is not completed"); err != nil {
+		if err := add(&transferID, &deliveryID, "APPLIED_WITHOUT_COMPLETED_STATE", "la evidencia de entrega está aplicada, pero la instrucción no está completada"); err != nil {
 			rows.Close()
 			return ReconciliationRun{}, err
 		}

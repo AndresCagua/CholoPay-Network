@@ -2,12 +2,12 @@ import { ChangeDetectionStrategy, Component, OnInit } from "@angular/core";
 import { SIERRA_PARTICIPANT_ID, TransferReadModel, TransferState, createTransferApi } from "./transfer-read-model";
 
 const STATE_LABELS: Record<TransferState, string> = {
-  INSTRUCTION_ACCEPTED: "Instruction accepted",
-  FUNDS_RESERVED: "Funds reserved",
-  SETTLED: "SETTLED — network settlement confirmed",
-  CREDIT_PENDING: "Credit pending",
-  COMPLETED: "COMPLETED — beneficiary credited",
-  UNKNOWN: "Unknown state",
+  INSTRUCTION_ACCEPTED: "Instrucción aceptada",
+  FUNDS_RESERVED: "Fondos reservados",
+  SETTLED: "SETTLED — liquidación de red confirmada",
+  CREDIT_PENDING: "Crédito pendiente",
+  COMPLETED: "COMPLETED — beneficiario acreditado",
+  UNKNOWN: "Estado desconocido",
 };
 
 @Component({
@@ -17,31 +17,31 @@ const STATE_LABELS: Record<TransferState, string> = {
     <main class="shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Participant read-only view</p>
+          <p class="eyebrow">Vista de solo lectura del participante</p>
           <h1>Banco Sierra</h1>
-          <p class="lede">Transfers visible to <strong>{{ participantId }}</strong></p>
+          <p class="lede">Transferencias visibles para <strong>{{ participantId }}</strong></p>
         </div>
         <span class="access-badge">READ_ONLY</span>
       </header>
 
-      <section class="notice" aria-label="Data access boundary">
-        <strong>Local contract fixture</strong>
-        <span>This panel reads an authorized transfer projection only. It does not access a database or create transfers.</span>
+      <section class="notice" aria-label="Límite de acceso a datos">
+        <strong>Fixture de contrato local</strong>
+        <span>Este panel solo lee una proyección autorizada de transferencias. No accede a bases de datos ni crea transferencias.</span>
       </section>
 
       <section aria-labelledby="transfers-heading">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Authorized projection</p>
-            <h2 id="transfers-heading">Transfer activity</h2>
+            <p class="eyebrow">Proyección autorizada</p>
+            <h2 id="transfers-heading">Actividad de transferencias</h2>
           </div>
-          <span class="count">{{ visibleTransfers.length }} visible</span>
+          <span class="count">{{ visibleTransfers.length }} visibles</span>
         </div>
 
-        @if (loading) { <p class="empty" role="status">Loading transfers…</p> }
+        @if (loading) { <p class="empty" role="status">Cargando transferencias…</p> }
         @if (error) { <p class="empty" role="alert">{{ error }}</p> }
         @for (transfer of visibleTransfers; track transfer.transfer_id) {
-          <article class="transfer-card" [attr.aria-label]="'Transfer ' + transfer.transfer_id">
+          <article class="transfer-card" [attr.aria-label]="'Transferencia ' + transfer.transfer_id">
             <div class="card-topline">
               <div>
                 <p class="transfer-id">{{ transfer.transfer_id }}</p>
@@ -53,25 +53,25 @@ const STATE_LABELS: Record<TransferState, string> = {
             </div>
 
             <dl class="route">
-              <div><dt>From</dt><dd>{{ transfer.source_participant_id }}</dd></div>
+              <div><dt>Desde</dt><dd>{{ transfer.source_participant_id }}</dd></div>
               <div class="arrow" aria-hidden="true">→</div>
-              <div><dt>To</dt><dd>{{ transfer.destination_participant_id }}</dd></div>
+              <div><dt>Hacia</dt><dd>{{ transfer.destination_participant_id }}</dd></div>
             </dl>
 
             <dl class="metadata">
-              <div><dt>Schema version</dt><dd>{{ transfer.schema_version }}</dd></div>
-              <div><dt>Participant scope</dt><dd>{{ transfer.participant_id }}</dd></div>
-              <div><dt>Correlation ID</dt><dd>{{ transfer.correlation_id }}</dd></div>
-              <div><dt>Causation ID</dt><dd>{{ transfer.causation_id ?? "—" }}</dd></div>
-              <div><dt>Idempotency key</dt><dd>{{ transfer.idempotency_key }}</dd></div>
-              <div><dt>Trace ID</dt><dd>{{ transfer.trace_id }}</dd></div>
-              <div><dt>Created (UTC)</dt><dd>{{ transfer.created_at }}</dd></div>
-              <div><dt>Settled (UTC)</dt><dd>{{ transfer.settled_at ?? "Not settled" }}</dd></div>
-              <div><dt>Last updated (UTC)</dt><dd>{{ transfer.last_updated_at }}</dd></div>
+              <div><dt>Versión del esquema</dt><dd>{{ transfer.schema_version }}</dd></div>
+              <div><dt>Alcance del participante</dt><dd>{{ transfer.participant_id }}</dd></div>
+              <div><dt>ID de correlación</dt><dd>{{ transfer.correlation_id }}</dd></div>
+              <div><dt>ID de causación</dt><dd>{{ transfer.causation_id ?? "—" }}</dd></div>
+              <div><dt>Clave de idempotencia</dt><dd>{{ transfer.idempotency_key }}</dd></div>
+              <div><dt>ID de traza</dt><dd>{{ transfer.trace_id }}</dd></div>
+              <div><dt>Creada (UTC)</dt><dd>{{ transfer.created_at }}</dd></div>
+              <div><dt>Liquidada (UTC)</dt><dd>{{ transfer.settled_at ?? "No liquidada" }}</dd></div>
+              <div><dt>Última actualización (UTC)</dt><dd>{{ transfer.last_updated_at }}</dd></div>
             </dl>
           </article>
         } @empty {
-          <p class="empty">No transfers are authorized for this participant.</p>
+          <p class="empty">No hay transferencias autorizadas para este participante.</p>
         }
       </section>
     </main>
@@ -119,7 +119,7 @@ export class AppComponent implements OnInit {
       this.visibleTransfers = transfers;
       this.loading = false;
     }).catch((reason: unknown) => {
-      this.error = reason instanceof Error ? reason.message : "Transfer API unavailable";
+      this.error = reason instanceof Error ? reason.message : "La API de transferencias no está disponible";
       this.loading = false;
     });
   }
@@ -129,7 +129,7 @@ export class AppComponent implements OnInit {
   }
 
   formatAmount(amountMinor: number, currency: string): string {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("es-EC", {
       style: "currency",
       currency,
       minimumFractionDigits: 2,

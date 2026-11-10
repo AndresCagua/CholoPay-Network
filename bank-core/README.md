@@ -1,10 +1,10 @@
-# CholoPay Bank Core — Phase 1
+# Núcleo bancario de CholoPay — Fase 1
 
-Parametrized Spring Boot bank core for Banco Costa, Banco Sierra, and Banco Oriente. This first slice implements synthetic accounts, integer-cent balances, balanced immutable journals, reservations, and idempotent internal transfers. It does not implement interbank settlement.
+Núcleo bancario Spring Boot parametrizado para Banco Costa, Banco Sierra y Banco Oriente. Este primer corte implementa cuentas sintéticas, saldos en centavos enteros, diarios inmutables equilibrados, reservas y transferencias internas idempotentes. No implementa liquidación interbancaria.
 
-## Docker-only build and test
+## Compilación y pruebas exclusivas para Docker
 
-The host needs Docker Engine and the Compose plugin only. Java, Maven, Gradle, and PostgreSQL are supplied by the project containers and must not be installed or invoked on the host.
+El host solo necesita Docker Engine y el complemento Compose. Java, Maven, Gradle y PostgreSQL los proporcionan los contenedores del proyecto y no deben instalarse ni invocarse en el host.
 
 From the repository root:
 
@@ -12,25 +12,25 @@ From the repository root:
 docker compose --env-file infra/config.env.template -f infra/compose.yaml --profile test run --rm bank-core-test
 ```
 
-The test image is built from `bank-core/Dockerfile` using Maven and JDK 21 inside the container. The runtime image contains only the JRE and the packaged application.
+La imagen de pruebas se construye desde `bank-core/Dockerfile` usando Maven y JDK 21 dentro del contenedor. La imagen de ejecución solo contiene el JRE y la aplicación empaquetada.
 
-To run the service with the Costa database entirely inside Compose:
+Para ejecutar el servicio con la base de datos de Costa completamente dentro de Compose:
 
 ```bash
 docker compose --env-file infra/config.env.template -f infra/compose.yaml up -d network-db costa-db bank-core
 ```
 
-The service is reachable only by other Compose services at `http://bank-core:8080`; no host port is published by default. If a local development proxy is added later, its host port must be checked before binding.
+El servicio solo es accesible para otros servicios Compose en `http://bank-core:8080`; de forma predeterminada no se publica ningún puerto al host. Si más adelante se añade un proxy de desarrollo local, debe comprobarse su puerto del host antes de enlazarlo.
 
-## Financial behavior
+## Comportamiento financiero
 
-- Amounts are positive integer USD cents.
-- A journal must contain balanced debit/credit entries.
-- Published journals are immutable in the domain model.
-- Internal transfers reserve, capture, debit, and credit within one service critical section.
-- Reusing an idempotency key with the same amount returns the original transaction; a different amount is rejected.
-- A successful internal transfer is not an interbank settlement.
+- Las cantidades son centavos de USD enteros positivos.
+- Un diario debe contener asientos de débito/crédito equilibrados.
+- Los diarios publicados son inmutables en el modelo de dominio.
+- Las transferencias internas reservan, capturan, adeudan y abonan dentro de una única sección crítica del servicio.
+- Reutilizar una clave de idempotencia con la misma cantidad devuelve la transacción original; una cantidad diferente se rechaza.
+- Una transferencia interna exitosa no es una liquidación interbancaria.
 
-The PostgreSQL migrations are under `src/main/resources/db/migration`. The internal receiver adapter is exposed at `POST /internal/v1/receiver-credits`; it applies a synthetic network clearing credit to a customer account in one local transaction and replays the same delivery without a second journal. It does not prove central settlement or replace the network acknowledgement protocol.
+Las migraciones de PostgreSQL están en `src/main/resources/db/migration`. El adaptador receptor interno se expone en `POST /internal/v1/receiver-credits`; aplica un abono sintético de compensación de red a una cuenta de cliente en una transacción local y reproduce la misma entrega sin un segundo diario. No demuestra la liquidación central ni sustituye el protocolo de confirmación de la red.
 
-The next implementation slice adds authenticated bank-to-network adapter transport and public error mapping before claiming production-like behavior.
+El siguiente corte de implementación añade transporte autenticado del adaptador banco-red y mapeo público de errores antes de afirmar un comportamiento similar al de producción.

@@ -1,7 +1,7 @@
-"""Synthetic commerce sandbox with an HTTP-only public surface.
+"""Entorno de pruebas de comercio sintético con una superficie pública solo HTTP.
 
-This service intentionally uses process-local memory. It is independent from the
-payment gateway and does not call external services or move real money.
+Este servicio usa intencionalmente memoria local al proceso. Es independiente de la
+pasarela de pagos, no llama a servicios externos ni mueve dinero real.
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ from urllib.parse import urlparse
 
 
 CATALOG = {
-    "demo-coffee": {"sku": "demo-coffee", "name": "Demo Coffee", "description": "Synthetic coffee product for sandbox flows", "price_minor": 650, "currency": "USD"},
-    "demo-mug": {"sku": "demo-mug", "name": "Demo Mug", "description": "Synthetic mug product for sandbox flows", "price_minor": 1200, "currency": "USD"},
+    "demo-coffee": {"sku": "demo-coffee", "name": "Demo Coffee", "description": "Producto de café sintético para flujos de pruebas", "price_minor": 650, "currency": "USD"},
+    "demo-mug": {"sku": "demo-mug", "name": "Demo Mug", "description": "Producto de taza sintético para flujos de pruebas", "price_minor": 1200, "currency": "USD"},
 }
 
 
@@ -106,7 +106,7 @@ GATEWAY_ADAPTER = os.environ.get("GATEWAY_ADAPTER") or ("http" if GATEWAY_URL el
 
 def gateway_create_intent(amount_minor: int, order_id: str, idempotency_key: str) -> tuple[int, dict[str, Any]]:
     if GATEWAY_ADAPTER == "synthetic":
-        return HTTPStatus.CREATED, {"id": f"pi_synthetic_{uuid.uuid4().hex}", "status": "requires_confirmation", "amount_minor": amount_minor, "currency": "USD", "ledger_boundary": "Commerce synthetic adapter never moves money."}
+        return HTTPStatus.CREATED, {"id": f"pi_synthetic_{uuid.uuid4().hex}", "status": "requires_confirmation", "amount_minor": amount_minor, "currency": "USD", "ledger_boundary": "El adaptador sintético de comercio nunca mueve dinero."}
     if not GATEWAY_URL:
         return HTTPStatus.SERVICE_UNAVAILABLE, {"error": "gateway_not_configured"}
     payload = json.dumps({"amount_minor": amount_minor, "currency": "USD", "merchant_order_id": order_id}).encode()

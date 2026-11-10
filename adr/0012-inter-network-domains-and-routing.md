@@ -1,23 +1,23 @@
-# ADR 0012: CholoPay Inter-Network domains and routing
+# ADR 0012: dominios y enrutamiento interredes de CholoPay
 
-- Status: Accepted for the first two-network slice
-- Date: 2026-11-09
-- Reference basis: BCE Codificación JPRM-2025-006-M and BCE-GG-008-2025, consulted 2026-11-09
+- Estado: Aceptado para el primer slice de dos redes
+- Fecha: 2026-11-09
+- Base de referencia: BCE Codificación JPRM-2025-006-M y BCE-GG-008-2025, consultadas el 2026-11-09
 
-## Context
+## Contexto
 
-The expanded product simulates two independent payment networks: a banking network containing Costa, Sierra, and Oriente, and a fintech network containing Wallet A and Wallet B. CholoNet must route instructions without collapsing their ownership boundaries.
+El producto ampliado simula dos redes de pago independientes: una red bancaria que contiene Costa, Sierra y Oriente, y una red fintech que contiene Wallet A y Wallet B. CholoNet debe enrutar instrucciones sin colapsar sus límites de propiedad.
 
-## Decision
+## Decisión
 
-Persist network domains and participant membership centrally. Each participant belongs to exactly one active domain at an instant. The route decision compares source and destination domains:
+Persistir centralmente los dominios de red y la pertenencia de participantes. Cada participante pertenece exactamente a un dominio activo en un instante dado. La decisión de ruta compara los dominios de origen y destino:
 
-- same domain: `INTRA_NETWORK`, handled by that network's policy;
-- different domains: `INTER_NETWORK`, sent through CholoNet inter-network coordination;
-- missing, suspended, or mismatched membership: reject before reservation.
+- mismo dominio: `INTRA_NETWORK`, gestionado por la política de esa red;
+- dominios diferentes: `INTER_NETWORK`, enviado mediante la coordinación interredes de CholoNet;
+- pertenencia inexistente, suspendida o incompatible: rechazar antes de reservar.
 
-The route decision is advisory and does not establish settlement. The central settlement ledger remains the only source of `SETTLED`. Directory resolution, authorization, risk rules, compensation, and participant ledgers remain separate concerns.
+La decisión de ruta es informativa y no establece la liquidación. El ledger central de liquidación sigue siendo la única fuente de `SETTLED`. La resolución del directorio, la autorización, las reglas de riesgo, la compensación y los ledgers de participantes siguen siendo preocupaciones separadas.
 
-## Consequences
+## Consecuencias
 
-The model demonstrates inter-network routing without claiming to implement the BCE SIP/RPI. It enables domain-specific credentials and policies, preserves participant isolation, and leaves room for distributed directory adapters. ISO 20022 is not claimed; events use CholoPay's versioned envelope until a concrete profile is approved.
+El modelo demuestra el enrutamiento interredes sin afirmar que implemente el SIP/RPI del BCE. Permite credenciales y políticas específicas por dominio, preserva el aislamiento de participantes y deja espacio para adaptadores de directorios distribuidos. No se afirma ISO 20022; los eventos usan la envoltura versionada de CholoPay hasta que se apruebe un perfil concreto.

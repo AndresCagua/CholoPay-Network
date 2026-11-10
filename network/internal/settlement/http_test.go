@@ -33,7 +33,7 @@ func TestSettlementHTTPReportsSettledOnlyAfterJournalCommit(t *testing.T) {
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", response.StatusCode)
+		t.Fatalf("se esperaba 201, se obtuvo %d", response.StatusCode)
 	}
 	var body struct {
 		State string `json:"state"`
@@ -42,6 +42,6 @@ func TestSettlementHTTPReportsSettledOnlyAfterJournalCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	if body.State != "SETTLED" {
-		t.Fatalf("unexpected state %q", body.State)
+		t.Fatalf("estado inesperado %q", body.State)
 	}
 }

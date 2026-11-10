@@ -1,4 +1,4 @@
-# C4 containers
+# Contenedores C4
 
 ```mermaid
 flowchart LR
@@ -20,4 +20,4 @@ flowchart LR
   kafka --> projections["Audit / notification projections"]
 ```
 
-Each PostgreSQL database is a distinct service and volume. Redis is never authoritative for balances, ledger entries, final settlement state, or the only copy of a key. Kafka is not a source of truth.
+Cada base de datos PostgreSQL es un servicio y un volumen distintos. Redis nunca es autoritativo para saldos, asientos del ledger, estado final de liquidación ni la única copia de una clave. Kafka no es una fuente de verdad.
