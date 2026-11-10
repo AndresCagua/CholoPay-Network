@@ -24,15 +24,34 @@ type healthResponse struct {
 	Status string `json:"status"`
 }
 
+type operatorIncident struct {
+	Code   string `json:"code"`
+	Count  int    `json:"count"`
+	Source string `json:"source"`
+}
+
+type operatorHealth struct {
+	NetworksTotal         int `json:"networks_total"`
+	NetworksActive        int `json:"networks_active"`
+	NetworksSuspended     int `json:"networks_suspended"`
+	ParticipantsTotal     int `json:"participants_total"`
+	ParticipantsActive    int `json:"participants_active"`
+	ParticipantsSuspended int `json:"participants_suspended"`
+	ActiveKeys            int `json:"active_keys"`
+	SuspendedKeys         int `json:"suspended_keys"`
+}
+
 type operatorOverview struct {
-	SchemaVersion        string `json:"schema_version"`
-	Source               string `json:"source"`
-	LastSynchronizedAt   string `json:"last_synchronized_at"`
-	ReconciliationStatus string `json:"reconciliation_status"`
-	Networks             int    `json:"networks"`
-	Participants         int    `json:"participants"`
-	ActiveKeys           int    `json:"active_keys"`
-	SuspendedKeys        int    `json:"suspended_keys"`
+	SchemaVersion        string             `json:"schema_version"`
+	Source               string             `json:"source"`
+	LastSynchronizedAt   string             `json:"last_synchronized_at"`
+	ReconciliationStatus string             `json:"reconciliation_status"`
+	Networks             int                `json:"networks"`
+	Participants         int                `json:"participants"`
+	ActiveKeys           int                `json:"active_keys"`
+	SuspendedKeys        int                `json:"suspended_keys"`
+	Health               operatorHealth     `json:"health"`
+	Incidents            []operatorIncident `json:"incidents"`
 }
 
 func operatorOverviewHandler(db *sql.DB) http.HandlerFunc {
@@ -41,23 +60,68 @@ func operatorOverviewHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "authorization required", http.StatusUnauthorized)
 			return
 		}
+		if db == nil {
+			http.Error(w, "operator projection unavailable", http.StatusServiceUnavailable)
+			return
+		}
 		var overview operatorOverview
 		overview.SchemaVersion = "1.0"
 		overview.Source = "cholonet-network-read-model"
 		overview.ReconciliationStatus = "UNKNOWN"
-		if err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM payment_network`).Scan(&overview.Networks); err != nil {
+		overview.Incidents = []operatorIncident{}
+		if err := db.QueryRowContext(r.Context(), `
+			SELECT
+				(SELECT COUNT(*) FROM payment_network),
+				(SELECT COUNT(*) FROM payment_network WHERE status='ACTIVE'),
+				(SELECT COUNT(*) FROM payment_network WHERE status='SUSPENDED'),
+				(SELECT COUNT(*) FROM network_participant),
+				(SELECT COUNT(*) FROM network_participant WHERE status='ACTIVE'),
+				(SELECT COUNT(*) FROM network_participant WHERE status='SUSPENDED'),
+				(SELECT COUNT(*) FROM directory_key WHERE status='ACTIVE'),
+				(SELECT COUNT(*) FROM directory_key WHERE status='SUSPENDED')
+		`).Scan(
+			&overview.Health.NetworksTotal,
+			&overview.Health.NetworksActive,
+			&overview.Health.NetworksSuspended,
+			&overview.Health.ParticipantsTotal,
+			&overview.Health.ParticipantsActive,
+			&overview.Health.ParticipantsSuspended,
+			&overview.Health.ActiveKeys,
+			&overview.Health.SuspendedKeys,
+		); err != nil {
 			http.Error(w, "operator projection unavailable", http.StatusServiceUnavailable)
 			return
 		}
-		if err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM network_participant`).Scan(&overview.Participants); err != nil {
+		overview.Networks = overview.Health.NetworksTotal
+		overview.Participants = overview.Health.ParticipantsTotal
+		overview.ActiveKeys = overview.Health.ActiveKeys
+		overview.SuspendedKeys = overview.Health.SuspendedKeys
+		rows, err := db.QueryContext(r.Context(), `
+			SELECT 'PARTICIPANT_SUSPENDED', COUNT(*), 'network_participant' FROM network_participant WHERE status='SUSPENDED' HAVING COUNT(*) > 0
+			UNION ALL
+			SELECT 'NETWORK_SUSPENDED', COUNT(*), 'payment_network' FROM payment_network WHERE status='SUSPENDED' HAVING COUNT(*) > 0
+			UNION ALL
+			SELECT 'DELIVERY_PENDING', COUNT(*), 'settlement_delivery' FROM settlement_delivery WHERE state='PENDING' HAVING COUNT(*) > 0
+			UNION ALL
+			SELECT code, COUNT(*), 'reconciliation_difference' FROM reconciliation_difference GROUP BY code
+			UNION ALL
+			SELECT 'TRANSFER_REJECTED', COUNT(*), 'transfer_instruction' FROM transfer_instruction WHERE state='REJECTED' HAVING COUNT(*) > 0
+			ORDER BY 1
+		`)
+		if err != nil {
 			http.Error(w, "operator projection unavailable", http.StatusServiceUnavailable)
 			return
 		}
-		if err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM directory_key WHERE status='ACTIVE'`).Scan(&overview.ActiveKeys); err != nil {
-			http.Error(w, "operator projection unavailable", http.StatusServiceUnavailable)
-			return
+		defer rows.Close()
+		for rows.Next() {
+			var incident operatorIncident
+			if err := rows.Scan(&incident.Code, &incident.Count, &incident.Source); err != nil {
+				http.Error(w, "operator projection unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			overview.Incidents = append(overview.Incidents, incident)
 		}
-		if err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM directory_key WHERE status='SUSPENDED'`).Scan(&overview.SuspendedKeys); err != nil {
+		if err := rows.Err(); err != nil {
 			http.Error(w, "operator projection unavailable", http.StatusServiceUnavailable)
 			return
 		}

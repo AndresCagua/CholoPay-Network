@@ -29,7 +29,7 @@ Scope: proyecciones agregadas de solo lectura sobre CholoNet, bancos y facturado
 ## Tasks
 
 - T1 (S1-S5): Inventariar fuentes y contratos read-only existentes, incluyendo autorización y alcance de datos. Route: inline. Commit: pending.
-- T2 (S1-S5): Implementar endpoint/proyección agregada de incidencias y salud de participantes. Route: pending inspection. Commit: pending.
+- T2 (S1-S5): Implementar endpoint/proyección agregada de incidencias y salud de participantes. Route: inline worker. Commit: pending.
 - T3 (S1-S5): Añadir regresiones de aislamiento, enmascaramiento, stale data y no-mutación. Route: pending. Commit: pending.
 - T4 (S1-S5): Documentar consola simulada y evidencia Docker. Route: pending. Commit: pending.
 
@@ -39,3 +39,4 @@ L1. Usuario: "papito hermoso pero como vergas me puedes tener ya una hora deteni
 L2. La revisión RDD de Phase 11 fue abandonada explícitamente por disposición del operador; el target queda sin aprobación nativa. Se continúa con la siguiente especificación: consola central simulada read-only.
 L3. Se añadió `GET /internal/v1/operator/overview`, una proyección agregada de solo lectura con `schema_version`, origen, timestamp de sincronización, estado de conciliación y conteos de redes, participantes y CholoKeys activas/suspendidas.
 L4. Evidencia Docker: `docker compose config` PASS; suite completa de `network` PASS; `gofmt` y `git diff --check` PASS.
+L5. T2 implementó salud agregada e incidencias desde tablas propias de CholoNet, mantuvo compatibilidad de campos existentes, devolvió `503` sin valores inventados cuando la proyección no está disponible y documentó el contrato OpenAPI. Evidencia Docker aislada: `docker compose -p cholopay-operator-verify --profile network-test -f infra/compose.yaml run --rm network-test` PASS; `docker compose config` y `git diff --check` PASS.

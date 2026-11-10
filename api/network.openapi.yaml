@@ -25,9 +25,13 @@ paths:
       security:
         - serviceBearer: []
       responses:
-        '200': {description: Aggregated read-only projection}
+        '200':
+          description: Aggregated read-only simulated operator projection
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OperatorOverview'}
         '401': {description: Authorization required}
-        '503': {description: Projection unavailable}
+        '503': {description: Projection unavailable; no source-derived values are returned}
   /internal/v1/directory/port:
     post:
       summary: Port a synthetic CholoKey between participants
@@ -96,6 +100,42 @@ components:
         source_participant_id: {type: string, format: uuid}
         destination_key: {type: string}
         correlation_id: {type: string, format: uuid}
+    OperatorOverview:
+      type: object
+      description: Aggregated participant-health and incident projection from CholoNet-owned read models only.
+      required: [schema_version, source, last_synchronized_at, reconciliation_status, health, incidents]
+      properties:
+        schema_version: {type: string}
+        source: {type: string, const: cholonet-network-read-model}
+        last_synchronized_at: {type: string, format: date-time}
+        reconciliation_status: {type: string, enum: [UNKNOWN, CLEAN, DIFFERENCES]}
+        networks: {type: integer, minimum: 0, description: Legacy aggregate count retained for compatibility}
+        participants: {type: integer, minimum: 0, description: Legacy aggregate count retained for compatibility}
+        active_keys: {type: integer, minimum: 0, description: Legacy aggregate count retained for compatibility}
+        suspended_keys: {type: integer, minimum: 0, description: Legacy aggregate count retained for compatibility}
+        health: {$ref: '#/components/schemas/OperatorHealth'}
+        incidents:
+          type: array
+          items: {$ref: '#/components/schemas/OperatorIncident'}
+    OperatorHealth:
+      type: object
+      required: [networks_total, networks_active, networks_suspended, participants_total, participants_active, participants_suspended, active_keys, suspended_keys]
+      properties:
+        networks_total: {type: integer, minimum: 0}
+        networks_active: {type: integer, minimum: 0}
+        networks_suspended: {type: integer, minimum: 0}
+        participants_total: {type: integer, minimum: 0}
+        participants_active: {type: integer, minimum: 0}
+        participants_suspended: {type: integer, minimum: 0}
+        active_keys: {type: integer, minimum: 0}
+        suspended_keys: {type: integer, minimum: 0}
+    OperatorIncident:
+      type: object
+      required: [code, count, source]
+      properties:
+        code: {type: string}
+        count: {type: integer, minimum: 1}
+        source: {type: string}
     Transfer:
       allOf:
         - $ref: '#/components/schemas/TransferRequest'
