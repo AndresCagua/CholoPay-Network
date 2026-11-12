@@ -49,6 +49,12 @@ func SignedReceiverRequest(method, url, secret string, p ReceiverCreditPayload, 
 	return req, nil
 }
 
+const defaultReceiverHTTPTimeout = 30 * time.Second
+
+func defaultReceiverHTTPClient() *http.Client {
+	return &http.Client{Timeout: defaultReceiverHTTPTimeout}
+}
+
 type DeliveryDispatcher struct {
 	Store       *Store
 	Client      *http.Client
@@ -62,7 +68,7 @@ type DeliveryDispatcher struct {
 
 func (d *DeliveryDispatcher) DispatchOnce(ctx context.Context) (bool, error) {
 	if d.Client == nil {
-		d.Client = http.DefaultClient
+		d.Client = defaultReceiverHTTPClient()
 	}
 	if d.Lease == 0 {
 		d.Lease = time.Minute

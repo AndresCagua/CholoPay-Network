@@ -12,6 +12,12 @@ import (
 	"github.com/google/uuid"
 )
 
+func TestDefaultReceiverHTTPClientHasBoundedTimeout(t *testing.T) {
+	if got := defaultReceiverHTTPClient().Timeout; got != 30*time.Second {
+		t.Fatalf("se esperaba timeout HTTP de 30 segundos, se obtuvo %s", got)
+	}
+}
+
 func TestDurationSecondsRejectsTextualOrFractionalIntervals(t *testing.T) {
 	if got, err := durationSeconds(time.Minute); err != nil || got != 60 {
 		t.Fatalf("se esperaban 60 segundos, se obtuvo %d/%v", got, err)
