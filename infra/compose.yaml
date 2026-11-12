@@ -87,6 +87,9 @@ services:
       GATEWAY_URL: http://gateway:8090
       GATEWAY_API_KEY: ${GATEWAY_API_KEY:-sk_sandbox_merchant_rw}
       BANK_API_TOKEN: ${BANK_API_TOKEN:-bank-local-test-only}
+      CHOLONET_URL: http://network:8080/internal/v1/inter-network/transfers
+      CHOLONET_HMAC_SECRET: ${CHOLONET_HMAC_SECRET:-}
+      OUTBOX_ENABLED: ${OUTBOX_ENABLED:-false}
     expose: ["8080"]
     depends_on:
       costa-db: {condition: service_healthy}
@@ -106,6 +109,9 @@ services:
       GATEWAY_URL: http://gateway:8090
       GATEWAY_API_KEY: ${GATEWAY_API_KEY:-sk_sandbox_merchant_rw}
       BANK_API_TOKEN: ${BANK_API_TOKEN:-bank-local-test-only}
+      CHOLONET_URL: http://network:8080/internal/v1/inter-network/transfers
+      CHOLONET_HMAC_SECRET: ${CHOLONET_HMAC_SECRET:-}
+      OUTBOX_ENABLED: ${OUTBOX_ENABLED:-false}
     depends_on:
       costa-db: {condition: service_healthy}
       gateway: {condition: service_started}
@@ -120,6 +126,7 @@ services:
       NETWORK_DB_URL: postgres://${POSTGRES_USER:-cholopay}:${POSTGRES_PASSWORD:-cholopay_local_only}@network-db:5432/${NETWORK_DB_NAME:-cholopay_network}?sslmode=disable
       OPERATOR_CONSOLE_TOKEN: ${OPERATOR_CONSOLE_TOKEN:-}
       DIRECTORY_PORT_TOKEN: ${DIRECTORY_PORT_TOKEN:-}
+      CHOLONET_HMAC_SECRET: ${CHOLONET_HMAC_SECRET:-}
     expose: ["8080"]
     depends_on:
       network-db: {condition: service_healthy}
