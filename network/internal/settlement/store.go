@@ -32,6 +32,8 @@ type Journal struct {
 	AmountMinor              int64
 	Currency                 string
 	CorrelationID            uuid.UUID
+	DestinationAccountID     uuid.UUID
+	ClearingAccountID        uuid.UUID
 	Entries                  []Entry
 }
 
@@ -47,12 +49,19 @@ func (s *Store) CreateAccount(ctx context.Context, participantID uuid.UUID, bala
 	return err
 }
 
-func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID uuid.UUID, amountMinor int64, idempotencyKey string, correlationID uuid.UUID) (Journal, error) {
+func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID uuid.UUID, amountMinor int64, idempotencyKey string, correlationID uuid.UUID, deliveryAccounts ...uuid.UUID) (Journal, error) {
 	if amountMinor <= 0 {
 		return Journal{}, errors.New("el importe de liquidación debe ser positivo")
 	}
 	if sourceID == destinationID {
 		return Journal{}, errors.New("los participantes de la liquidación deben ser distintos")
+	}
+	destinationAccountID, clearingAccountID := destinationID, sourceID
+	if len(deliveryAccounts) == 2 {
+		destinationAccountID, clearingAccountID = deliveryAccounts[0], deliveryAccounts[1]
+	}
+	if destinationAccountID == uuid.Nil || clearingAccountID == uuid.Nil || destinationAccountID == clearingAccountID {
+		return Journal{}, errors.New("las cuentas de entrega deben ser válidas y distintas")
 	}
 	requestHash := instruction.RequestHash(sourceID, &destinationID, amountMinor, "USD")
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -64,7 +73,7 @@ func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID 
 		return Journal{}, err
 	}
 	var existing Journal
-	err = tx.QueryRowContext(ctx, `SELECT journal_id,transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,amount_minor,currency,correlation_id FROM settlement_journal WHERE idempotency_key=$1`, idempotencyKey).Scan(&existing.JournalID, &existing.TransferID, &existing.IdempotencyKey, &existing.RequestHash, &existing.SourceParticipantID, &existing.DestinationParticipantID, &existing.AmountMinor, &existing.Currency, &existing.CorrelationID)
+	err = tx.QueryRowContext(ctx, `SELECT journal_id,transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,destination_account_id,clearing_account_id,amount_minor,currency,correlation_id FROM settlement_journal WHERE idempotency_key=$1`, idempotencyKey).Scan(&existing.JournalID, &existing.TransferID, &existing.IdempotencyKey, &existing.RequestHash, &existing.SourceParticipantID, &existing.DestinationParticipantID, &existing.DestinationAccountID, &existing.ClearingAccountID, &existing.AmountMinor, &existing.Currency, &existing.CorrelationID)
 	if err == nil {
 		if existing.RequestHash != requestHash {
 			return Journal{}, ErrIdempotencyConflict
@@ -112,7 +121,7 @@ func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID 
 	if _, err = tx.ExecContext(ctx, `UPDATE settlement_account SET balance_minor=balance_minor+$1,updated_at=CURRENT_TIMESTAMP WHERE participant_id=$2`, amountMinor, destinationID); err != nil {
 		return Journal{}, err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO settlement_journal(journal_id,transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,amount_minor,currency,correlation_id) VALUES ($1,$2,$3,$4,$5,$6,$7,'USD',$8)`, journalID, transferID, idempotencyKey, requestHash, sourceID, destinationID, amountMinor, correlationID); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO settlement_journal(journal_id,transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,destination_account_id,clearing_account_id,amount_minor,currency,correlation_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'USD',$10)`, journalID, transferID, idempotencyKey, requestHash, sourceID, destinationID, destinationAccountID, clearingAccountID, amountMinor, correlationID); err != nil {
 		return Journal{}, err
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO settlement_entry(entry_id,journal_id,participant_id,amount_minor,direction,currency) VALUES ($1,$2,$3,$4,'DEBIT','USD'),($5,$2,$6,$4,'CREDIT','USD')`, uuid.New(), journalID, sourceID, amountMinor, uuid.New(), destinationID); err != nil {
@@ -121,7 +130,7 @@ func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID 
 	if _, err = tx.ExecContext(ctx, `UPDATE transfer_instruction SET state='SETTLED',updated_at=CURRENT_TIMESTAMP WHERE transfer_id=$1 AND state IN ('READY_FOR_SETTLEMENT','FUNDS_RESERVED')`, transferID); err != nil {
 		return Journal{}, err
 	}
-	result := Journal{JournalID: journalID, TransferID: transferID, IdempotencyKey: idempotencyKey, RequestHash: requestHash, SourceParticipantID: sourceID, DestinationParticipantID: destinationID, AmountMinor: amountMinor, Currency: "USD", CorrelationID: correlationID, Entries: []Entry{{sourceID, amountMinor, Debit, "USD"}, {destinationID, amountMinor, Credit, "USD"}}}
+	result := Journal{JournalID: journalID, TransferID: transferID, IdempotencyKey: idempotencyKey, RequestHash: requestHash, SourceParticipantID: sourceID, DestinationParticipantID: destinationID, AmountMinor: amountMinor, Currency: "USD", CorrelationID: correlationID, DestinationAccountID: destinationAccountID, ClearingAccountID: clearingAccountID, Entries: []Entry{{sourceID, amountMinor, Debit, "USD"}, {destinationID, amountMinor, Credit, "USD"}}}
 	if err = tx.Commit(); err != nil {
 		return Journal{}, err
 	}

@@ -17,6 +17,8 @@ type Instruction struct {
 	RequestHash              string
 	SourceParticipantID      uuid.UUID
 	DestinationParticipantID *uuid.UUID
+	DestinationAccountID     *uuid.UUID
+	ClearingAccountID        *uuid.UUID
 	AmountMinor              int64
 	Currency                 string
 	State                    transfer.State
@@ -27,10 +29,8 @@ type Instruction struct {
 
 type Store struct{ db *sql.DB }
 
-func NewStore(db *sql.DB) *Store { return &Store{db: db} }
-
+func NewStore(db *sql.DB) *Store                              { return &Store{db: db} }
 func (s *Store) BeginTx(ctx context.Context) (*sql.Tx, error) { return s.db.BeginTx(ctx, nil) }
-
 func RequestHash(source uuid.UUID, destination *uuid.UUID, amount int64, currency string) string {
 	destinationValue := ""
 	if destination != nil {
@@ -39,7 +39,6 @@ func RequestHash(source uuid.UUID, destination *uuid.UUID, amount int64, currenc
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%s:%d:%s", source, destinationValue, amount, currency)))
 	return hex.EncodeToString(sum[:])
 }
-
 func (s *Store) Create(ctx context.Context, instruction Instruction) (Instruction, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -55,7 +54,6 @@ func (s *Store) Create(ctx context.Context, instruction Instruction) (Instructio
 	}
 	return existing, nil
 }
-
 func (s *Store) CreateTx(ctx context.Context, tx *sql.Tx, instruction Instruction) (Instruction, error) {
 	if instruction.TransferID == uuid.Nil {
 		instruction.TransferID = uuid.New()
@@ -69,15 +67,12 @@ func (s *Store) CreateTx(ctx context.Context, tx *sql.Tx, instruction Instructio
 	if instruction.State == "" {
 		instruction.State = transfer.Created
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO transfer_instruction
-		(transfer_id, idempotency_key, request_hash, source_participant_id, destination_participant_id, amount_minor, currency, state, schema_version, correlation_id, causation_id)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-		ON CONFLICT (idempotency_key) DO NOTHING`, instruction.TransferID, instruction.IdempotencyKey, instruction.RequestHash, instruction.SourceParticipantID, instruction.DestinationParticipantID, instruction.AmountMinor, instruction.Currency, instruction.State, instruction.SchemaVersion, instruction.CorrelationID, instruction.CausationID)
+	_, err := tx.ExecContext(ctx, `INSERT INTO transfer_instruction (transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,destination_account_id,clearing_account_id,amount_minor,currency,state,schema_version,correlation_id,causation_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT (idempotency_key) DO NOTHING`, instruction.TransferID, instruction.IdempotencyKey, instruction.RequestHash, instruction.SourceParticipantID, instruction.DestinationParticipantID, instruction.DestinationAccountID, instruction.ClearingAccountID, instruction.AmountMinor, instruction.Currency, instruction.State, instruction.SchemaVersion, instruction.CorrelationID, instruction.CausationID)
 	if err != nil {
 		return Instruction{}, err
 	}
 	var existing Instruction
-	err = tx.QueryRowContext(ctx, `SELECT transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,amount_minor,currency,state,schema_version,correlation_id,causation_id FROM transfer_instruction WHERE idempotency_key=$1 FOR UPDATE`, instruction.IdempotencyKey).Scan(&existing.TransferID, &existing.IdempotencyKey, &existing.RequestHash, &existing.SourceParticipantID, &existing.DestinationParticipantID, &existing.AmountMinor, &existing.Currency, &existing.State, &existing.SchemaVersion, &existing.CorrelationID, &existing.CausationID)
+	err = tx.QueryRowContext(ctx, `SELECT transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,destination_account_id,clearing_account_id,amount_minor,currency,state,schema_version,correlation_id,causation_id FROM transfer_instruction WHERE idempotency_key=$1 FOR UPDATE`, instruction.IdempotencyKey).Scan(&existing.TransferID, &existing.IdempotencyKey, &existing.RequestHash, &existing.SourceParticipantID, &existing.DestinationParticipantID, &existing.DestinationAccountID, &existing.ClearingAccountID, &existing.AmountMinor, &existing.Currency, &existing.State, &existing.SchemaVersion, &existing.CorrelationID, &existing.CausationID)
 	if err != nil {
 		return Instruction{}, err
 	}
@@ -86,7 +81,6 @@ func (s *Store) CreateTx(ctx context.Context, tx *sql.Tx, instruction Instructio
 	}
 	return existing, nil
 }
-
 func (s *Store) Advance(ctx context.Context, id uuid.UUID, next transfer.State, causation uuid.UUID) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -94,21 +88,20 @@ func (s *Store) Advance(ctx context.Context, id uuid.UUID, next transfer.State, 
 	}
 	defer tx.Rollback()
 	var current transfer.State
-	if err = tx.QueryRowContext(ctx, `SELECT state FROM transfer_instruction WHERE transfer_id=$1 FOR UPDATE`, id).Scan(&current); err != nil {
+	if err = tx.QueryRowContext(ctx, "SELECT state FROM transfer_instruction WHERE transfer_id=$1 FOR UPDATE", id).Scan(&current); err != nil {
 		return err
 	}
 	if err = transfer.Advance(current, next); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE transfer_instruction SET state=$1, causation_id=$2, updated_at=CURRENT_TIMESTAMP WHERE transfer_id=$3`, next, causation, id); err != nil {
+	if _, err = tx.ExecContext(ctx, "UPDATE transfer_instruction SET state=$1,causation_id=$2,updated_at=CURRENT_TIMESTAMP WHERE transfer_id=$3", next, causation, id); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
-
 func (s *Store) Get(ctx context.Context, id uuid.UUID) (Instruction, error) {
 	var result Instruction
-	err := s.db.QueryRowContext(ctx, `SELECT transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,amount_minor,currency,state,schema_version,correlation_id,causation_id FROM transfer_instruction WHERE transfer_id=$1`, id).Scan(&result.TransferID, &result.IdempotencyKey, &result.RequestHash, &result.SourceParticipantID, &result.DestinationParticipantID, &result.AmountMinor, &result.Currency, &result.State, &result.SchemaVersion, &result.CorrelationID, &result.CausationID)
+	err := s.db.QueryRowContext(ctx, "SELECT transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,destination_account_id,clearing_account_id,amount_minor,currency,state,schema_version,correlation_id,causation_id FROM transfer_instruction WHERE transfer_id=$1", id).Scan(&result.TransferID, &result.IdempotencyKey, &result.RequestHash, &result.SourceParticipantID, &result.DestinationParticipantID, &result.DestinationAccountID, &result.ClearingAccountID, &result.AmountMinor, &result.Currency, &result.State, &result.SchemaVersion, &result.CorrelationID, &result.CausationID)
 	return result, err
 }
 

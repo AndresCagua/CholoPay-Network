@@ -16,6 +16,8 @@ type createRequest struct {
 	IdempotencyKey           string     `json:"idempotency_key"`
 	SourceParticipantID      uuid.UUID  `json:"source_participant_id"`
 	DestinationParticipantID *uuid.UUID `json:"destination_participant_id"`
+	DestinationAccountID     *uuid.UUID `json:"destination_account_id"`
+	ClearingAccountID        *uuid.UUID `json:"clearing_account_id"`
 	AmountMinor              int64      `json:"amount_minor"`
 	Currency                 string     `json:"currency"`
 	CorrelationID            uuid.UUID  `json:"correlation_id"`
@@ -37,7 +39,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "instrucción de transferencia no válida", http.StatusBadRequest)
 		return
 	}
-	result, err := h.store.Create(r.Context(), Instruction{TransferID: req.TransferID, IdempotencyKey: req.IdempotencyKey, SourceParticipantID: req.SourceParticipantID, DestinationParticipantID: req.DestinationParticipantID, AmountMinor: req.AmountMinor, Currency: req.Currency, CorrelationID: req.CorrelationID})
+	result, err := h.store.Create(r.Context(), Instruction{TransferID: req.TransferID, IdempotencyKey: req.IdempotencyKey, SourceParticipantID: req.SourceParticipantID, DestinationParticipantID: req.DestinationParticipantID, DestinationAccountID: req.DestinationAccountID, ClearingAccountID: req.ClearingAccountID, AmountMinor: req.AmountMinor, Currency: req.Currency, CorrelationID: req.CorrelationID})
 	if err == ErrIdempotencyConflict {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return

@@ -50,7 +50,7 @@ func TestReconciliationDetectsAndClearsDeliveryDifferences(t *testing.T) {
 	if !hasCode(pending, "DELIVERY_PENDING") {
 		t.Fatalf("se esperaba una entrega pendiente, se obtuvo %+v", pending)
 	}
-	if _, err := store.AcknowledgeDelivery(ctx, delivery.DeliveryID, receiver, uuid.New()); err != nil {
+	if _, err := store.AcknowledgeDelivery(ctx, delivery.DeliveryID, receiver, delivery.EventID); err != nil {
 		t.Fatal(err)
 	}
 	clean, err := store.Reconcile(ctx, uuid.New())

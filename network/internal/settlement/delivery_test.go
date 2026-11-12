@@ -44,7 +44,7 @@ func TestDeliveryIsAtLeastOnceAndAcknowledgementIsIdempotent(t *testing.T) {
 	if first.DeliveryID != replay.DeliveryID || first.State != "PENDING" {
 		t.Fatalf("repetición de entrega inesperada: %+v %+v", first, replay)
 	}
-	eventID := uuid.New()
+	eventID := first.EventID
 	applied, err := store.AcknowledgeDelivery(ctx, first.DeliveryID, receiver, eventID)
 	if err != nil {
 		t.Fatal(err)

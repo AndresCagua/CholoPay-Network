@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,6 +17,7 @@ func TestSettlementHTTPReportsSettledOnlyAfterJournalCommit(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 	source, destination := uuid.New(), uuid.New()
+	destinationAccount, clearingAccount := uuid.New(), uuid.New()
 	if err := store.CreateAccount(ctx, source, 500); err != nil {
 		t.Fatal(err)
 	}
@@ -26,14 +28,16 @@ func TestSettlementHTTPReportsSettledOnlyAfterJournalCommit(t *testing.T) {
 	NewHandler(store).Register(mux)
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	payload, _ := json.Marshal(map[string]any{"transfer_id": uuid.New(), "source_participant_id": source, "destination_participant_id": destination, "amount_minor": 200, "idempotency_key": "http-settlement-key", "correlation_id": uuid.New()})
+	payload, _ := json.Marshal(map[string]any{"transfer_id": uuid.New(), "source_participant_id": source, "destination_participant_id": destination, "amount_minor": 200, "idempotency_key": "http-settlement-key", "correlation_id": uuid.New(), "destination_account_id": destinationAccount, "clearing_account_id": clearingAccount})
 	response, err := http.Post(server.URL+"/internal/v1/settlements", "application/json", bytes.NewReader(payload))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusCreated {
-		t.Fatalf("se esperaba 201, se obtuvo %d", response.StatusCode)
+		var detail []byte
+		detail, _ = io.ReadAll(response.Body)
+		t.Fatalf("se esperaba 201, se obtuvo %d: %s", response.StatusCode, detail)
 	}
 	var body struct {
 		State string `json:"state"`

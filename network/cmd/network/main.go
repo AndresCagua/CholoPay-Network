@@ -174,6 +174,16 @@ func main() {
 	instruction.NewHandler(instruction.NewStore(db)).Register(mux)
 	settlementStore := settlement.NewStore(db)
 	settlement.NewHandler(settlementStore).Register(mux)
+	if receiverURL := os.Getenv("BANK_RECEIVER_CREDIT_URL"); receiverURL != "" {
+		dispatcher := &settlement.DeliveryDispatcher{Store: settlementStore, ReceiverURL: receiverURL, Secret: os.Getenv("NETWORK_ADAPTER_SECRET")}
+		go func() {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				_, _ = dispatcher.DispatchOnce(context.Background())
+			}
+		}()
+	}
 	settlement.NewReconciliationHandler(settlementStore).Register(mux)
 	routing.NewHandler(routingStore).Register(mux)
 	directoryStore := directory.NewStore(db)

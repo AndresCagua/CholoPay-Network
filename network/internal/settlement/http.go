@@ -17,6 +17,8 @@ type settleRequest struct {
 	AmountMinor              int64     `json:"amount_minor"`
 	IdempotencyKey           string    `json:"idempotency_key"`
 	CorrelationID            uuid.UUID `json:"correlation_id"`
+	DestinationAccountID     uuid.UUID `json:"destination_account_id"`
+	ClearingAccountID        uuid.UUID `json:"clearing_account_id"`
 }
 
 type settleResponse struct {
@@ -34,7 +36,11 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "solicitud de liquidación inválida", http.StatusBadRequest)
 		return
 	}
-	journal, err := h.store.Settle(r.Context(), request.TransferID, request.SourceParticipantID, request.DestinationParticipantID, request.AmountMinor, request.IdempotencyKey, request.CorrelationID)
+	if request.DestinationAccountID == uuid.Nil || request.ClearingAccountID == uuid.Nil || request.DestinationAccountID == request.ClearingAccountID {
+		http.Error(w, "se requieren cuentas de destino y compensación válidas y distintas", http.StatusBadRequest)
+		return
+	}
+	journal, err := h.store.Settle(r.Context(), request.TransferID, request.SourceParticipantID, request.DestinationParticipantID, request.AmountMinor, request.IdempotencyKey, request.CorrelationID, request.DestinationAccountID, request.ClearingAccountID)
 	if err == ErrIdempotencyConflict {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
