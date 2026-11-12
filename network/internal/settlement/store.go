@@ -75,7 +75,8 @@ func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID 
 	var existing Journal
 	err = tx.QueryRowContext(ctx, `SELECT journal_id,transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,destination_account_id,clearing_account_id,amount_minor,currency,correlation_id FROM settlement_journal WHERE idempotency_key=$1`, idempotencyKey).Scan(&existing.JournalID, &existing.TransferID, &existing.IdempotencyKey, &existing.RequestHash, &existing.SourceParticipantID, &existing.DestinationParticipantID, &existing.DestinationAccountID, &existing.ClearingAccountID, &existing.AmountMinor, &existing.Currency, &existing.CorrelationID)
 	if err == nil {
-		if existing.RequestHash != requestHash && !sameJournalRequest(existing, sourceID, destinationID, destinationAccountID, clearingAccountID, amountMinor) {
+		legacyHash := instruction.RequestHash(existing.SourceParticipantID, &existing.DestinationParticipantID, existing.AmountMinor, existing.Currency)
+		if existing.RequestHash != requestHash && !(existing.RequestHash == legacyHash && sameJournalRequest(existing, sourceID, destinationID, destinationAccountID, clearingAccountID, amountMinor)) {
 			return Journal{}, ErrIdempotencyConflict
 		}
 		existing.Entries, err = entries(ctx, tx, existing.JournalID)

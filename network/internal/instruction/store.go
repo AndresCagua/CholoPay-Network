@@ -86,7 +86,7 @@ func (s *Store) CreateTx(ctx context.Context, tx *sql.Tx, instruction Instructio
 	if err != nil {
 		return Instruction{}, err
 	}
-	if existing.RequestHash != instruction.RequestHash && !sameRequest(existing, instruction) {
+	if existing.RequestHash != instruction.RequestHash && !(legacyRequestHash(existing) == existing.RequestHash && sameRequest(existing, instruction)) {
 		return Instruction{}, ErrIdempotencyConflict
 	}
 	return existing, nil
@@ -113,6 +113,10 @@ func (s *Store) Get(ctx context.Context, id uuid.UUID) (Instruction, error) {
 	var result Instruction
 	err := s.db.QueryRowContext(ctx, "SELECT transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,destination_account_id,clearing_account_id,amount_minor,currency,state,schema_version,correlation_id,causation_id FROM transfer_instruction WHERE transfer_id=$1", id).Scan(&result.TransferID, &result.IdempotencyKey, &result.RequestHash, &result.SourceParticipantID, &result.DestinationParticipantID, &result.DestinationAccountID, &result.ClearingAccountID, &result.AmountMinor, &result.Currency, &result.State, &result.SchemaVersion, &result.CorrelationID, &result.CausationID)
 	return result, err
+}
+
+func legacyRequestHash(value Instruction) string {
+	return RequestHash(value.SourceParticipantID, value.DestinationParticipantID, value.AmountMinor, value.Currency)
 }
 
 func sameRequest(left, right Instruction) bool {

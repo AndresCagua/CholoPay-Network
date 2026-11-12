@@ -37,6 +37,10 @@ func TestPostgresInstructionStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	legacyHash := RequestHash(source, &destination, 500, "USD")
+	if _, err := db.ExecContext(ctx, `UPDATE transfer_instruction SET request_hash=$1 WHERE transfer_id=$2`, legacyHash, created.TransferID); err != nil {
+		t.Fatal(err)
+	}
 	replayed, err := store.Create(ctx, Instruction{IdempotencyKey: "network-test-key", SourceParticipantID: source, DestinationParticipantID: &destination, DestinationAccountID: &destinationAccount, ClearingAccountID: &clearingAccount, AmountMinor: 500, Currency: "USD", CorrelationID: uuid.New()})
 	if err != nil {
 		t.Fatal(err)

@@ -54,6 +54,10 @@ func TestSettlementIsBalancedAndIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	legacyHash := instruction.RequestHash(source, &destination, 250, "USD")
+	if _, err := db.ExecContext(ctx, `UPDATE settlement_journal SET request_hash=$1 WHERE transfer_id=$2`, legacyHash, transferID); err != nil {
+		t.Fatal(err)
+	}
 	second, err := store.Settle(ctx, uuid.New(), source, destination, 250, "settle-key", uuid.New(), destinationAccount, clearingAccount)
 	if err != nil {
 		t.Fatal(err)
