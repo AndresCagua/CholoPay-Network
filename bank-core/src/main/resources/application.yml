@@ -14,3 +14,10 @@ cholopay:
   outbox:
     event-name: TRANSFER_REQUESTED
     schema-version: 1.0
+    network-url: ${CHOLONET_URL:}
+    hmac-secret: ${CHOLONET_HMAC_SECRET:}
+    lease-duration: ${OUTBOX_LEASE_DURATION:30s}
+    max-attempts: ${OUTBOX_MAX_ATTEMPTS:5}
+    base-backoff: ${OUTBOX_BASE_BACKOFF:1s}
+    max-backoff: ${OUTBOX_MAX_BACKOFF:1m}
+    http-timeout: ${OUTBOX_HTTP_TIMEOUT:2s}

@@ -11,8 +11,16 @@ CREATE TABLE inter_network_outbox (
   idempotency_key VARCHAR(160) NOT NULL UNIQUE,
   trace_id VARCHAR(160) NOT NULL,
   payload JSONB NOT NULL,
+  serialized_envelope TEXT NOT NULL,
   payload_hash CHAR(64) NOT NULL,
-  state VARCHAR(32) NOT NULL DEFAULT 'PENDING' CHECK (state = 'PENDING'),
+  state VARCHAR(32) NOT NULL DEFAULT 'PENDING' CHECK (state IN ('PENDING', 'IN_FLIGHT', 'PUBLISHED', 'DEAD_LETTER')),
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  last_attempt_at TIMESTAMPTZ,
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  lease_token UUID,
+  lease_until TIMESTAMPTZ,
+  last_error TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX inter_network_outbox_pending ON inter_network_outbox(state, created_at);
+CREATE INDEX inter_network_outbox_dispatch ON inter_network_outbox(state, next_attempt_at, created_at);
+CREATE INDEX inter_network_outbox_lease ON inter_network_outbox(state, lease_until);

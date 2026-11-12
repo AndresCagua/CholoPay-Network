@@ -188,7 +188,7 @@ func main() {
 		os.Exit(1)
 	}
 	message.NewHandler(messageStore).Register(mux)
-	orchestration.NewHandler(orchestration.NewService(instruction.NewStore(db), routingStore, messageStore)).Register(mux)
+	orchestration.NewHandler(orchestration.NewService(instruction.NewStore(db), routingStore, messageStore), os.Getenv("CHOLONET_HMAC_SECRET")).Register(mux)
 	mux.HandleFunc("GET /internal/v1/operator/overview", operatorOverviewHandler(db))
 	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

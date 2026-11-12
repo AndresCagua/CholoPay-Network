@@ -3,12 +3,17 @@ package orchestration
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/cholopay/network/internal/instruction"
 	"github.com/cholopay/network/internal/message"
@@ -99,8 +104,15 @@ func TestPostgresOrchestrationRoutesAndReplaysWithoutSettlement(t *testing.T) {
 	}
 	body, _ := json.Marshal(map[string]any{"idempotency_key": "orch-http", "source_participant_id": costa, "destination_participant_id": wallet, "amount_minor": 300, "currency": "USD", "correlation_id": uuid.New()})
 	mux := http.NewServeMux()
-	NewHandler(service).Register(mux)
+	NewHandler(service, "test-secret").Register(mux)
 	req := httptest.NewRequest(http.MethodPost, "/internal/v1/inter-network/transfers", bytes.NewReader(body))
+	timestamp := time.Now().Unix()
+	requestID := "test-request"
+	mac := hmac.New(sha256.New, []byte("test-secret"))
+	_, _ = mac.Write([]byte(strconv.FormatInt(timestamp, 10) + "." + requestID + "." + string(body)))
+	req.Header.Set("X-CholoPay-Timestamp", strconv.FormatInt(timestamp, 10))
+	req.Header.Set("X-CholoPay-Request-Id", requestID)
+	req.Header.Set("X-CholoPay-Signature", hex.EncodeToString(mac.Sum(nil)))
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, req)
 	if response.Code != http.StatusAccepted {

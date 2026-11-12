@@ -9,4 +9,4 @@
 7. Documentar errores de API, permisos y semilla de datos sintéticos.
 8. Ejecutar pruebas de integración enfocadas contra PostgreSQL efímero.
 
-El contrato del outbox quedó definido en `adr/0013-transactional-outbox-contract.md`. T10a implementa la persistencia atómica, el envelope `TRANSFER_REQUESTED` y la orden inter-red interna; el dispatcher, leases, reintentos, DLQ y publicación HMAC quedan pendientes para T10b. La liquidación interbancaria se difiere deliberadamente hasta que los ADR del protocolo de la fase 2 respondan las preguntas financieras de la sección 19 de `spec.md`.
+El contrato del outbox quedó definido en `adr/0013-transactional-outbox-contract.md`. T10a implementa la persistencia atómica, el envelope `TRANSFER_REQUESTED` y la orden inter-red interna. T10b añade dispatcher, leases, reintentos, DLQ, publicación por orquestación y HMAC sintético fail-closed; el wiring operativo de secretos y URL debe proporcionarse por entorno Docker. La liquidación interbancaria se difiere deliberadamente hasta que los ADR del protocolo de la fase 2 respondan las preguntas financieras de la sección 19 de `spec.md`.
