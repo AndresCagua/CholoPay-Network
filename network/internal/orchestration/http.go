@@ -134,8 +134,11 @@ func (h *Handler) validSignature(r *http.Request, body []byte) bool {
 		return false
 	}
 	requestID := r.Header.Get("X-CholoPay-Request-Id")
+	if _, err := uuid.Parse(requestID); err != nil {
+		return false
+	}
 	provided, err := hex.DecodeString(r.Header.Get("X-CholoPay-Signature"))
-	if err != nil || requestID == "" {
+	if err != nil {
 		return false
 	}
 	mac := hmac.New(sha256.New, []byte(h.hmacSecret))

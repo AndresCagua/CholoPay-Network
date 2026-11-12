@@ -107,7 +107,7 @@ func TestPostgresOrchestrationRoutesAndReplaysWithoutSettlement(t *testing.T) {
 	NewHandler(service, "test-secret").Register(mux)
 	req := httptest.NewRequest(http.MethodPost, "/internal/v1/inter-network/transfers", bytes.NewReader(body))
 	timestamp := time.Now().Unix()
-	requestID := "test-request"
+	requestID := uuid.New().String()
 	mac := hmac.New(sha256.New, []byte("test-secret"))
 	_, _ = mac.Write([]byte(strconv.FormatInt(timestamp, 10) + "." + requestID + "." + string(body)))
 	req.Header.Set("X-CholoPay-Timestamp", strconv.FormatInt(timestamp, 10))
@@ -117,5 +117,29 @@ func TestPostgresOrchestrationRoutesAndReplaysWithoutSettlement(t *testing.T) {
 	mux.ServeHTTP(response, req)
 	if response.Code != http.StatusAccepted {
 		t.Fatalf("se esperaba HTTP aceptado, se obtuvo %d: %s", response.Code, response.Body.String())
+	}
+
+	var beforeMalformed int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM inter_network_message").Scan(&beforeMalformed); err != nil {
+		t.Fatal(err)
+	}
+	malformedID := "malformed-request-id"
+	malformedRequest := httptest.NewRequest(http.MethodPost, "/internal/v1/inter-network/transfers", bytes.NewReader(body))
+	malformedRequest.Header.Set("X-CholoPay-Timestamp", strconv.FormatInt(timestamp, 10))
+	malformedRequest.Header.Set("X-CholoPay-Request-Id", malformedID)
+	malformedMac := hmac.New(sha256.New, []byte("test-secret"))
+	_, _ = malformedMac.Write([]byte(strconv.FormatInt(timestamp, 10) + "." + malformedID + "." + string(body)))
+	malformedRequest.Header.Set("X-CholoPay-Signature", hex.EncodeToString(malformedMac.Sum(nil)))
+	malformedResponse := httptest.NewRecorder()
+	mux.ServeHTTP(malformedResponse, malformedRequest)
+	if malformedResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("se esperaba HTTP no autorizado para request ID inválido, se obtuvo %d", malformedResponse.Code)
+	}
+	var afterMalformed int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM inter_network_message").Scan(&afterMalformed); err != nil {
+		t.Fatal(err)
+	}
+	if afterMalformed != beforeMalformed {
+		t.Fatalf("request ID inválido no debe crear mensajes: antes=%d después=%d", beforeMalformed, afterMalformed)
 	}
 }
