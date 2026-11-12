@@ -2,6 +2,8 @@ package com.cholopay.bankcore.service;
 
 import com.cholopay.bankcore.domain.Journal;
 import com.cholopay.bankcore.domain.LedgerEntry;
+import com.cholopay.bankcore.domain.OutboxEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +18,7 @@ import java.util.UUID;
 @Service
 public class JdbcInternalTransferService {
     private final JdbcTemplate jdbc;
+    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
 
     public JdbcInternalTransferService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
@@ -57,6 +60,42 @@ public class JdbcInternalTransferService {
         return new Journal(journalId, transactionId, idempotencyKey, correlationId,
                 List.of(new LedgerEntry(sourceId, amountMinor, LedgerEntry.Direction.DEBIT, "USD"),
                         new LedgerEntry(destinationId, amountMinor, LedgerEntry.Direction.CREDIT, "USD")), Instant.now());
+    }
+
+    /** Executes the local journal and its inter-network outbox insert in one transaction. */
+    @Transactional
+    public InterNetworkTransferService.OrderResult transferInterNetwork(InterNetworkTransferService.OrderRequest request) {
+        if (request.amountMinor() <= 0) throw new IllegalArgumentException("amount_minor debe ser positivo");
+        if (request.sourceAccountId().equals(request.destinationAccountId())) throw new IllegalArgumentException("el origen y el destino deben ser distintos");
+        String requestHash = hash(request.sourceAccountId() + ":" + request.destinationAccountId() + ":" + request.sourceParticipantId() + ":" + request.destinationParticipantId() + ":" + request.amountMinor() + ":" + request.currency() + ":" + request.sourceNetworkId() + ":" + request.destinationNetworkId() + ":" + request.correlationId() + ":" + request.causationId() + ":" + request.traceId());
+        ExistingJournal existing = jdbc.query("SELECT transaction_id, request_hash FROM journal WHERE idempotency_key = ? FOR UPDATE", (rs, row) -> new ExistingJournal(rs.getObject("transaction_id", UUID.class), rs.getString("request_hash")), request.idempotencyKey()).stream().findFirst().orElse(null);
+        if (existing != null) {
+            if (!requestHash.equals(existing.requestHash())) throw new InternalTransferService.IdempotencyConflictException();
+            OutboxEvent event = readOutbox(existing.transactionId());
+            return new InterNetworkTransferService.OrderResult(existing.transactionId(), event.eventId(), event.payloadHash(), "PENDING");
+        }
+        List<UUID> ordered = List.of(request.sourceAccountId(), request.destinationAccountId()).stream().sorted().toList();
+        jdbc.query("SELECT id FROM ledger_account WHERE id IN (?, ?) ORDER BY id FOR UPDATE", (org.springframework.jdbc.core.RowMapper<UUID>) (rs, row) -> rs.getObject("id", UUID.class), ordered.get(0), ordered.get(1));
+        Balance source = balance(request.sourceAccountId());
+        Balance destination = balance(request.destinationAccountId());
+        if (source == null || destination == null) throw new IllegalArgumentException("cuenta no encontrada");
+        if (source.postedMinor() - source.reservedMinor() < request.amountMinor()) throw new IllegalStateException("fondos disponibles insuficientes");
+        UUID transferId = UUID.randomUUID();
+        UUID journalId = UUID.randomUUID();
+        jdbc.update("UPDATE ledger_account SET posted_balance_minor = posted_balance_minor - ? WHERE id = ? AND posted_balance_minor - reserved_balance_minor >= ?", request.amountMinor(), request.sourceAccountId(), request.amountMinor());
+        jdbc.update("UPDATE ledger_account SET posted_balance_minor = posted_balance_minor + ? WHERE id = ?", request.amountMinor(), request.destinationAccountId());
+        jdbc.update("INSERT INTO balance_reservation(id, account_id, transfer_id, amount_minor, status) VALUES (?, ?, ?, ?, 'CAPTURED')", UUID.randomUUID(), request.sourceAccountId(), transferId, request.amountMinor());
+        jdbc.update("INSERT INTO journal(id, transaction_id, idempotency_key, correlation_id, request_hash) VALUES (?, ?, ?, ?, ?)", journalId, transferId, request.idempotencyKey(), request.correlationId(), requestHash);
+        jdbc.update("INSERT INTO journal_entry(id, journal_id, account_id, amount_minor, direction, currency) VALUES (?, ?, ?, ?, 'DEBIT', ?), (?, ?, ?, ?, 'CREDIT', ?)", UUID.randomUUID(), journalId, request.sourceAccountId(), request.amountMinor(), request.currency(), UUID.randomUUID(), journalId, request.destinationAccountId(), request.amountMinor(), request.currency());
+        OutboxEvent event = new OutboxEvent(UUID.randomUUID(), "TRANSFER", transferId, "TRANSFER_REQUESTED", "1.0", 1, request.occurredAt(), request.correlationId(), request.causationId(), request.idempotencyKey(), request.traceId(), new OutboxEvent.Payload(transferId, request.sourceParticipantId(), request.destinationParticipantId(), request.amountMinor(), request.currency(), "INTER_NETWORK", request.sourceNetworkId(), request.destinationNetworkId()), "");
+        try {
+            jdbc.update("INSERT INTO inter_network_outbox(event_id, aggregate_type, aggregate_id, event_name, schema_version, event_version, occurred_at, correlation_id, causation_id, idempotency_key, trace_id, payload, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)", event.eventId(), event.aggregateType(), event.aggregateId(), event.eventName(), event.schemaVersion(), event.version(), event.occurredAt(), event.correlationId(), event.causationId(), event.idempotencyKey(), event.traceId(), event.canonicalJson(), event.payloadHash());
+        } catch (RuntimeException failure) { throw failure; }
+        return new InterNetworkTransferService.OrderResult(transferId, event.eventId(), event.payloadHash(), "PENDING");
+    }
+
+    private OutboxEvent readOutbox(UUID transferId) {
+        return jdbc.queryForObject("SELECT event_id, aggregate_type, aggregate_id, event_name, schema_version, event_version, occurred_at, correlation_id, causation_id, idempotency_key, trace_id, payload_hash, payload->>'source_participant_id', payload->>'destination_participant_id', (payload->>'amount_minor')::bigint, payload->>'currency', payload->>'route_kind', payload->>'source_network_id', payload->>'destination_network_id' FROM inter_network_outbox WHERE aggregate_id = ?", (rs, row) -> new OutboxEvent(rs.getObject(1, UUID.class), rs.getString(2), rs.getObject(3, UUID.class), rs.getString(4), rs.getString(5), rs.getInt(6), rs.getTimestamp(7).toInstant(), rs.getObject(8, UUID.class), rs.getObject(9, UUID.class), rs.getString(10), rs.getString(11), new OutboxEvent.Payload(transferId, UUID.fromString(rs.getString(13)), UUID.fromString(rs.getString(14)), rs.getLong(15), rs.getString(16), rs.getString(17), UUID.fromString(rs.getString(18)), UUID.fromString(rs.getString(19))), rs.getString(12)), transferId);
     }
 
     private Balance balance(UUID id) {

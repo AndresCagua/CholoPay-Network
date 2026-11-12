@@ -11,3 +11,6 @@ server:
   port: ${SERVER_PORT:8081}
 cholopay:
   participant-id: ${PARTICIPANT_ID:COSTA}
+  outbox:
+    event-name: TRANSFER_REQUESTED
+    schema-version: 1.0

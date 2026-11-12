@@ -138,6 +138,17 @@ Una repetición idéntica devuelve o conserva el resultado existente. Un conflic
 - Reintentos agotados: `DEAD_LETTER` y revisión operativa, sin cambiar la operación financiera.
 - Receptor no disponible después de la liquidación: la red conserva `CREDIT_PENDING`, reintenta la entrega y reconcilia; el inbox del receptor evita un segundo efecto financiero.
 
+## Decisiones de integración T10
+
+Las decisiones operativas para el primer slice de implementación son:
+
+- Una nueva orden inter-red interna, separada de la ruta de transferencias locales, crea `TRANSFER_REQUESTED`.
+- El adaptador genera un UUID propio e inmutable como `transfer_id`; no reutiliza el `transaction_id` local.
+- `bank-core` publica hacia `/internal/v1/inter-network/transfers`, dejando la creación de la instrucción y del mensaje bajo ownership de CholoNet.
+- El enlace banco→red usa un secreto HMAC sintético separado de `NETWORK_ADAPTER_SECRET`, con timestamp y request ID; la validación es fail-closed.
+
+La ruta `/v1/transfers/internal` permanece local-only y no genera eventos inter-red.
+
 ## No decidido aquí
 
 Este ADR no define:
