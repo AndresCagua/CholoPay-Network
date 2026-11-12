@@ -2,6 +2,8 @@ package com.cholopay.bankcore.domain;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -25,7 +27,9 @@ public record OutboxEvent(UUID eventId, String aggregateType, UUID aggregateId,
             throw new IllegalArgumentException("envelope TRANSFER_REQUESTED 1.0 inválido");
         }
         if (payload == null) throw new IllegalArgumentException("payload requerido");
-        payloadHash = sha256(canonicalJson());
+        if (payloadHash == null || payloadHash.isBlank()) {
+            payloadHash = sha256(canonicalJson());
+        }
     }
 
     public String canonicalJson() {
@@ -51,6 +55,7 @@ public record OutboxEvent(UUID eventId, String aggregateType, UUID aggregateId,
         catch (Exception e) { throw new IllegalStateException(e); }
     }
 
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record Payload(UUID transferId, UUID sourceParticipantId, UUID destinationParticipantId,
                           long amountMinor, String currency, String routeKind,
                           UUID sourceNetworkId, UUID destinationNetworkId) {
