@@ -12,7 +12,31 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
+
+func TestDeliveryLeaseFromEnvValidatesBounds(t *testing.T) {
+	for _, test := range []struct {
+		value string
+		want  time.Duration
+		valid bool
+	}{
+		{"", time.Minute, true},
+		{"5", 5 * time.Second, true},
+		{"3600", time.Hour, true},
+		{"4", 0, false},
+		{"3601", 0, false},
+		{"invalid", 0, false},
+	} {
+		got, err := deliveryLeaseFromEnv(test.value)
+		if test.valid && (err != nil || got != test.want) {
+			t.Fatalf("lease %q: got %s/%v, want %s", test.value, got, err, test.want)
+		}
+		if !test.valid && err == nil {
+			t.Fatalf("lease %q debía rechazarse", test.value)
+		}
+	}
+}
 
 func TestOperatorOverviewRequiresAuthorization(t *testing.T) {
 	t.Setenv("OPERATOR_CONSOLE_TOKEN", "expected-token")

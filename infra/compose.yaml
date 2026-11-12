@@ -129,6 +129,7 @@ services:
       CHOLONET_HMAC_SECRET: ${CHOLONET_HMAC_SECRET:-}
       NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
       BANK_RECEIVER_CREDIT_URL: http://bank-core:8080/internal/v1/receiver-credits
+      DELIVERY_LEASE_SECONDS: ${DELIVERY_LEASE_SECONDS:-60}
     expose: ["8080"]
     depends_on:
       network-db: {condition: service_healthy}

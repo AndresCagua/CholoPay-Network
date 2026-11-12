@@ -5,9 +5,11 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -139,6 +141,17 @@ func authorizedBearer(r *http.Request, expected string) bool {
 	return len(value) == len(expected) && subtle.ConstantTimeCompare([]byte(value), []byte(expected)) == 1
 }
 
+func deliveryLeaseFromEnv(value string) (time.Duration, error) {
+	if value == "" {
+		value = "60"
+	}
+	seconds, err := strconv.Atoi(value)
+	if err != nil || seconds < 5 || seconds > 3600 {
+		return 0, fmt.Errorf("DELIVERY_LEASE_SECONDS debe estar entre 5 y 3600")
+	}
+	return time.Duration(seconds) * time.Second, nil
+}
+
 func main() {
 	dbURL := os.Getenv("NETWORK_DB_URL")
 	if dbURL == "" {
@@ -175,7 +188,12 @@ func main() {
 	settlementStore := settlement.NewStore(db)
 	settlement.NewHandler(settlementStore).Register(mux)
 	if receiverURL := os.Getenv("BANK_RECEIVER_CREDIT_URL"); receiverURL != "" {
-		dispatcher := &settlement.DeliveryDispatcher{Store: settlementStore, ReceiverURL: receiverURL, Secret: os.Getenv("NETWORK_ADAPTER_SECRET")}
+		lease, leaseErr := deliveryLeaseFromEnv(os.Getenv("DELIVERY_LEASE_SECONDS"))
+		if leaseErr != nil {
+			slog.Error("configuración inválida del lease de entrega", "error", leaseErr)
+			os.Exit(1)
+		}
+		dispatcher := &settlement.DeliveryDispatcher{Store: settlementStore, ReceiverURL: receiverURL, Secret: os.Getenv("NETWORK_ADAPTER_SECRET"), Lease: lease}
 		go func() {
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
