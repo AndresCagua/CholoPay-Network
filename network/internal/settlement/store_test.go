@@ -49,16 +49,20 @@ func TestSettlementIsBalancedAndIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	transferID, correlation := uuid.New(), uuid.New()
-	first, err := store.Settle(ctx, transferID, source, destination, 250, "settle-key", correlation)
+	destinationAccount, clearingAccount := uuid.New(), uuid.New()
+	first, err := store.Settle(ctx, transferID, source, destination, 250, "settle-key", correlation, destinationAccount, clearingAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := store.Settle(ctx, uuid.New(), source, destination, 250, "settle-key", uuid.New())
+	second, err := store.Settle(ctx, uuid.New(), source, destination, 250, "settle-key", uuid.New(), destinationAccount, clearingAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first.TransferID != second.TransferID || !first.Balanced() {
 		t.Fatalf("diarios inesperados: %+v %+v", first, second)
+	}
+	if _, err := store.Settle(ctx, uuid.New(), source, destination, 250, "settle-key", uuid.New(), uuid.New(), clearingAccount); err != ErrIdempotencyConflict {
+		t.Fatalf("se esperaba conflicto por binding de cuenta, se obtuvo %v", err)
 	}
 	var sourceBalance, destinationBalance int64
 	if err := db.QueryRowContext(ctx, "SELECT balance_minor FROM settlement_account WHERE participant_id=$1", source).Scan(&sourceBalance); err != nil {

@@ -32,11 +32,21 @@ type Store struct{ db *sql.DB }
 func NewStore(db *sql.DB) *Store                              { return &Store{db: db} }
 func (s *Store) BeginTx(ctx context.Context) (*sql.Tx, error) { return s.db.BeginTx(ctx, nil) }
 func RequestHash(source uuid.UUID, destination *uuid.UUID, amount int64, currency string) string {
-	destinationValue := ""
-	if destination != nil {
-		destinationValue = destination.String()
+	return requestHash(source, destination, nil, nil, amount, currency)
+}
+
+func RequestHashWithAccounts(source uuid.UUID, destination, destinationAccount, clearingAccount *uuid.UUID, amount int64, currency string) string {
+	return requestHash(source, destination, destinationAccount, clearingAccount, amount, currency)
+}
+
+func requestHash(source uuid.UUID, destination, destinationAccount, clearingAccount *uuid.UUID, amount int64, currency string) string {
+	value := func(id *uuid.UUID) string {
+		if id == nil {
+			return ""
+		}
+		return id.String()
 	}
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%s:%d:%s", source, destinationValue, amount, currency)))
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%s:%s:%s:%d:%s", source, value(destination), value(destinationAccount), value(clearingAccount), amount, currency)))
 	return hex.EncodeToString(sum[:])
 }
 func (s *Store) Create(ctx context.Context, instruction Instruction) (Instruction, error) {
@@ -59,7 +69,7 @@ func (s *Store) CreateTx(ctx context.Context, tx *sql.Tx, instruction Instructio
 		instruction.TransferID = uuid.New()
 	}
 	if instruction.RequestHash == "" {
-		instruction.RequestHash = RequestHash(instruction.SourceParticipantID, instruction.DestinationParticipantID, instruction.AmountMinor, instruction.Currency)
+		instruction.RequestHash = RequestHashWithAccounts(instruction.SourceParticipantID, instruction.DestinationParticipantID, instruction.DestinationAccountID, instruction.ClearingAccountID, instruction.AmountMinor, instruction.Currency)
 	}
 	if instruction.SchemaVersion == 0 {
 		instruction.SchemaVersion = 1
@@ -76,7 +86,7 @@ func (s *Store) CreateTx(ctx context.Context, tx *sql.Tx, instruction Instructio
 	if err != nil {
 		return Instruction{}, err
 	}
-	if existing.RequestHash != instruction.RequestHash {
+	if existing.RequestHash != instruction.RequestHash && !sameRequest(existing, instruction) {
 		return Instruction{}, ErrIdempotencyConflict
 	}
 	return existing, nil
@@ -103,6 +113,17 @@ func (s *Store) Get(ctx context.Context, id uuid.UUID) (Instruction, error) {
 	var result Instruction
 	err := s.db.QueryRowContext(ctx, "SELECT transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,destination_account_id,clearing_account_id,amount_minor,currency,state,schema_version,correlation_id,causation_id FROM transfer_instruction WHERE transfer_id=$1", id).Scan(&result.TransferID, &result.IdempotencyKey, &result.RequestHash, &result.SourceParticipantID, &result.DestinationParticipantID, &result.DestinationAccountID, &result.ClearingAccountID, &result.AmountMinor, &result.Currency, &result.State, &result.SchemaVersion, &result.CorrelationID, &result.CausationID)
 	return result, err
+}
+
+func sameRequest(left, right Instruction) bool {
+	return left.SourceParticipantID == right.SourceParticipantID && equalUUID(left.DestinationParticipantID, right.DestinationParticipantID) && equalUUID(left.DestinationAccountID, right.DestinationAccountID) && equalUUID(left.ClearingAccountID, right.ClearingAccountID) && left.AmountMinor == right.AmountMinor && left.Currency == right.Currency
+}
+
+func equalUUID(left, right *uuid.UUID) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return *left == *right
 }
 
 var ErrIdempotencyConflict = errors.New("la clave de idempotencia ya se usó con una solicitud diferente")

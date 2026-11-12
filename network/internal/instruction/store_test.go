@@ -32,11 +32,12 @@ func TestPostgresInstructionStore(t *testing.T) {
 	}
 	store := NewStore(db)
 	source, destination := uuid.New(), uuid.New()
-	created, err := store.Create(ctx, Instruction{IdempotencyKey: "network-test-key", SourceParticipantID: source, DestinationParticipantID: &destination, AmountMinor: 500, Currency: "USD", CorrelationID: uuid.New()})
+	destinationAccount, clearingAccount := uuid.New(), uuid.New()
+	created, err := store.Create(ctx, Instruction{IdempotencyKey: "network-test-key", SourceParticipantID: source, DestinationParticipantID: &destination, DestinationAccountID: &destinationAccount, ClearingAccountID: &clearingAccount, AmountMinor: 500, Currency: "USD", CorrelationID: uuid.New()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	replayed, err := store.Create(ctx, Instruction{IdempotencyKey: "network-test-key", SourceParticipantID: source, DestinationParticipantID: &destination, AmountMinor: 500, Currency: "USD", CorrelationID: uuid.New()})
+	replayed, err := store.Create(ctx, Instruction{IdempotencyKey: "network-test-key", SourceParticipantID: source, DestinationParticipantID: &destination, DestinationAccountID: &destinationAccount, ClearingAccountID: &clearingAccount, AmountMinor: 500, Currency: "USD", CorrelationID: uuid.New()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +50,11 @@ func TestPostgresInstructionStore(t *testing.T) {
 	if err := store.Advance(ctx, created.TransferID, transfer.Completed, uuid.New()); err == nil {
 		t.Fatal("se esperaba una transición no válida")
 	}
-	if _, err := store.Create(ctx, Instruction{IdempotencyKey: "network-test-key", SourceParticipantID: source, DestinationParticipantID: &destination, AmountMinor: 501, Currency: "USD", CorrelationID: uuid.New()}); err != ErrIdempotencyConflict {
+	if _, err := store.Create(ctx, Instruction{IdempotencyKey: "network-test-key", SourceParticipantID: source, DestinationParticipantID: &destination, DestinationAccountID: &destinationAccount, ClearingAccountID: &clearingAccount, AmountMinor: 501, Currency: "USD", CorrelationID: uuid.New()}); err != ErrIdempotencyConflict {
 		t.Fatalf("se esperaba un conflicto, se obtuvo %v", err)
+	}
+	otherAccount := uuid.New()
+	if _, err := store.Create(ctx, Instruction{IdempotencyKey: "network-test-key", SourceParticipantID: source, DestinationParticipantID: &destination, DestinationAccountID: &otherAccount, ClearingAccountID: &clearingAccount, AmountMinor: 500, Currency: "USD", CorrelationID: uuid.New()}); err != ErrIdempotencyConflict {
+		t.Fatalf("se esperaba conflicto por binding de cuenta, se obtuvo %v", err)
 	}
 }

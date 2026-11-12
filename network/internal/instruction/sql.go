@@ -30,9 +30,12 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	for _, statement := range []string{
 		`ALTER TABLE transfer_instruction ADD COLUMN IF NOT EXISTS destination_account_id UUID`,
 		`ALTER TABLE transfer_instruction ADD COLUMN IF NOT EXISTS clearing_account_id UUID`,
+		`UPDATE transfer_instruction SET destination_account_id=destination_participant_id WHERE destination_participant_id IS NOT NULL AND destination_account_id IS NULL`,
+		`UPDATE transfer_instruction SET clearing_account_id=source_participant_id WHERE destination_participant_id IS NOT NULL AND clearing_account_id IS NULL`,
+		`ALTER TABLE transfer_instruction DROP CONSTRAINT IF EXISTS transfer_instruction_delivery_accounts_check`,
 	} {
 		if _, err := db.ExecContext(ctx, statement); err != nil {
-			return err
+			return fmt.Errorf("upgrade transfer_instruction: %w", err)
 		}
 	}
 	_, err := db.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS transfer_instruction_state ON transfer_instruction(state, updated_at)")

@@ -63,7 +63,7 @@ func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID 
 	if destinationAccountID == uuid.Nil || clearingAccountID == uuid.Nil || destinationAccountID == clearingAccountID {
 		return Journal{}, errors.New("las cuentas de entrega deben ser válidas y distintas")
 	}
-	requestHash := instruction.RequestHash(sourceID, &destinationID, amountMinor, "USD")
+	requestHash := instruction.RequestHashWithAccounts(sourceID, &destinationID, &destinationAccountID, &clearingAccountID, amountMinor, "USD")
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Journal{}, err
@@ -75,7 +75,7 @@ func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID 
 	var existing Journal
 	err = tx.QueryRowContext(ctx, `SELECT journal_id,transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,destination_account_id,clearing_account_id,amount_minor,currency,correlation_id FROM settlement_journal WHERE idempotency_key=$1`, idempotencyKey).Scan(&existing.JournalID, &existing.TransferID, &existing.IdempotencyKey, &existing.RequestHash, &existing.SourceParticipantID, &existing.DestinationParticipantID, &existing.DestinationAccountID, &existing.ClearingAccountID, &existing.AmountMinor, &existing.Currency, &existing.CorrelationID)
 	if err == nil {
-		if existing.RequestHash != requestHash {
+		if existing.RequestHash != requestHash && !sameJournalRequest(existing, sourceID, destinationID, destinationAccountID, clearingAccountID, amountMinor) {
 			return Journal{}, ErrIdempotencyConflict
 		}
 		existing.Entries, err = entries(ctx, tx, existing.JournalID)
@@ -159,6 +159,10 @@ func (j Journal) Balanced() bool {
 		return false
 	}
 	return j.Entries[0].AmountMinor == j.Entries[1].AmountMinor && j.Entries[0].Direction == Debit && j.Entries[1].Direction == Credit
+}
+
+func sameJournalRequest(j Journal, sourceID, destinationID, destinationAccountID, clearingAccountID uuid.UUID, amountMinor int64) bool {
+	return j.SourceParticipantID == sourceID && j.DestinationParticipantID == destinationID && j.DestinationAccountID == destinationAccountID && j.ClearingAccountID == clearingAccountID && j.AmountMinor == amountMinor && j.Currency == "USD"
 }
 
 var ErrIdempotencyConflict = fmt.Errorf("la clave de idempotencia de liquidación ya se usó con una solicitud diferente")
