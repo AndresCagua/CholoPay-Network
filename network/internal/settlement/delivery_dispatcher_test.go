@@ -12,6 +12,17 @@ import (
 	"github.com/google/uuid"
 )
 
+func TestDurationSecondsRejectsTextualOrFractionalIntervals(t *testing.T) {
+	if got, err := durationSeconds(time.Minute); err != nil || got != 60 {
+		t.Fatalf("se esperaban 60 segundos, se obtuvo %d/%v", got, err)
+	}
+	for _, value := range []time.Duration{0, -time.Second, 1500 * time.Millisecond} {
+		if _, err := durationSeconds(value); err == nil {
+			t.Fatalf("se esperaba rechazar la duración %s", value)
+		}
+	}
+}
+
 func TestSignedReceiverRequestUsesStableDeliveryIdentityAndCanonicalPayload(t *testing.T) {
 	p := ReceiverCreditPayload{DeliveryID: uuid.New(), EventID: uuid.New(), TransferID: uuid.New(), DestinationAccountID: uuid.New(), ClearingAccountID: uuid.New(), AmountMinor: 125}
 	now := time.Unix(1700000000, 0)

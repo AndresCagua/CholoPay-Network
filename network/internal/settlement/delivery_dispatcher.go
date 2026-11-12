@@ -116,7 +116,11 @@ func (d *DeliveryDispatcher) recordRetry(ctx context.Context, delivery Delivery,
 	if delivery.AttemptCount >= d.MaxAttempts {
 		return d.recordFailure(ctx, delivery, owner, "DELIVERY_DLQ", detail)
 	}
-	_, err := d.Store.db.ExecContext(ctx, `UPDATE settlement_delivery SET next_attempt_at=CURRENT_TIMESTAMP+$1::interval,lease_owner=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP,failure_detail=$2 WHERE delivery_id=$3 AND lease_owner=$4`, d.Backoff(delivery.AttemptCount).String(), detail, delivery.DeliveryID, owner)
+	backoffSeconds := int64(d.Backoff(delivery.AttemptCount) / time.Second)
+	if backoffSeconds < 1 {
+		backoffSeconds = 1
+	}
+	_, err := d.Store.db.ExecContext(ctx, `UPDATE settlement_delivery SET next_attempt_at=CURRENT_TIMESTAMP+($1 * INTERVAL '1 second'),lease_owner=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP,failure_detail=$2 WHERE delivery_id=$3 AND lease_owner=$4`, backoffSeconds, detail, delivery.DeliveryID, owner)
 	return err
 }
 func (d *DeliveryDispatcher) recordFailure(ctx context.Context, delivery Delivery, owner uuid.UUID, code, detail string) error {

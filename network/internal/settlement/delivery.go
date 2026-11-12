@@ -106,7 +106,18 @@ func (s *Store) AcknowledgeDelivery(ctx context.Context, deliveryID, receiverID,
 	return d, nil
 }
 func (s *Store) ClaimDelivery(ctx context.Context, owner uuid.UUID, lease time.Duration) (Delivery, error) {
+	seconds, err := durationSeconds(lease)
+	if err != nil {
+		return Delivery{}, err
+	}
 	var d Delivery
-	err := s.db.QueryRowContext(ctx, `WITH candidate AS (SELECT delivery_id FROM settlement_delivery WHERE state='PENDING' AND next_attempt_at<=CURRENT_TIMESTAMP AND (lease_until IS NULL OR lease_until<CURRENT_TIMESTAMP) ORDER BY next_attempt_at,created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE settlement_delivery d SET lease_owner=$1,lease_until=CURRENT_TIMESTAMP+$2::interval,attempt_count=attempt_count+1,updated_at=CURRENT_TIMESTAMP FROM candidate WHERE d.delivery_id=candidate.delivery_id RETURNING d.delivery_id,d.transfer_id,d.receiver_participant_id,d.destination_account_id,d.clearing_account_id,d.amount_minor,d.event_id,d.state,d.attempt_count,d.last_event_id,d.lease_owner`, owner, lease.String()).Scan(&d.DeliveryID, &d.TransferID, &d.ReceiverParticipantID, &d.DestinationAccountID, &d.ClearingAccountID, &d.AmountMinor, &d.EventID, &d.State, &d.AttemptCount, &d.LastEventID, &d.LeaseOwner)
+	err = s.db.QueryRowContext(ctx, `WITH candidate AS (SELECT delivery_id FROM settlement_delivery WHERE state='PENDING' AND next_attempt_at<=CURRENT_TIMESTAMP AND (lease_until IS NULL OR lease_until<CURRENT_TIMESTAMP) ORDER BY next_attempt_at,created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE settlement_delivery d SET lease_owner=$1,lease_until=CURRENT_TIMESTAMP+($2 * INTERVAL '1 second'),attempt_count=attempt_count+1,updated_at=CURRENT_TIMESTAMP FROM candidate WHERE d.delivery_id=candidate.delivery_id RETURNING d.delivery_id,d.transfer_id,d.receiver_participant_id,d.destination_account_id,d.clearing_account_id,d.amount_minor,d.event_id,d.state,d.attempt_count,d.last_event_id,d.lease_owner`, owner, seconds).Scan(&d.DeliveryID, &d.TransferID, &d.ReceiverParticipantID, &d.DestinationAccountID, &d.ClearingAccountID, &d.AmountMinor, &d.EventID, &d.State, &d.AttemptCount, &d.LastEventID, &d.LeaseOwner)
 	return d, err
+}
+
+func durationSeconds(value time.Duration) (int64, error) {
+	if value <= 0 || value%time.Second != 0 {
+		return 0, errors.New("la duración debe expresarse en segundos enteros positivos")
+	}
+	return int64(value / time.Second), nil
 }
