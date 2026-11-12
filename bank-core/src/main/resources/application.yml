@@ -20,4 +20,6 @@ cholopay:
     max-attempts: ${OUTBOX_MAX_ATTEMPTS:5}
     base-backoff: ${OUTBOX_BASE_BACKOFF:1s}
     max-backoff: ${OUTBOX_MAX_BACKOFF:1m}
+    enabled: ${OUTBOX_ENABLED:false}
+    poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:1000}
     http-timeout: ${OUTBOX_HTTP_TIMEOUT:2s}
