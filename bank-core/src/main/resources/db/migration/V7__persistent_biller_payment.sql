@@ -1,3 +1,9 @@
+INSERT INTO ledger_account (id, owner_ref, currency, posted_balance_minor)
+VALUES
+  ('00000000-0000-4000-8000-000000000001', 'synthetic-electricity-source', 'USD', 1000000),
+  ('00000000-0000-4000-8000-000000000002', 'synthetic-utilities-clearing', 'USD', 0)
+ON CONFLICT (id) DO NOTHING;
+
 CREATE TABLE payment_intent (
   id UUID PRIMARY KEY,
   obligation_id VARCHAR(160) NOT NULL,

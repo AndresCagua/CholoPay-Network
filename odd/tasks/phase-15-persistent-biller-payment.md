@@ -13,13 +13,17 @@ Alcance: convertir el flujo actual sintético gateway→facturador en un intento
 
 ## Tasks
 
-- T1 (S2-S5): Definir el contrato persistente de payment intent de obligación en bank-core, su idempotencia y estados, sin afirmar settlement real. Ruta: bank-core. Commit: `dac2b4a`.
-- T2 (S3-S5): Implementar débito ACID idempotente y outbox de aplicación al facturador, conservando `PENDING`/`UNKNOWN_PENDING_RECONCILIATION` ante indisponibilidad. Ruta: bank-core/gateway. Commit: `dac2b4a`.
-- T3 (S3-S6): Añadir pruebas Docker públicas de éxito, replay, conflicto, saldo insuficiente, caída del facturador y recuperación sin doble débito. Ruta: bank-core/gateway/utilities. Commit: `dac2b4a` (cobertura implementada para éxito, replay, conflicto y saldo insuficiente; aplicación/recuperación queda en el siguiente slice).
-- T4 (S1-S6): Actualizar OpenAPI, documentación y evidencia Docker; registrar límites sintéticos. Ruta: inline. Commit: `dac2b4a`.
+- T1 (S2-S5): Definir el contrato persistente de payment intent de obligación en bank-core, su idempotencia y estados, sin afirmar settlement real. Ruta: bank-core. Commit: `149a0ab`.
+- T2 (S3-S5): Implementar débito ACID idempotente y outbox de aplicación al facturador, conservando `PENDING`/`UNKNOWN_PENDING_RECONCILIATION` ante indisponibilidad. Ruta: bank-core/gateway. Commit: `149a0ab`.
+- T3 (S3-S6): Añadir pruebas Docker públicas de éxito, replay, conflicto, saldo insuficiente, caída del facturador y recuperación sin doble débito. Ruta: bank-core/gateway/utilities. Commit: `149a0ab` (cobertura implementada para éxito, replay, conflicto y saldo insuficiente; aplicación/recuperación queda en el siguiente slice).
+- T4 (S1-S6): Actualizar OpenAPI, documentación y evidencia Docker; registrar límites sintéticos. Ruta: inline. Commit: `149a0ab`.
+- T5 (S1-S6): Aplicar el outbox de electricidad fuera de la transacción financiera y conservar compatibilidad del contrato sintético existente para agua, internet, móvil y tránsito hasta sus slices persistentes. Ruta: bank-core/infra. Commit: pending.
 
 ## Log
 
 L1. Usuario: "HIJO DE PUTA REVISA !!!!!!!1 Y TERMINA LO QUE FALTA !!!!!!!!!!"
 L2. La auditoría completa de `spec.md` identificó como brecha prioritaria el primer recorrido de pago de obligación respaldado por ledger; el T7 existente solo prueba estados sintéticos de gateway/facturadores y no modifica un ledger bancario.
 L3. El slice se limita a electricidad en Banco Costa para no inventar todavía semánticas de tres bancos, fondeo, finality productiva ni settlement real.
+L4. La T7 reconstruida pasó la electricidad hasta el siguiente elemento y falló en agua con `422 solicitud de pago de electricidad inválida`; esto confirma que la aceptación existente exige conservar el contrato sintético para las obligaciones aún no persistidas.
+L5. El worker fue cancelado durante T5 y dejó cambios parciales; el padre revisó esos cambios, corrigió el error de compilación y verificó en Docker que T7 reconstruida pasa para las seis obligaciones sintéticas. La aplicación eléctrica ocurre después del commit financiero mediante el payload persistido del outbox; si falla conserva `PENDING_APPLICATION`.
+L6. La fecha real se verificó con `date +%Y%m%d` antes de corregir el commit anterior a `20261117:`, conforme a la regla operativa del usuario.

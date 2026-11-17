@@ -45,10 +45,10 @@ class JdbcObligationPaymentIntegrationTest {
     void successReplayConflictAndInsufficientFundsArePersistentAndBalanced() throws Exception {
         String body = body("10.00");
         mvc.perform(post("/v1/obligations/electricity-1/payment-intents").header("Authorization", "Bearer test-token").header("Idempotency-Key", "electricity-1").contentType("application/json").content(body))
-                .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("PENDING_APPLICATION"));
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("APPLIED"));
         long sourceAfter = balance(source);
         mvc.perform(post("/v1/obligations/electricity-1/payment-intents").header("Authorization", "Bearer test-token").header("Idempotency-Key", "electricity-1").contentType("application/json").content(body))
-                .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("PENDING_APPLICATION"));
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("APPLIED"));
         assertEquals(sourceAfter, balance(source));
         mvc.perform(post("/v1/obligations/electricity-1/payment-intents").header("Authorization", "Bearer test-token").header("Idempotency-Key", "electricity-1").contentType("application/json").content(body("11.00")))
                 .andExpect(status().isConflict());

@@ -88,6 +88,7 @@ services:
       GATEWAY_URL: http://gateway:8090
       GATEWAY_API_KEY: ${GATEWAY_API_KEY:-sk_sandbox_merchant_rw}
       BANK_API_TOKEN: ${BANK_API_TOKEN:-bank-local-test-only}
+      BILLER_UTILITIES_CLEARING_ACCOUNT_ID: ${BILLER_UTILITIES_CLEARING_ACCOUNT_ID:-00000000-0000-4000-8000-000000000002}
       CHOLONET_URL: http://network:8080/internal/v1/inter-network/transfers
       CHOLONET_HMAC_SECRET: ${CHOLONET_HMAC_SECRET:-}
       OUTBOX_ENABLED: ${OUTBOX_ENABLED:-false}
@@ -126,6 +127,7 @@ services:
       GATEWAY_URL: http://gateway:8090
       GATEWAY_API_KEY: ${GATEWAY_API_KEY:-sk_sandbox_merchant_rw}
       BANK_API_TOKEN: ${BANK_API_TOKEN:-bank-local-test-only}
+      BILLER_UTILITIES_CLEARING_ACCOUNT_ID: ${BILLER_UTILITIES_CLEARING_ACCOUNT_ID:-00000000-0000-4000-8000-000000000002}
       CHOLONET_URL: http://network:8080/internal/v1/inter-network/transfers
       CHOLONET_HMAC_SECRET: ${CHOLONET_HMAC_SECRET:-}
       OUTBOX_ENABLED: ${OUTBOX_ENABLED:-false}
