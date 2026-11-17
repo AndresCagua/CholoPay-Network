@@ -25,7 +25,7 @@ public class ObligationPaymentController {
         this.bankApiToken = bankApiToken;
     }
 
-    /** Compatibility constructor for the pre-persistence unit tests; production wiring uses the JDBC service above. */
+    /** Constructor de compatibilidad para las pruebas unitarias anteriores a la persistencia; producción usa el servicio JDBC anterior. */
     public ObligationPaymentController(ObligationPaymentGatewayService service, String bankApiToken) {
         this.persistentService = null;
         this.legacyService = service;

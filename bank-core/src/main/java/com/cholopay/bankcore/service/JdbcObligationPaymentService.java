@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Persists the local synthetic obligation payment boundary; it does not settle real money. */
+/** Persiste el límite local del pago sintético; no liquida dinero real. */
 @Service
 public class JdbcObligationPaymentService {
     private final JdbcTemplate jdbc;
@@ -41,7 +41,7 @@ public class JdbcObligationPaymentService {
         this.clearingAccount = clearingAccount;
     }
 
-    /** The debit transaction completes before this method performs any HTTP application. */
+    /** La transacción de débito termina antes de que este método aplique el pago por HTTP. */
     public Result start(String obligationId, String idempotencyKey, Request request) {
         Result persisted = transactions.execute(status -> persist(obligationId, idempotencyKey, request));
         if (persisted == null || persisted.error != null || persisted.paymentId == null
@@ -126,10 +126,11 @@ public class JdbcObligationPaymentService {
         } catch (Exception applicationFailure) {
             try {
                 transactions.executeWithoutResult(tx -> jdbc.update("UPDATE payment_intent SET status='UNKNOWN_PENDING_RECONCILIATION' WHERE id=? AND status='PENDING_APPLICATION'", paymentId));
-            } catch (RuntimeException ignored) {
-                // Preserve the original pending record when reconciliation metadata cannot be written.
+                return new Result(HttpStatus.ACCEPTED.value(), bodyWithStatus(persisted.body, "UNKNOWN_PENDING_RECONCILIATION"), null, paymentId);
+            } catch (RuntimeException reconciliationFailure) {
+                // Nunca informar UNKNOWN si no se actualizó la fila durable; el replay debe observar el mismo estado.
+                return persisted;
             }
-            return new Result(HttpStatus.ACCEPTED.value(), bodyWithStatus(persisted.body, "UNKNOWN_PENDING_RECONCILIATION"), null, paymentId);
         }
         return persisted;
     }

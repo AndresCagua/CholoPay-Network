@@ -20,6 +20,7 @@ Alcance: convertir el flujo actual sintético gateway→facturador en un intento
 - T4 (S1-S6): Actualizar OpenAPI, documentación y evidencia Docker; registrar límites sintéticos. Ruta: inline. Commit: `149a0ab`.
 - T5 (S1-S6): Aplicar el outbox de electricidad fuera de la transacción financiera y conservar compatibilidad del contrato sintético existente para agua, internet, móvil y tránsito hasta sus slices persistentes. Ruta: bank-core/infra. Commit: `4f22274`.
 - T6 (S7): Versionar el contrato de errores con códigos estables, mensajes humanos en español, OpenAPI 0.2.0 y estado explícito de reconciliación. Ruta: bank-core/api/infra. Commit: `95cdb3b`.
+- T7 (S3-S6): Corregir la divergencia entre respuesta `UNKNOWN_PENDING_RECONCILIATION` y estado durable cuando falla la escritura de reconciliación; mantener comentarios de código en español. Ruta: bank-core/service/api. Commit: pending.
 
 ## Log
 
@@ -30,3 +31,4 @@ L4. La T7 reconstruida pasó la electricidad hasta el siguiente elemento y fall�
 L5. El worker fue cancelado durante T5 y dejó cambios parciales; el padre revisó esos cambios, corrigió el error de compilación y verificó en Docker que T7 reconstruida pasa para las seis obligaciones sintéticas. La aplicación eléctrica ocurre después del commit financiero mediante el payload persistido del outbox; si falla conserva `PENDING_APPLICATION`.
 L6. La fecha real se verificó con `date +%Y%m%d` antes de corregir el commit anterior a `20261117:`, conforme a la regla operativa del usuario.
 L7. La review RDD cerrada escaló hallazgos sobre mensajes observables y estado incierto; el usuario ordenó documentar/versionar el contrato y corregir esos temas antes de abrir una nueva review.
+L8. La review nueva `review-eca74817bf75e96e` corroboró una divergencia crítica entre el estado devuelto y el estado durable. La corrección solo devuelve UNKNOWN_PENDING_RECONCILIATION después de actualizar la fila; si esa actualización falla, conserva PENDING_APPLICATION.
