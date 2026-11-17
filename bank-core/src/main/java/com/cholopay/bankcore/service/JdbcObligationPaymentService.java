@@ -123,7 +123,14 @@ public class JdbcObligationPaymentService {
                 });
                 return new Result(201, applied, null, paymentId);
             }
-        } catch (Exception ignored) { /* application remains pending; the debit is never reversed */ }
+        } catch (Exception applicationFailure) {
+            try {
+                transactions.executeWithoutResult(tx -> jdbc.update("UPDATE payment_intent SET status='UNKNOWN_PENDING_RECONCILIATION' WHERE id=? AND status='PENDING_APPLICATION'", paymentId));
+            } catch (RuntimeException ignored) {
+                // Preserve the original pending record when reconciliation metadata cannot be written.
+            }
+            return new Result(HttpStatus.ACCEPTED.value(), bodyWithStatus(persisted.body, "UNKNOWN_PENDING_RECONCILIATION"), null, paymentId);
+        }
         return persisted;
     }
 
@@ -132,18 +139,24 @@ public class JdbcObligationPaymentService {
             try { return new Result(201, json.readValue(existing.applicationResult(), Map.class), null, existing.id()); } catch (Exception ignored) { }
         }
         Map<String, Object> body = jdbc.queryForObject("SELECT obligation_id, amount_minor FROM payment_intent WHERE id = ?", (rs, row) -> body(existing.id(), rs.getString(1), rs.getLong(2), existing.status(), existing.journalId()), existing.id());
+        if ("APPLIED".equals(existing.status())) return new Result(201, body, null, existing.id());
         return Result.pending(existing.id(), body);
     }
     private Map<String, Object> body(UUID id, String obligation, long amount, String status, UUID journal) { return Map.of("payment_intent_id", id, "obligation_id", obligation, "amount", BigDecimal.valueOf(amount, 2), "currency", "USD", "status", status, "journal_id", journal, "settlement", "not_claimed"); }
+    private Map<String, Object> bodyWithStatus(Map<String, Object> original, String status) {
+        Map<String, Object> copy = new LinkedHashMap<>(original);
+        copy.put("status", status);
+        return copy;
+    }
     private static boolean isBlank(String value) { return value == null || value.isBlank(); }
     private static String hash(String value) { try { return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); } catch (Exception e) { throw new IllegalStateException(e); } }
     private record Existing(UUID id, String hash, String status, UUID journalId, String applicationResult) {}
     public record Request(String participantId, UUID sourceAccountId, String biller, String amount, String currency, String service, String invoiceId) {}
     public record Result(int status, Map<String, Object> body, String error, UUID paymentId) {
         static Result pending(UUID id, Map<String, Object> body) { return new Result(HttpStatus.ACCEPTED.value(), body, null, id); }
-        static Result configurationMissing() { return new Result(503, Map.of("error", "configuración de compensación no disponible"), "configuration", null); }
-        static Result invalid(String message) { return new Result(422, Map.of("error", message), "invalid", null); }
-        static Result conflict() { return new Result(409, Map.of("error", "la clave de idempotencia ya fue utilizada con otra solicitud"), "conflict", null); }
-        static Result insufficient() { return new Result(422, Map.of("error", "fondos disponibles insuficientes"), "insufficient_funds", null); }
+        static Result configurationMissing() { return new Result(503, Map.of("error", "configuration_missing", "message", "la configuración de compensación no está disponible"), "configuration", null); }
+        static Result invalid(String message) { return new Result(422, Map.of("error", "invalid_request", "message", message), "invalid", null); }
+        static Result conflict() { return new Result(409, Map.of("error", "idempotency_key_conflict", "message", "la clave de idempotencia ya fue utilizada con otra solicitud"), "conflict", null); }
+        static Result insufficient() { return new Result(422, Map.of("error", "insufficient_funds", "message", "los fondos disponibles son insuficientes"), "insufficient_funds", null); }
     }
 }

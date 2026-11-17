@@ -23,9 +23,13 @@ class ObligationPaymentControllerTest {
     void requiresAuthenticationAndIdempotencyKeyBeforeDelegating() throws Exception {
         String body = "{\"participantId\":\"COSTA\",\"sourceAccountId\":\"" + UUID.randomUUID() + "\",\"biller\":\"transit\",\"amount\":\"25.00\",\"currency\":\"SYN\"}";
         mvc.perform(post("/v1/obligations/fine-1/payment-intents").contentType("application/json").content(body))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("unauthorized"))
+                .andExpect(jsonPath("$.message").value("la autorización bancaria no es válida"));
         mvc.perform(post("/v1/obligations/fine-1/payment-intents").header("Authorization", "Bearer bank-token").contentType("application/json").content(body))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("idempotency_key_required"))
+                .andExpect(jsonPath("$.message").value("se requiere la clave de idempotencia"));
         verifyNoInteractions(service);
     }
 

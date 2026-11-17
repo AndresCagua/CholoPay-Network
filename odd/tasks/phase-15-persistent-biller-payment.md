@@ -10,6 +10,7 @@ Alcance: convertir el flujo actual sintético gateway→facturador en un intento
 4. **S4 — Idempotencia:** "Una misma instrucción de negocio no produce dos liquidaciones.".
 5. **S5 — Estados inciertos:** "Si no se puede establecer con certeza el estado de liquidación, no repetir la operación con nuevo ID ni informar «fallida» sin reconciliar; usar `UNKNOWN_PENDING_RECONCILIATION`.".
 6. **S6 — Aceptación del slice:** iniciar un pago eléctrico desde Banco Costa, debitar una cuenta sintética una sola vez, conservar el resultado incierto/pending si el facturador no está disponible, y aplicar/reproducir el evento sin doble débito tras recuperación.
+7. **S7 — Regla de mensajes:** "todo mensaje al usuario debe ser en español".
 
 ## Tasks
 
@@ -18,6 +19,7 @@ Alcance: convertir el flujo actual sintético gateway→facturador en un intento
 - T3 (S3-S6): Añadir pruebas Docker públicas de éxito, replay, conflicto, saldo insuficiente, caída del facturador y recuperación sin doble débito. Ruta: bank-core/gateway/utilities. Commit: `149a0ab` (cobertura implementada para éxito, replay, conflicto y saldo insuficiente; aplicación/recuperación queda en el siguiente slice).
 - T4 (S1-S6): Actualizar OpenAPI, documentación y evidencia Docker; registrar límites sintéticos. Ruta: inline. Commit: `149a0ab`.
 - T5 (S1-S6): Aplicar el outbox de electricidad fuera de la transacción financiera y conservar compatibilidad del contrato sintético existente para agua, internet, móvil y tránsito hasta sus slices persistentes. Ruta: bank-core/infra. Commit: `4f22274`.
+- T6 (S7): Versionar el contrato de errores con códigos estables, mensajes humanos en español, OpenAPI 0.2.0 y estado explícito de reconciliación. Ruta: bank-core/api/infra. Commit: pending.
 
 ## Log
 
@@ -27,3 +29,4 @@ L3. El slice se limita a electricidad en Banco Costa para no inventar todavía s
 L4. La T7 reconstruida pasó la electricidad hasta el siguiente elemento y falló en agua con `422 solicitud de pago de electricidad inválida`; esto confirma que la aceptación existente exige conservar el contrato sintético para las obligaciones aún no persistidas.
 L5. El worker fue cancelado durante T5 y dejó cambios parciales; el padre revisó esos cambios, corrigió el error de compilación y verificó en Docker que T7 reconstruida pasa para las seis obligaciones sintéticas. La aplicación eléctrica ocurre después del commit financiero mediante el payload persistido del outbox; si falla conserva `PENDING_APPLICATION`.
 L6. La fecha real se verificó con `date +%Y%m%d` antes de corregir el commit anterior a `20261117:`, conforme a la regla operativa del usuario.
+L7. La review RDD cerrada escaló hallazgos sobre mensajes observables y estado incierto; el usuario ordenó documentar/versionar el contrato y corregir esos temas antes de abrir una nueva review.
