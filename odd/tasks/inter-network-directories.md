@@ -13,9 +13,9 @@ Fuente de verdad del slice de directorios distribuidos. Lee hasta `## Log` antes
 
 ## Tasks
 
-- T1 (S1-S3): Agregar registros aislados de directorio/clave y API de consulta determinista. Ruta: inline. Commit: pending.
-- T2 (S4-S5): Agregar evidencia versionada de resolución del directorio y documentación explícita de no conexión con redes reales. Ruta: inline. Commit: pending.
-- T3 (S6): Ejecutar pruebas de PostgreSQL en Docker y registrar la evidencia. Ruta: inline. Commit: pending.
+- T1 (S1-S3): Agregar registros aislados de directorio/clave y API de consulta determinista. Ruta: inline. Commit: `7a470df`.
+- T2 (S4-S5): Agregar evidencia versionada de resolución del directorio y documentación explícita de no conexión con redes reales. Ruta: inline. Commit: `7a470df`.
+- T3 (S6): Ejecutar pruebas de PostgreSQL en Docker y registrar la evidencia. Ruta: inline. Commit: `7a470df`.
 
 ## Log
 

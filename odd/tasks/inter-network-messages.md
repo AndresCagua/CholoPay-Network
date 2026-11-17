@@ -13,9 +13,9 @@ Fuente de verdad del slice de envolturas de mensajes interredes. Lee hasta `## L
 
 ## Tasks
 
-- T1 (S1-S2): Definir y persistir envolturas versionadas de mensajes interredes. Ruta: inline. Commit: pending.
-- T2 (S3-S5): Agregar aceptación idempotente y validación de límites de red mediante la API HTTP interna. Ruta: inline. Commit: pending.
-- T3 (S6): Ejecutar pruebas de PostgreSQL en Docker y registrar la evidencia. Ruta: inline. Commit: pending.
+- T1 (S1-S2): Definir y persistir envolturas versionadas de mensajes interredes. Ruta: inline. Commit: `b89e11e`.
+- T2 (S3-S5): Agregar aceptación idempotente y validación de límites de red mediante la API HTTP interna. Ruta: inline. Commit: `b89e11e`.
+- T3 (S6): Ejecutar pruebas de PostgreSQL en Docker y registrar la evidencia. Ruta: inline. Commit: `b89e11e`.
 
 ## Log
 

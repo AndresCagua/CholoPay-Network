@@ -23,9 +23,9 @@ Alcance: registro atómico y límites sintéticos del directorio; no portabilida
 
 ## Tareas
 
-- T1 (S1-S4): Añadir límites y unicidad global sintética a la migración/store del directorio, con registro idempotente. Ruta: inline después de la exploración. Commit: pending.
-- T2 (S1-S5): Añadir pruebas de concurrencia, duplicado, límite y replay por interfaz pública. Ruta: inline. Commit: pending.
-- T3 (S1-S5): Actualizar documentación y evidencia Docker. Ruta: inline. Commit: pending.
+- T1 (S1-S4): Añadir límites y unicidad global sintética a la migración/store del directorio, con registro idempotente. Ruta: inline después de la exploración. Commit: `6879228`.
+- T2 (S1-S5): Añadir pruebas de concurrencia, duplicado, límite y replay por interfaz pública. Ruta: inline. Commit: `6879228`.
+- T3 (S1-S5): Actualizar documentación y evidencia Docker. Ruta: inline. Commit: `6879228`.
 
 ## Log
 

@@ -13,9 +13,9 @@ Fuente de verdad del primer slice de enrutamiento/mensajería de extremo a extre
 
 ## Tasks
 
-- T1 (S1-S3): Agregar servicio de orquestación y endpoint HTTP interno de recepción. Ruta: inline. Commit: pending.
-- T2 (S4-S5): Agregar replay idempotente y evidencia explícita de respuesta sin efectos secundarios de liquidación. Ruta: inline. Commit: pending.
-- T3 (S6): Ejecutar pruebas Docker y registrar la evidencia. Ruta: inline. Commit: pending.
+- T1 (S1-S3): Agregar servicio de orquestación y endpoint HTTP interno de recepción. Ruta: inline. Commit: `d79df1b`.
+- T2 (S4-S5): Agregar replay idempotente y evidencia explícita de respuesta sin efectos secundarios de liquidación. Ruta: inline. Commit: `bdec042`.
+- T3 (S6): Ejecutar pruebas Docker y registrar la evidencia. Ruta: inline. Commit: `bdec042`.
 
 ## Log
 

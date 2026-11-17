@@ -28,10 +28,10 @@ Alcance: proyecciones agregadas de solo lectura sobre CholoNet, bancos y factura
 
 ## Tareas
 
-- T1 (S1-S5): Inventariar fuentes y contratos de solo lectura existentes, incluyendo autorización y alcance de datos. Ruta: inline. Commit: pending.
-- T2 (S1-S5): Implementar endpoint/proyección agregada de incidencias y salud de participantes. Ruta: worker inline. Commit: pending.
-- T3 (S1-S5): Añadir regresiones de aislamiento, enmascaramiento, datos obsoletos y no-mutación. Ruta: worker inline. Commit: pending.
-- T4 (S1-S5): Documentar consola simulada y evidencia Docker. Ruta: inline. Commit: pending.
+- T1 (S1-S5): Inventariar fuentes y contratos de solo lectura existentes, incluyendo autorización y alcance de datos. Ruta: inline. Commit: `ed05718`.
+- T2 (S1-S5): Implementar endpoint/proyección agregada de incidencias y salud de participantes. Ruta: worker inline. Commit: `cb99eb0`.
+- T3 (S1-S5): Añadir regresiones de aislamiento, enmascaramiento, datos obsoletos y no-mutación. Ruta: worker inline. Commit: `712fa48`.
+- T4 (S1-S5): Documentar consola simulada y evidencia Docker. Ruta: inline. Commit: `1391e7b`.
 
 ## Log
 

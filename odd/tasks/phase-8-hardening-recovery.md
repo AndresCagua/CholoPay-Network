@@ -21,10 +21,10 @@ Alcance: controles locales exclusivos de Docker, respaldos/restauración de dato
 
 ## Tareas
 
-- T1 (S1, S4): Añadir comprobaciones locales de configuración segura para Compose, ausencia de puertos publicados no autorizados y secretos reales. Ruta: inline después de la exploración. Commit: pending.
-- T2 (S2): Crear respaldo/restauración reproducible de una base sintética mediante Docker, sin tocar infraestructura externa. Ruta: inline. Commit: pending.
-- T3 (S1-S3): Escribir runbooks operativos mínimos para respaldo, restauración, caída de participante y rotación de credenciales sintéticas. Ruta: inline. Commit: pending.
-- T4 (S1-S4): Ejecutar checks exclusivos de Docker, validar evidencia y documentar límites. Ruta: inline. Commit: pending.
+- T1 (S1, S4): Añadir comprobaciones locales de configuración segura para Compose, ausencia de puertos publicados no autorizados y secretos reales. Ruta: inline después de la exploración. Commit: `7ed267e`.
+- T2 (S2): Crear respaldo/restauración reproducible de una base sintética mediante Docker, sin tocar infraestructura externa. Ruta: inline. Commit: `7ed267e`.
+- T3 (S1-S3): Escribir runbooks operativos mínimos para respaldo, restauración, caída de participante y rotación de credenciales sintéticas. Ruta: inline. Commit: `7ed267e`.
+- T4 (S1-S4): Ejecutar checks exclusivos de Docker, validar evidencia y documentar límites. Ruta: inline. Commit: `7ed267e`.
 
 ## Log
 

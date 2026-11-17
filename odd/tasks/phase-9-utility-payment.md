@@ -26,9 +26,9 @@ Alcance: flujo sintético de una factura de electricidad desde el intent de pago
 
 ## Tareas
 
-- T1 (S1-S4): Extender utilities con estado de obligación, payment intent idempotente y evento interno autenticado sintético. Ruta: inline después de una exploración acotada. Commit: pendiente.
-- T2 (S3-S5): Probar replay, concurrencia y aplicación eventual sin débito ni ledger local. Ruta: inline. Commit: pendiente.
-- T3 (S1-S5): Actualizar contrato, README y evidencia Docker. Ruta: inline. Commit: pendiente.
+- T1 (S1-S4): Extender utilities con estado de obligación, payment intent idempotente y evento interno autenticado sintético. Ruta: inline después de una exploración acotada. Commit: `001e81d`.
+- T2 (S3-S5): Probar replay, concurrencia y aplicación eventual sin débito ni ledger local. Ruta: inline. Commit: `001e81d`.
+- T3 (S1-S5): Actualizar contrato, README y evidencia Docker. Ruta: inline. Commit: `001e81d`.
 
 ## Log
 

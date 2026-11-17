@@ -30,10 +30,10 @@ Alcance: suspensión determinista, resolución durante transición y portabilida
 
 ## Tareas
 
-- T1 (S1-S2): Definir estados de ciclo de vida y contrato de transición/portabilidad en el directorio. Ruta: inline después de la exploración. Commit: pending.
-- T2 (S1-S5): Implementar transición atómica de propietario con idempotencia y resolución durante suspensión/transición. Ruta: inline. Commit: pending.
-- T3 (S1-S5): Añadir regresiones Docker de doble destino, replay, conflicto y suspensión. Ruta: inline. Commit: pending.
-- T4 (S1-S5): Actualizar README, contrato y evidencia. Ruta: inline. Commit: pending.
+- T1 (S1-S2): Definir estados de ciclo de vida y contrato de transición/portabilidad en el directorio. Ruta: inline después de la exploración. Commit: `c0c51a7`.
+- T2 (S1-S5): Implementar transición atómica de propietario con idempotencia y resolución durante suspensión/transición. Ruta: inline. Commit: `c0c51a7`.
+- T3 (S1-S5): Añadir regresiones Docker de doble destino, replay, conflicto y suspensión. Ruta: inline. Commit: `ec32fb7`.
+- T4 (S1-S5): Actualizar README, contrato y evidencia. Ruta: inline. Commit: `ec32fb7`.
 
 ## Log
 

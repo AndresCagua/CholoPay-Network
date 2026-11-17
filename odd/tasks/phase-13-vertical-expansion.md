@@ -24,7 +24,7 @@ Alcance: completar progresivamente un pago sintético de factura, operaciones we
 - T1 (S1): Implementar el recorrido sintético Banco Costa → CholoNet/Gateway → CholoServicios para una factura de electricidad, con idempotencia, aplicación eventual y evidencia pública. Ruta: writer delegado y acotado. Commit: `43c805a`.
 - T2 (S2): Convertir los paneles web provisionales en una lectura/operación delimitada por participante contra API, sin acceso directo a bases. Ruta: worker. Commit: `3d33ab9`.
 - T3 (S3): Completar reembolsos sintéticos e integración mínima comercio-gateway con contrato de checkout. Ruta: worker. Commit: `cbcacb2`.
-- T4 (S1-S3): Ejecutar verificación Docker, actualizar contratos/runbooks y registrar límites. Ruta: inline. Commit: pending.
+- T4 (S1-S3): Ejecutar verificación Docker, actualizar contratos/runbooks y registrar límites. Ruta: inline. Commit: `2783bfb`.
 
 ## Log
 
