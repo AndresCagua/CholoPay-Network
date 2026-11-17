@@ -179,10 +179,13 @@ class HttpObligationsClient implements ObligationsClient {
   }) async {
     final headers = <String, String>{'Idempotency-Key': idempotencyKey};
     if (authorizationToken != null && authorizationToken!.isNotEmpty) headers['Authorization'] = 'Bearer $authorizationToken';
+    if (service == null || service.trim().isEmpty) {
+      throw ArgumentError.value(service, 'service', 'must be provided by the obligation projection');
+    }
     final selectedAmount = amount ?? '0.00';
     final selectedCurrency = currency ?? 'USD';
     final isTransit = selectedCurrency == 'SYN' || service == 'registration' || service == 'matricula' || service == 'traffic_fine' || service == 'fine';
-    final selectedService = service ?? (isTransit ? 'registration' : obligationId);
+    final selectedService = service;
     final json = await _request(
       'POST',
       _bankCoreBaseUri.resolve('/v1/participants/$participantId/obligations/$obligationId/payment-intents'),

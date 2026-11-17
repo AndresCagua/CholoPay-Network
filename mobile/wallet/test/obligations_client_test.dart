@@ -79,6 +79,8 @@ void main() {
       participantId: 'COSTA',
       obligationId: 'bill-light-001',
       idempotencyKey: 'wallet-obligation-001',
+      service: 'electricity',
+      invoiceId: 'bill-light-001',
     );
 
     expect(transport.method, 'POST');
@@ -88,7 +90,7 @@ void main() {
     final payload = jsonDecode(transport.body!) as Map<String, dynamic>;
     expect(payload['participantId'], 'COSTA');
     expect(payload['sourceAccountId'], '00000000-0000-4000-8000-000000000001');
-    expect(payload['service'], 'bill-light-001');
+    expect(payload['service'], 'electricity');
     expect(payload['invoiceId'], 'bill-light-001');
     expect(payload['amount'], '0.00');
     expect(payload['currency'], 'USD');
@@ -122,6 +124,23 @@ void main() {
     expect(payload['invoiceId'], isNull);
     expect(payload['amount'], '32.00');
     expect(payload['currency'], 'SYN');
+  });
+
+  test('rechaza un servicio ausente en lugar de inventarlo desde el ID', () async {
+    final client = HttpObligationsClient(
+      baseUri: Uri.parse('https://gateway.synthetic.test'),
+      bankCoreBaseUri: Uri.parse('https://bank-core.synthetic.test'),
+      transport: FakeTransport(const WalletHttpResponse(201, '{}')),
+    );
+
+    expect(
+      () => client.startPayment(
+        participantId: 'COSTA',
+        obligationId: 'bill-light-001',
+        idempotencyKey: 'wallet-missing-service',
+      ),
+      throwsArgumentError,
+    );
   });
 
   test('rechaza respuestas HTTP no exitosas', () async {
