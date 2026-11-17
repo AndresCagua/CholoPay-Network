@@ -42,6 +42,18 @@ class TransitHttpTest(unittest.TestCase):
         self.assertEqual(status, 201)
         return result
 
+    def test_registration_exposes_stable_synthetic_matricula_obligation(self):
+        first = self.registration()
+        obligation_id = first['obligation_id']
+        status, result = self.request('GET', f"/v1/obligations/{obligation_id}")
+        self.assertEqual(status, 200)
+        self.assertEqual(result['type'], 'registration')
+        self.assertEqual(result['registration_id'], first['id'])
+        self.assertEqual(result['status'], 'unpaid')
+        status, by_plate = self.request('GET', f"/v1/vehicles/{first['plate']}/obligations")
+        self.assertEqual(status, 200)
+        self.assertEqual(by_plate['items'][0]['id'], obligation_id)
+
     def test_registration_fine_obligation_status_and_constancia_are_publicly_observable(self):
         registration = self.registration()
         self.assertFalse((self.request("GET", f"/v1/registrations/{registration['plate']}")[1])["owner_ref"].startswith("real"))

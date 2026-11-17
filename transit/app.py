@@ -44,6 +44,12 @@ class TransitStore:
                       "vehicle_type": body.get("vehicle_type", "synthetic-car"),
                       "owner_ref": body.get("owner_ref", "synthetic-owner"), "status": "active"}
             self.registrations[record["id"]] = record
+            obligation = {"id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"cholopay:registration:{record['id']}")),
+                          "type": "registration", "source_id": record["id"],
+                          "registration_id": record["id"], "amount_minor": 3200,
+                          "currency": "SYN", "status": "unpaid"}
+            self.obligations[obligation["id"]] = obligation
+            record["obligation_id"] = obligation["id"]
             return HTTPStatus.CREATED, record
 
     def create_fine(self, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
@@ -94,6 +100,20 @@ class TransitStore:
                 return HTTPStatus.NOT_FOUND, {"error": "vehicle_not_found"}
             return HTTPStatus.OK, {"vehicle": registration, "items": [o for o in self.obligations.values() if o["registration_id"] == registration["id"]]}
 
+    def apply_gateway_event(self, body: dict[str, Any], event_id: str | None, timestamp: str | None, signature: str | None) -> tuple[int, dict[str, Any]]:
+        if not event_id or not timestamp or not signature:
+            return HTTPStatus.UNAUTHORIZED, {"error": "invalid_event_signature"}
+        canonical = json.dumps(body, sort_keys=True, separators=(",", ":"))
+        expected = hmac.new(EVENT_SECRET.encode(), f"{timestamp}.{canonical}".encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            return HTTPStatus.UNAUTHORIZED, {"error": "invalid_event_signature"}
+        event = {"event_id": event_id, "type": body.get("event_type"),
+                 "payment_intent_id": body.get("payment_intent_id"),
+                 "obligation_id": body.get("obligation_id")}
+        event_raw = json.dumps(event, separators=(",", ":")).encode()
+        event_signature = hmac.new(EVENT_SECRET.encode(), event_raw, hashlib.sha256).hexdigest()
+        return self.apply_event(event, event_signature)
+
     def apply_event(self, body: dict[str, Any], signature: str | None) -> tuple[int, dict[str, Any]]:
         raw = json.dumps(body, separators=(",", ":")).encode()
         expected = hmac.new(EVENT_SECRET.encode(), raw, hashlib.sha256).hexdigest()
@@ -109,7 +129,7 @@ class TransitStore:
             obligation = self.obligations.get(body.get("obligation_id"))
             if not intent or not obligation or intent["obligation_id"] != obligation["id"]:
                 return HTTPStatus.NOT_FOUND, {"error": "payment_intent_or_obligation_not_found"}
-            if body.get("type") not in ("payment.final.confirmed", "payment.confirmed"):
+            if body.get("type") not in ("payment.final.confirmed", "payment.confirmed", "payment.settled"):
                 return HTTPStatus.UNPROCESSABLE_ENTITY, {"error": "unsupported_event_type"}
             if body.get("application_available", True) is False:
                 result = {"event_id": event_id, "status": "SETTLED_AWAITING_APPLICATION", "payment_intent_id": intent["id"], "obligation_id": obligation["id"]}
@@ -217,6 +237,8 @@ class TransitHandler(BaseHTTPRequestHandler):
             status, result = STORE.payment_intent(body, self.headers.get("Idempotency-Key"))
         elif path == "/v1/internal/events":
             status, result = STORE.apply_event(body, self.headers.get("X-Transit-Signature") or self.headers.get("X-Event-Signature"))
+        elif path == "/v1/internal/payment-events":
+            status, result = STORE.apply_gateway_event(body, self.headers.get("X-CholoPay-Event-Id"), self.headers.get("X-CholoPay-Timestamp"), self.headers.get("X-CholoPay-Signature"))
         elif path == "/v1/fines":
             status, result = STORE.create_fine(body)
         elif path == "/v1/payment-intents":

@@ -189,8 +189,8 @@ export function createServer(options: GatewayOptions = {}): Server {
         const utilities = await utilitiesResponse.json() as { invoices?: Array<Record<string, unknown>> };
         const transit = await transitResponse.json() as { items?: Array<Record<string, unknown>> };
         const obligations = [
-          ...(utilities.invoices ?? []).map((item) => ({ id: item.id, participantId, kind: item.service, description: `Factura sintética de ${item.service}`, amountMinor: Math.round(Number(item.amount) * 100), currency: item.currency, status: String(item.status ?? '').toUpperCase() })),
-          ...(transit.items ?? []).map((item) => ({ id: item.id, participantId, kind: item.type, description: `Obligación sintética ${item.type}`, amountMinor: item.amount_minor, currency: item.currency, status: String(item.status ?? '').toUpperCase() })),
+          ...(utilities.invoices ?? []).map((item) => ({ id: item.id, participantId, kind: item.service, service: item.service, invoiceId: item.id, biller: 'utilities', description: `Factura sintética de ${item.service}`, amountMinor: Math.round(Number(item.amount) * 100), currency: item.currency, status: String(item.status ?? '').toUpperCase() })),
+          ...(transit.items ?? []).map((item) => ({ id: item.id, participantId, kind: item.type, service: item.type, biller: 'transit', description: `Obligación sintética ${item.type}`, amountMinor: item.amount_minor, currency: item.currency, status: String(item.status ?? '').toUpperCase() })),
         ];
         sendJson(response, 200, { participantId, obligations });
       } catch { sendJson(response, 502, errorBody('biller_unavailable', 'No se pudieron consultar las obligaciones sintéticas')); }

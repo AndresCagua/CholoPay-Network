@@ -1,5 +1,6 @@
 package com.cholopay.bankcore.outbox;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,7 @@ public class OutboxDispatcher {
     private final Duration baseBackoff;
     private final Duration maxBackoff;
 
+    @Autowired
     public OutboxDispatcher(OutboxRepository repository, OutboxClient client,
                             @Value("${cholopay.outbox.lease-duration:30s}") Duration leaseDuration,
                             @Value("${cholopay.outbox.max-attempts:5}") int maxAttempts,

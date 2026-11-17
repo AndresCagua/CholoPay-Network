@@ -10,6 +10,9 @@ class Obligation {
     required this.amountMinor,
     required this.currency,
     required this.status,
+    this.service,
+    this.invoiceId,
+    this.biller,
   });
 
   final String id;
@@ -19,6 +22,9 @@ class Obligation {
   final int amountMinor;
   final String currency;
   final String status;
+  final String? service;
+  final String? invoiceId;
+  final String? biller;
 
   factory Obligation.fromJson(Map<String, dynamic> json) => Obligation(
         id: json['id'] as String,
@@ -28,6 +34,9 @@ class Obligation {
         amountMinor: json['amountMinor'] as int,
         currency: json['currency'] as String,
         status: json['status'] as String,
+        service: json['service'] as String?,
+        invoiceId: json['invoiceId'] as String? ?? json['invoice_id'] as String?,
+        biller: json['biller'] as String?,
       );
 }
 
@@ -57,6 +66,9 @@ abstract interface class ObligationsClient {
     required String obligationId,
     required String idempotencyKey,
     String? amount,
+    String? service,
+    String? invoiceId,
+    String? currency,
   });
 }
 
@@ -113,13 +125,17 @@ class WalletHttpException implements Exception {
 class HttpObligationsClient implements ObligationsClient {
   HttpObligationsClient({
     required Uri baseUri,
+    Uri? bankCoreBaseUri,
     this.authorizationToken,
-    this.sourceAccountId = 'account-costa-001',
+    this.sourceAccountId = '00000000-0000-4000-8000-000000000001',
     WalletHttpTransport? transport,
-  })  : _baseUri = baseUri,
+  })  : assert(RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$').hasMatch(sourceAccountId), 'sourceAccountId must be a UUID'),
+        _baseUri = baseUri,
+        _bankCoreBaseUri = bankCoreBaseUri ?? baseUri,
         _transport = transport ?? DartIoWalletHttpTransport();
 
   final Uri _baseUri;
+  final Uri _bankCoreBaseUri;
   final WalletHttpTransport _transport;
   final String? authorizationToken;
   final String sourceAccountId;
@@ -157,18 +173,36 @@ class HttpObligationsClient implements ObligationsClient {
     required String obligationId,
     required String idempotencyKey,
     String? amount,
+    String? service,
+    String? invoiceId,
+    String? currency,
   }) async {
     final headers = <String, String>{'Idempotency-Key': idempotencyKey};
     if (authorizationToken != null && authorizationToken!.isNotEmpty) headers['Authorization'] = 'Bearer $authorizationToken';
+    final selectedAmount = amount ?? '0.00';
+    final selectedCurrency = currency ?? 'USD';
+    final isTransit = selectedCurrency == 'SYN' || service == 'registration' || service == 'matricula' || service == 'traffic_fine' || service == 'fine';
+    final selectedService = service ?? (isTransit ? 'registration' : obligationId);
     final json = await _request(
       'POST',
-      _uri('/v1/participants/$participantId/obligations/$obligationId/payment-intents'),
+      _bankCoreBaseUri.resolve('/v1/participants/$participantId/obligations/$obligationId/payment-intents'),
       headers: headers,
-      body: jsonEncode({'participantId': participantId, 'participant_id': participantId, 'source_account_id': sourceAccountId, 'biller': 'utilities', 'amount': amount ?? '0.00', 'currency': 'USD'}),
+      body: jsonEncode({
+        'participantId': participantId,
+        'participant_id': participantId,
+        'sourceAccountId': sourceAccountId,
+        'source_account_id': sourceAccountId,
+        'biller': isTransit ? 'transit' : 'utilities',
+        'service': selectedService,
+        'invoiceId': invoiceId ?? (isTransit ? null : obligationId),
+        'invoice_id': invoiceId ?? (isTransit ? null : obligationId),
+        'amount': selectedAmount,
+        'currency': selectedCurrency,
+      }),
     );
     final payload = (json['paymentIntent'] as Map<String, dynamic>?) ?? json;
     return PaymentIntent.fromJson({
-      'id': payload['id'],
+      'id': payload['id'] ?? 'intent-$idempotencyKey',
       'obligationId': payload['obligationId'] ?? payload['obligation_id'] ?? obligationId,
       'state': payload['state'] ?? payload['status'] ?? 'PENDING',
     });
@@ -217,6 +251,9 @@ class SyntheticObligationsClient implements ObligationsClient {
     required String obligationId,
     required String idempotencyKey,
     String? amount,
+    String? service,
+    String? invoiceId,
+    String? currency,
   }) async {
     if (failure != null) throw failure!;
     final exists = obligations.any((item) => item.id == obligationId && item.participantId == participantId);

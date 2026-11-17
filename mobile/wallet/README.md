@@ -8,12 +8,12 @@ La aplicación no accede directamente a bases de datos ni contiene secretos. La 
 
 ## Obligaciones participant-scoped
 
-`lib/obligations_client.dart` separa la interfaz `ObligationsClient` del transporte HTTP. `HttpObligationsClient` recibe un `baseUri` configurable y un transporte inyectable para consultar e iniciar pagos sin red real en las pruebas:
+`lib/obligations_client.dart` separa la interfaz `ObligationsClient` del transporte HTTP. `HttpObligationsClient` recibe URI configurables para gateway (consulta) y bank-core (inicio de pago), y un transporte inyectable para probar sin red real:
 
 - `GET /v1/participants/{participantId}/obligations`
-- `POST /v1/participants/{participantId}/obligations/{obligationId}/payment-intents` (adaptador participant-scoped del banco; envía la cuenta de origen y la clave de idempotencia)
+- `POST /v1/participants/{participantId}/obligations/{obligationId}/payment-intents` (bank-core participant-scoped; envía `service`, `invoiceId`, `amount`, `currency`, `sourceAccountId` UUID sintético y la clave de idempotencia)
 
-La UI usa fixtures sintéticos por defecto y conserva estados explícitos de carga, error y vacío. El cliente solo envía el `participantId` de la sesión y una clave de idempotencia; no usa acceso directo a bases, credenciales ni secretos. Las pruebas reemplazan el transporte por un fake o usan `SyntheticObligationsClient`.
+La UI usa fixtures sintéticos por defecto y conserva estados explícitos de carga, error y vacío. El cliente solo usa APIs HTTP participant-scoped; no accede a bases, credenciales ni secretos. Las pruebas reemplazan el transporte por un fake o usan `SyntheticObligationsClient`.
 
 ## Comprobaciones únicamente mediante Docker
 

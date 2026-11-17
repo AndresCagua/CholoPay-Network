@@ -71,6 +71,7 @@ void main() {
     ));
     final client = HttpObligationsClient(
       baseUri: Uri.parse('https://gateway.synthetic.test'),
+      bankCoreBaseUri: Uri.parse('https://bank-core.synthetic.test'),
       transport: transport,
     );
 
@@ -84,8 +85,43 @@ void main() {
     expect(transport.uri!.path,
         '/v1/participants/COSTA/obligations/bill-light-001/payment-intents');
     expect(transport.headers!['Idempotency-Key'], 'wallet-obligation-001');
-    expect(jsonDecode(transport.body!)['participantId'], 'COSTA');
+    final payload = jsonDecode(transport.body!) as Map<String, dynamic>;
+    expect(payload['participantId'], 'COSTA');
+    expect(payload['sourceAccountId'], '00000000-0000-4000-8000-000000000001');
+    expect(payload['service'], 'bill-light-001');
+    expect(payload['invoiceId'], 'bill-light-001');
+    expect(payload['amount'], '0.00');
+    expect(payload['currency'], 'USD');
+    expect(transport.uri!.host, 'bank-core.synthetic.test');
     expect(intent.state, 'PENDING');
+  });
+
+  test('envía tránsito al banco con moneda y servicio sintéticos', () async {
+    final transport = FakeTransport(WalletHttpResponse(
+      202,
+      jsonEncode({'status': 'PENDING_BILLER', 'obligation_id': 'registration-001'}),
+    ));
+    final client = HttpObligationsClient(
+      baseUri: Uri.parse('https://gateway.synthetic.test'),
+      bankCoreBaseUri: Uri.parse('https://bank-core.synthetic.test'),
+      transport: transport,
+    );
+
+    await client.startPayment(
+      participantId: 'COSTA',
+      obligationId: 'registration-001',
+      idempotencyKey: 'wallet-transit-001',
+      amount: '32.00',
+      service: 'registration',
+      currency: 'SYN',
+    );
+
+    final payload = jsonDecode(transport.body!) as Map<String, dynamic>;
+    expect(payload['biller'], 'transit');
+    expect(payload['service'], 'registration');
+    expect(payload['invoiceId'], isNull);
+    expect(payload['amount'], '32.00');
+    expect(payload['currency'], 'SYN');
   });
 
   test('rechaza respuestas HTTP no exitosas', () async {

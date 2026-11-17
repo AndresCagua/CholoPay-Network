@@ -72,6 +72,10 @@ public class ObligationPaymentGatewayService {
                     .build();
             HttpResponse<String> response = httpClient.send(gatewayRequest, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 401 || response.statusCode() == 403) return GatewayResult.unauthorized();
+            if (response.statusCode() == 409) {
+                Map<String, Object> body = objectMapper.readValue(response.body(), new TypeReference<>() {});
+                return GatewayResult.conflict(body);
+            }
             if (response.statusCode() < 200 || response.statusCode() >= 300) return GatewayResult.gatewayUnavailable();
             Map<String, Object> body = objectMapper.readValue(response.body(), new TypeReference<>() {});
             Object state = body.get("status");
@@ -95,5 +99,6 @@ public class ObligationPaymentGatewayService {
         static GatewayResult invalidRequest() { return new GatewayResult(HttpStatus.UNPROCESSABLE_ENTITY.value(), Map.of("error", "invalid_request"), "invalid_request"); }
         static GatewayResult unauthorized() { return new GatewayResult(HttpStatus.BAD_GATEWAY.value(), Map.of("error", "gateway_unauthorized"), "gateway_unauthorized"); }
         static GatewayResult gatewayUnavailable() { return new GatewayResult(HttpStatus.BAD_GATEWAY.value(), Map.of("error", "gateway_unavailable"), "gateway_unavailable"); }
+        static GatewayResult conflict(Map<String, Object> body) { return new GatewayResult(HttpStatus.CONFLICT.value(), body, "conflict"); }
     }
 }

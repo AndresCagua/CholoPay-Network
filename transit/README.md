@@ -15,17 +15,18 @@ De forma predeterminada no se expone ningún puerto al host. Los datos son local
 ## Superficie HTTP
 
 - `GET /health/live`
-- `POST /v1/registrations` — `{ "plate": "SYN-001", "vehicle_type": "synthetic-car" }`
+- `POST /v1/registrations` — `{ "plate": "SYN-001", "vehicle_type": "synthetic-car" }`; crea y expone una obligación estable de `type: registration`/matrícula con moneda `SYN`.
 - `GET /v1/registrations/{id-or-plate}`
 - `POST /v1/fines` — crea una multa sintética y su obligación impagada.
 - `GET /v1/fines/{id}`
-- `GET /v1/obligations/{id}` y `GET /v1/obligations?registration_id=...&status=unpaid`
+- `GET /v1/obligations/{id}` y `GET /v1/obligations?registration_id=...&status=unpaid`; la matrícula sintética se consulta y paga igual que una multa.
 - `GET /v1/vehicles/{syntheticPlate}/obligations` — consulta obligaciones de la placa sintética.
 - `POST /v1/obligations/{id}/payment-intents` — crea una intención ligada a esa obligación; requiere `Idempotency-Key`.
 - `GET /v1/obligations/{id}/receipt` — constancia sintética disponible únicamente después de confirmación final.
 - `GET /v1/status?registration_id=...`
 - `POST /v1/constancias` — crea una constancia de estado sintética solo cuando todas las obligaciones están confirmadas; no es un certificado oficial.
 - `POST /v1/internal/events` — aplica eventos internos firmados HMAC (`X-Transit-Signature`), idempotentes por `event_id`; una confirmación final marca la obligación pagada.
+- `POST /v1/internal/payment-events` — adaptador HTTP firmado usado por gateway para aplicar `payment.settled`; sigue siendo interno y sintético.
 - `POST /v1/payment-intents` — requiere `Idempotency-Key`; solo crea una intención pendiente.
 - `GET /v1/payment-intents/{id}`
 

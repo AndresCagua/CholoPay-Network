@@ -56,6 +56,7 @@ services:
       target: runtime
     environment:
       PORT: 8082
+      TRANSIT_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:-local-test-only}
     expose: ["8082"]
     networks: [internal_services, default]
 
@@ -94,6 +95,22 @@ services:
     depends_on:
       costa-db: {condition: service_healthy}
       gateway: {condition: service_started}
+
+  obligations-e2e:
+    image: python:3.13-alpine
+    profiles: [acceptance]
+    environment:
+      GATEWAY_API_KEY: ${GATEWAY_API_KEY:-sk_sandbox_merchant_rw}
+      BANK_API_TOKEN: ${BANK_API_TOKEN:-bank-local-test-only}
+    volumes:
+      - ./tests/t7_obligations_e2e.py:/tests/t7_obligations_e2e.py:ro
+    command: ["python", "/tests/t7_obligations_e2e.py"]
+    depends_on:
+      transit: {condition: service_started}
+      utilities: {condition: service_started}
+      gateway: {condition: service_started}
+      bank-core: {condition: service_started}
+    networks: [internal_services, default]
 
   bank-core-test:
     build:

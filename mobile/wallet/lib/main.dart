@@ -244,6 +244,9 @@ class _WalletShellState extends State<WalletShell> {
         obligationId: obligation.id,
         idempotencyKey: 'wallet-${obligation.id}',
         amount: (obligation.amountMinor / 100).toStringAsFixed(2),
+        service: obligation.kind,
+        invoiceId: obligation.biller == 'utilities' ? obligation.id : null,
+        currency: obligation.currency,
       );
       if (!mounted) return;
       setState(() => paymentIntents[obligation.id] = intent);

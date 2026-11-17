@@ -59,7 +59,8 @@ components:
         biller: {type: string, enum: [utilities, transit], default: utilities}
         invoice_id: {type: string, description: Referencia de factura de utilities}
         obligation_id: {type: string, description: Referencia de obligación de tránsito}
-        service: {type: string, enum: [electricity, water, internet, mobile, traffic_fine]}
+        service: {type: string, enum: [electricity, water, internet, mobile, registration, traffic_fine]}
+        invoiceId: {type: string, description: Alias camelCase aceptado por clientes HTTP}
         amount: {type: string}
         currency: {type: string, enum: [USD, SYN]}
     PaymentIntentCreate:
