@@ -17,7 +17,7 @@ Alcance: convertir el flujo actual sintético gateway→facturador en un intento
 - T2 (S3-S5): Implementar débito ACID idempotente y outbox de aplicación al facturador, conservando `PENDING`/`UNKNOWN_PENDING_RECONCILIATION` ante indisponibilidad. Ruta: bank-core/gateway. Commit: `149a0ab`.
 - T3 (S3-S6): Añadir pruebas Docker públicas de éxito, replay, conflicto, saldo insuficiente, caída del facturador y recuperación sin doble débito. Ruta: bank-core/gateway/utilities. Commit: `149a0ab` (cobertura implementada para éxito, replay, conflicto y saldo insuficiente; aplicación/recuperación queda en el siguiente slice).
 - T4 (S1-S6): Actualizar OpenAPI, documentación y evidencia Docker; registrar límites sintéticos. Ruta: inline. Commit: `149a0ab`.
-- T5 (S1-S6): Aplicar el outbox de electricidad fuera de la transacción financiera y conservar compatibilidad del contrato sintético existente para agua, internet, móvil y tránsito hasta sus slices persistentes. Ruta: bank-core/infra. Commit: pending.
+- T5 (S1-S6): Aplicar el outbox de electricidad fuera de la transacción financiera y conservar compatibilidad del contrato sintético existente para agua, internet, móvil y tránsito hasta sus slices persistentes. Ruta: bank-core/infra. Commit: `4f22274`.
 
 ## Log
 
