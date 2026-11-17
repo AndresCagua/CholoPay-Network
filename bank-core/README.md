@@ -33,10 +33,10 @@ El servicio solo es accesible para otros servicios Compose en `http://bank-core:
 
 Las migraciones de PostgreSQL están en `src/main/resources/db/migration`. El adaptador receptor interno se expone en `POST /internal/v1/receiver-credits`; aplica un abono sintético de compensación de red a una cuenta de cliente en una transacción local y reproduce la misma entrega sin un segundo diario. No demuestra la liquidación central ni sustituye el protocolo de confirmación de la red.
 
-## Pago sintético de obligaciones desde el banco
+## Pago persistente de electricidad desde el banco
 
-`POST /v1/obligations/{obligationId}/payment-intents` es una ruta participant-scoped para iniciar el pago de una obligación de `utilities` o `transit`. Requiere `Authorization: Bearer $BANK_API_TOKEN`, `Idempotency-Key` y un cuerpo con `participant_id`, `source_account_id`, `biller`, `amount` y `currency`; la cuenta de origen es explícita pero no se debita en este recorrido sintético.
+`POST /v1/obligations/{obligationId}/payment-intents` requiere `Authorization: Bearer $BANK_API_TOKEN`, `Idempotency-Key` y un cuerpo con `participantId`, `sourceAccountId`, `biller`, `service`, `amount` y `currency`. Este corte acepta exclusivamente `biller=utilities`, `service=electricity` y `currency=USD`.
 
-El banco solo delega a `GATEWAY_URL` (o `BILLER_GATEWAY_URL`) mediante `GATEWAY_API_KEY` y devuelve el estado sintético del gateway (`APPLIED`, `PENDING_BILLER` o `PENDING_APPLICATION`). Si el participante no coincide con `PARTICIPANT_ID`, falta autenticación o falta configuración, la operación se rechaza sin escribir balances, diarios ni ledgers bancarios. En Compose, el gateway se alcanza únicamente por la red interna.
+El banco valida el importe en centavos, bloquea de forma determinista la cuenta de origen y la cuenta sintética configurada en `BILLER_UTILITIES_CLEARING_ACCOUNT_ID`, y registra el débito, crédito, diario, intento y outbox en una sola transacción. Un replay de la misma clave y carga útil devuelve el mismo intento; una carga útil distinta produce conflicto y no cambia saldos. La aplicación al facturador debe ocurrir mediante el contrato `BILL_PAYMENT_REQUESTED` del outbox: el servicio no llama HTTP ni encola fuera de la transacción.
 
-El siguiente corte de implementación añade transporte autenticado del adaptador banco-red y mapeo público de errores antes de afirmar un comportamiento similar al de producción.
+El estado inicial es `PENDING_APPLICATION`; no representa liquidación real ni confirma que el facturador haya aplicado la obligación. Este proyecto sigue siendo sintético y no procesa dinero real.
