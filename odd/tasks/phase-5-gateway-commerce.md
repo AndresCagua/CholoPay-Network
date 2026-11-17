@@ -39,7 +39,7 @@ Alcance: implementar el primer slice ejecutable del gateway público y una tiend
 
 - T1 (S1, S3, S4): Crear gateway TypeScript exclusivo de Docker con contratos HTTP, autenticación sandbox de alcance limitado y almacenamiento local/in-memory explícito. Ruta: delegada a la superficie del gateway. Commit: `bdcf987`.
 - T2 (S2, S4, S5): Implementar payment intents, consulta y confirmación idempotente con estado simulado; no escribir ledger. Ruta: delegada a la superficie del gateway. Commit: `bf06cf6`.
-- T3 (S2, S6): Crear tienda sandbox mínima con catálogo, carrito, orden e inventario sintéticos. Ruta: delegada a la superficie de comercio. Commit: pendiente.
+- T3 (S2, S6): Crear tienda sandbox mínima con catálogo, carrito, orden e inventario sintéticos. Ruta: delegada a la superficie de comercio. Commit: `5797785`.
 - T4 (S2, S3): Implementar webhook HMAC con timestamp, protección de replay, reintentos acotados y DLQ in-memory. Ruta: delegada a la superficie del gateway. Commit: `d6777eb`.
 - T5 (S2, S4): Añadir pruebas públicas de contrato y comportamiento, documentación OpenAPI y evidencia Docker. Ruta: inline. Commit: `cd16ac9`.
 

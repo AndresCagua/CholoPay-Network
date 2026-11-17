@@ -17,7 +17,7 @@ Fuente de verdad del primer slice de implementación. Lee hasta `## Log` antes d
 - T2 (S2, S3, S4): Crear la estructura del repositorio de infraestructura local con servicios PostgreSQL aislados para la red y tres bancos, perfil opcional de Kafka, checks de salud y objetivos Make reproducibles. Commit: `9bb25d1`.
 - T3 (S2, S6): Agregar una prueba smoke que compruebe la configuración y salud de los servicios; inspeccionar la disponibilidad de puertos del host antes de iniciar contenedores. Commit: `9bb25d1`.
 - T4 (S2, S5): Ejecutar checks de documentación, YAML/OpenAPI, Compose y smoke; registrar evidencia exacta y bloqueos. Commit: `9bb25d1`.
-- T5 (S1-S6): Registrar decisiones, inventario de licencias y resultado de la fase 0; identificar el siguiente slice vertical aprobado. Commit: pending.
+- T5 (S1-S6): Registrar decisiones, inventario de licencias y resultado de la fase 0; identificar el siguiente slice vertical aprobado. Commit: `9bb25d1`.
 
 ## Log
 
