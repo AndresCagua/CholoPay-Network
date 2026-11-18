@@ -3,6 +3,8 @@ spring:
     name: cholopay-bank-core
   flyway:
     enabled: true
+    placeholders:
+      participant_id: ${PARTICIPANT_ID:}
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:15433/cholopay_costa}
     username: ${DB_USER:cholopay}

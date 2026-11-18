@@ -195,6 +195,16 @@ def settle_target(target):
         (delivery_id,),
     )[0]
     assert inbox_before == inbox_after == (1, 1), (target["name"], inbox_before, inbox_after)
+    other_destinations = [
+        other["destination"] for other in TARGETS if other["name"] != target["name"]
+    ]
+    cross_bank_rows = db_query(
+        target["network_db"],
+        target["bank_db"],
+        "SELECT COUNT(*) FROM ledger_account WHERE id = ANY(%s)",
+        ([str(account) for account in other_destinations],),
+    )[0][0]
+    assert cross_bank_rows == 0, (target["name"], "cross-bank fixtures", cross_bank_rows)
     return target["name"]
 
 
