@@ -37,6 +37,7 @@ Las tres instancias bancarias tienen bases PostgreSQL, credenciales, claves y le
 - [Invariantes del ledger](docs/ledger-invariants.md)
 - [Modelo de amenazas](docs/security-threat-model.md)
 - [Estrategia de pruebas](docs/testing-strategy.md)
+- [Trabajo pendiente de `spec.md`](docs/spec-pending-work.md)
 - [Inventario FOSS](sbom/dependencies.spdx.json)
 - [Backlog de la fase 0](backlog/phase-0.md)
 - [Núcleo bancario de la fase 1](bank-core/README.md)

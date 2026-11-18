@@ -97,6 +97,68 @@ services:
       costa-db: {condition: service_healthy}
       gateway: {condition: service_started}
 
+  bank-core-sierra:
+    build:
+      context: ../bank-core
+      target: runtime
+    environment:
+      DB_URL: jdbc:postgresql://sierra-db:5432/${SIERRA_DB_NAME:-cholopay_sierra}
+      DB_USER: ${POSTGRES_USER:-cholopay}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+      PARTICIPANT_ID: BANCO_SIERRA
+      SERVER_PORT: 8080
+      NETWORK_ADAPTER_SECRET: ${SIERRA_NETWORK_ADAPTER_SECRET:-sierra-local-test-only}
+      GATEWAY_URL: http://gateway:8090
+      GATEWAY_API_KEY: ${SIERRA_GATEWAY_API_KEY:-sk_sandbox_sierra_rw}
+      BANK_API_TOKEN: ${SIERRA_BANK_API_TOKEN:-bank-sierra-local-test-only}
+      BILLER_UTILITIES_CLEARING_ACCOUNT_ID: ${SIERRA_BILLER_UTILITIES_CLEARING_ACCOUNT_ID:-00000000-0000-4000-8000-000000000012}
+      CHOLONET_URL: http://network:8080/internal/v1/inter-network/transfers
+      CHOLONET_HMAC_SECRET: ${SIERRA_CHOLONET_HMAC_SECRET:-}
+      OUTBOX_ENABLED: ${SIERRA_OUTBOX_ENABLED:-false}
+    expose: ["8080"]
+    depends_on:
+      sierra-db: {condition: service_healthy}
+      gateway: {condition: service_started}
+
+  bank-core-oriente:
+    build:
+      context: ../bank-core
+      target: runtime
+    environment:
+      DB_URL: jdbc:postgresql://oriente-db:5432/${ORIENTE_DB_NAME:-cholopay_oriente}
+      DB_USER: ${POSTGRES_USER:-cholopay}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+      PARTICIPANT_ID: BANCO_ORIENTE
+      SERVER_PORT: 8080
+      NETWORK_ADAPTER_SECRET: ${ORIENTE_NETWORK_ADAPTER_SECRET:-oriente-local-test-only}
+      GATEWAY_URL: http://gateway:8090
+      GATEWAY_API_KEY: ${ORIENTE_GATEWAY_API_KEY:-sk_sandbox_oriente_rw}
+      BANK_API_TOKEN: ${ORIENTE_BANK_API_TOKEN:-bank-oriente-local-test-only}
+      BILLER_UTILITIES_CLEARING_ACCOUNT_ID: ${ORIENTE_BILLER_UTILITIES_CLEARING_ACCOUNT_ID:-00000000-0000-4000-8000-000000000022}
+      CHOLONET_URL: http://network:8080/internal/v1/inter-network/transfers
+      CHOLONET_HMAC_SECRET: ${ORIENTE_CHOLONET_HMAC_SECRET:-}
+      OUTBOX_ENABLED: ${ORIENTE_OUTBOX_ENABLED:-false}
+    expose: ["8080"]
+    depends_on:
+      oriente-db: {condition: service_healthy}
+      gateway: {condition: service_started}
+
+  phase16-banks-test:
+    image: python:3.13-alpine
+    profiles: [phase16]
+    environment:
+      COSTA_BANK_API_TOKEN: ${BANK_API_TOKEN:-bank-local-test-only}
+      SIERRA_BANK_API_TOKEN: ${SIERRA_BANK_API_TOKEN:-bank-sierra-local-test-only}
+      ORIENTE_BANK_API_TOKEN: ${ORIENTE_BANK_API_TOKEN:-bank-oriente-local-test-only}
+    volumes:
+      - ./tests/phase16_three_banks.py:/tests/phase16_three_banks.py:ro
+    command: ["python", "/tests/phase16_three_banks.py"]
+    depends_on:
+      bank-core: {condition: service_started}
+      bank-core-sierra: {condition: service_started}
+      bank-core-oriente: {condition: service_started}
+    networks: [internal_services, default]
+
   obligations-e2e:
     image: python:3.13-alpine
     profiles: [acceptance]
