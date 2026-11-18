@@ -19,9 +19,11 @@ type Delivery struct {
 	AttemptCount          int
 	LastEventID           *uuid.UUID
 	LeaseOwner            *uuid.UUID
+	FailureCode           *string
 }
 
 var ErrDeliveryConflict = errors.New("la confirmación del receptor entra en conflicto con la evidencia de entrega existente")
+var ErrDeliveryNotReplayable = errors.New("la entrega no está en estado FAILED con código DELIVERY_DLQ")
 
 // EnqueueEligibleDeliveries is the explicit post-settlement trigger owned by the worker.
 func (s *Store) EnqueueEligibleDeliveries(ctx context.Context) error {
@@ -75,6 +77,38 @@ func (s *Store) EnqueueDelivery(ctx context.Context, transferID, receiverID uuid
 	}
 	return d, nil
 }
+
+// ReplayDelivery reopens one exhausted delivery without creating a new delivery or event.
+func (s *Store) ReplayDelivery(ctx context.Context, deliveryID uuid.UUID) (Delivery, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Delivery{}, err
+	}
+	defer tx.Rollback()
+	var d Delivery
+	var failureCode *string
+	err = tx.QueryRowContext(ctx, `SELECT delivery_id,transfer_id,receiver_participant_id,destination_account_id,clearing_account_id,amount_minor,event_id,state,attempt_count,last_event_id,lease_owner,failure_code FROM settlement_delivery WHERE delivery_id=$1 FOR UPDATE`, deliveryID).Scan(&d.DeliveryID, &d.TransferID, &d.ReceiverParticipantID, &d.DestinationAccountID, &d.ClearingAccountID, &d.AmountMinor, &d.EventID, &d.State, &d.AttemptCount, &d.LastEventID, &d.LeaseOwner, &failureCode)
+	if err != nil {
+		return Delivery{}, err
+	}
+	d.FailureCode = failureCode
+	if d.State == "PENDING" {
+		return d, nil
+	}
+	if d.State != "FAILED" || failureCode == nil || *failureCode != "DELIVERY_DLQ" {
+		return Delivery{}, ErrDeliveryNotReplayable
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE settlement_delivery SET state='PENDING',failure_code=NULL,failure_detail=NULL,next_attempt_at=CURRENT_TIMESTAMP,lease_owner=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE delivery_id=$1`, deliveryID); err != nil {
+		return Delivery{}, err
+	}
+	d.State = "PENDING"
+	d.FailureCode = nil
+	if err = tx.Commit(); err != nil {
+		return Delivery{}, err
+	}
+	return d, nil
+}
+
 func (s *Store) AcknowledgeDelivery(ctx context.Context, deliveryID, receiverID, eventID uuid.UUID) (Delivery, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

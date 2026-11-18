@@ -50,6 +50,20 @@ func TestReconciliationDetectsAndClearsDeliveryDifferences(t *testing.T) {
 	if !hasCode(pending, "DELIVERY_PENDING") {
 		t.Fatalf("se esperaba una entrega pendiente, se obtuvo %+v", pending)
 	}
+	if _, err := db.ExecContext(ctx, `UPDATE settlement_delivery SET state='FAILED',failure_code='DELIVERY_DLQ',attempt_count=5 WHERE delivery_id=$1`, delivery.DeliveryID); err != nil {
+		t.Fatal(err)
+	}
+	dlq, err := store.Reconcile(ctx, uuid.New())
+	if err != nil || !hasCode(dlq, "DELIVERY_DLQ") {
+		t.Fatalf("se esperaba DELIVERY_DLQ, se obtuvo %+v error=%v", dlq, err)
+	}
+	if _, err := store.ReplayDelivery(ctx, delivery.DeliveryID); err != nil {
+		t.Fatal(err)
+	}
+	stillPending, err := store.Reconcile(ctx, uuid.New())
+	if err != nil || !hasCode(stillPending, "DELIVERY_PENDING") || hasCode(stillPending, "DELIVERY_DLQ") {
+		t.Fatalf("se esperaba reconciliación pendiente tras replay, se obtuvo %+v error=%v", stillPending, err)
+	}
 	if _, err := store.AcknowledgeDelivery(ctx, delivery.DeliveryID, receiver, delivery.EventID); err != nil {
 		t.Fatal(err)
 	}

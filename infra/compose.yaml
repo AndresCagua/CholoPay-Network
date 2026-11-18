@@ -176,7 +176,7 @@ services:
 
   phase18-seed:
     image: postgres:17-alpine
-    profiles: [phase18]
+    profiles: [phase18, phase20]
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
     command:
@@ -207,6 +207,27 @@ services:
       network: {condition: service_started}
       bank-core-sierra: {condition: service_started}
       bank-core-oriente: {condition: service_started}
+    networks: [internal_services, default]
+
+  phase20-e2e:
+    image: python:3.13-alpine
+    profiles: [phase20]
+    environment:
+      NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
+      OPERATOR_CONSOLE_TOKEN: ${OPERATOR_CONSOLE_TOKEN:-operator-local-only}
+      POSTGRES_USER: ${POSTGRES_USER:-cholopay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+      PHASE20_MODE: ${PHASE20_MODE:-prepare}
+    volumes:
+      - ./tests/phase20_receiver_outage.py:/tests/phase20_receiver_outage.py:ro
+    command:
+      - sh
+      - -c
+      - pip install --no-cache-dir 'psycopg[binary]' >/dev/null && python /tests/phase20_receiver_outage.py "$${PHASE20_MODE}"
+    depends_on:
+      phase18-seed: {condition: service_completed_successfully}
+      network: {condition: service_started}
+      bank-core-sierra: {condition: service_started}
     networks: [internal_services, default]
 
   obligations-e2e:
@@ -265,11 +286,11 @@ services:
     environment:
       SERVER_PORT: 8080
       NETWORK_DB_URL: postgres://${POSTGRES_USER:-cholopay}:${POSTGRES_PASSWORD:-cholopay_local_only}@network-db:5432/${NETWORK_DB_NAME:-cholopay_network}?sslmode=disable
-      OPERATOR_CONSOLE_TOKEN: ${OPERATOR_CONSOLE_TOKEN:-}
       DIRECTORY_PORT_TOKEN: ${DIRECTORY_PORT_TOKEN:-}
       DIRECTORY_PARTICIPANT_TOKENS: ${DIRECTORY_PARTICIPANT_TOKENS:-00000000-0000-4000-8000-000000000101=costa-directory-participant-local-only,00000000-0000-4000-8000-000000000102=sierra-directory-participant-local-only,00000000-0000-4000-8000-000000000103=oriente-directory-participant-local-only}
       CHOLONET_HMAC_SECRET: ${CHOLONET_HMAC_SECRET:-}
       NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
+      OPERATOR_CONSOLE_TOKEN: ${OPERATOR_CONSOLE_TOKEN:-operator-local-only}
       BANK_RECEIVER_CREDIT_URL: http://bank-core:8080/internal/v1/receiver-credits
       BANK_RECEIVER_ROUTES: ${BANK_RECEIVER_ROUTES:-00000000-0000-4000-8000-000000000101=http://bank-core:8080/internal/v1/receiver-credits|local-test-only,00000000-0000-4000-8000-000000000102=http://bank-core-sierra:8080/internal/v1/receiver-credits|sierra-local-test-only,00000000-0000-4000-8000-000000000103=http://bank-core-oriente:8080/internal/v1/receiver-credits|oriente-local-test-only}
       DELIVERY_LEASE_SECONDS: ${DELIVERY_LEASE_SECONDS:-60}

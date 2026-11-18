@@ -36,15 +36,15 @@ func (s *Store) Reconcile(ctx context.Context, runID uuid.UUID) (ReconciliationR
 		return nil
 	}
 
-	rows, err := s.db.QueryContext(ctx, `SELECT j.transfer_id,d.delivery_id,d.state FROM settlement_journal j LEFT JOIN settlement_delivery d ON d.transfer_id=j.transfer_id`)
+	rows, err := s.db.QueryContext(ctx, `SELECT j.transfer_id,d.delivery_id,d.state,d.failure_code FROM settlement_journal j LEFT JOIN settlement_delivery d ON d.transfer_id=j.transfer_id`)
 	if err != nil {
 		return ReconciliationRun{}, err
 	}
 	for rows.Next() {
 		var transferID uuid.UUID
 		var deliveryID *uuid.UUID
-		var state *string
-		if err := rows.Scan(&transferID, &deliveryID, &state); err != nil {
+		var state, failureCode *string
+		if err := rows.Scan(&transferID, &deliveryID, &state, &failureCode); err != nil {
 			rows.Close()
 			return ReconciliationRun{}, err
 		}
@@ -57,6 +57,13 @@ func (s *Store) Reconcile(ctx context.Context, runID uuid.UUID) (ReconciliationR
 			if err := add(&transferID, deliveryID, "DELIVERY_PENDING", "la entrega receptora no ha sido confirmada"); err != nil {
 				rows.Close()
 				return ReconciliationRun{}, err
+			}
+		} else if *state == "FAILED" {
+			if failureCode != nil && *failureCode == "DELIVERY_DLQ" {
+				if err := add(&transferID, deliveryID, "DELIVERY_DLQ", "la entrega receptora agotó sus reintentos y requiere replay individual"); err != nil {
+					rows.Close()
+					return ReconciliationRun{}, err
+				}
 			}
 		}
 	}

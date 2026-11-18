@@ -1,9 +1,13 @@
 package settlement
 
 import (
+	"crypto/subtle"
+	"database/sql"
 	"encoding/json"
 	"github.com/google/uuid"
 	"net/http"
+	"os"
+	"strings"
 )
 
 type Handler struct{ store *Store }
@@ -29,7 +33,40 @@ type settleResponse struct {
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /internal/v1/settlements", h.create)
+	mux.HandleFunc("POST /internal/v1/settlement-deliveries/{id}/replay", h.replay)
 }
+func (h *Handler) replay(w http.ResponseWriter, r *http.Request) {
+	if !authorizedReplayBearer(r) {
+		http.Error(w, "autenticación requerida", http.StatusUnauthorized)
+		return
+	}
+	deliveryID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "identificador de entrega inválido", http.StatusBadRequest)
+		return
+	}
+	delivery, err := h.store.ReplayDelivery(r.Context(), deliveryID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "entrega no encontrada", http.StatusNotFound)
+		return
+	}
+	if err == ErrDeliveryNotReplayable {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if err != nil {
+		http.Error(w, "falló el replay de la entrega", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"delivery_id": delivery.DeliveryID, "event_id": delivery.EventID, "state": delivery.State, "attempt_count": delivery.AttemptCount})
+}
+
+func authorizedReplayBearer(r *http.Request) bool {
+	expected := os.Getenv("OPERATOR_CONSOLE_TOKEN")
+	value := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	return expected != "" && len(value) == len(expected) && subtle.ConstantTimeCompare([]byte(value), []byte(expected)) == 1
+}
+
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	var request settleRequest
 	if json.NewDecoder(r.Body).Decode(&request) != nil || request.TransferID == uuid.Nil || request.SourceParticipantID == uuid.Nil || request.DestinationParticipantID == uuid.Nil || request.AmountMinor <= 0 || request.IdempotencyKey == "" {

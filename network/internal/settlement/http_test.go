@@ -12,6 +12,23 @@ import (
 	"testing"
 )
 
+func TestReplayHTTPRequiresOperatorBearer(t *testing.T) {
+	t.Setenv("OPERATOR_CONSOLE_TOKEN", "operator-test-token")
+	mux := http.NewServeMux()
+	NewHandler(nil).Register(mux)
+	for _, token := range []string{"", "wrong-token"} {
+		req := httptest.NewRequest(http.MethodPost, "/internal/v1/settlement-deliveries/00000000-0000-4000-8000-000000000001/replay", nil)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		response := httptest.NewRecorder()
+		mux.ServeHTTP(response, req)
+		if response.Code != http.StatusUnauthorized {
+			t.Fatalf("token %q: se esperaba 401, se obtuvo %d", token, response.Code)
+		}
+	}
+}
+
 func TestSettlementHTTPReportsSettledOnlyAfterJournalCommit(t *testing.T) {
 	db, store := testStore(t)
 	defer db.Close()

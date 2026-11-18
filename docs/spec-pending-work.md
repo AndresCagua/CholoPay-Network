@@ -22,11 +22,13 @@ Existen bases PostgreSQL, frontends y configuración para Costa, Sierra y Orient
 
 ### P2. Transferencia interbancaria completa
 
-**Estado:** Parcial completado en Phase 18 (`odd/tasks/phase-18-interbank-e2e-acceptance.md`). La aceptación Costa→Sierra/Oriente, entrega, replay e idempotencia pasaron; falta inyección E2E de caída real del receptor y las APIs públicas de balances/journals de P3.
+**Estado:** Parcial completado en Phase 18 y Phase 20 slice 1 (`odd/tasks/phase-18-interbank-e2e-acceptance.md`, `odd/tasks/phase-20-receiver-outage-recovery.md`). La aceptación Costa→Sierra/Oriente, entrega, replay e idempotencia pasaron; Phase 20 slice 1 demostró caída breve real del receptor, retry/backoff y recuperación. El slice 2 queda definido para cerrar la recuperación tras agotamiento de retries.
 
-Falta cerrar y demostrar el recorrido completo `Banco Costa → CholoNet → Banco Sierra/Oriente → receiver inbox → ledger receptor → consulta desde UI`.
+Falta cerrar y demostrar el recorrido completo `Banco Costa → CholoNet → Banco Sierra/Oriente → receiver inbox → ledger receptor → consulta desde UI` bajo una outage prolongada, con DLQ observable, replay individual autenticado y reconciliación posterior.
 
-**Evidencia pendiente:** replay, reordenamiento, caída del receptor, retry, DLQ, reconciliación, saldos y journals de emisor y receptor.
+**Evidencia:** Phase 20 slice 2 (`job-4`) demostró outage prolongada, agotamiento en 5 intentos, `FAILED/DELIVERY_DLQ`, replay autenticado e idempotente conservando `delivery_id/event_id`, recuperación `APPLIED`/`COMPLETED`, inbox/journal únicos, balance `125/125` y reconciliación limpia para la transferencia objetivo.
+
+**Evidencia pendiente:** reordenamiento, saldos y journals completos de emisor y receptor, además de una reconciliación global sin diferencias históricas preexistentes.
 
 ### P3. APIs bancarias completas
 
@@ -62,9 +64,9 @@ Utilities y tránsito son servicios sintéticos; electricidad cuenta con aplicac
 
 ### P7. Outbox, Kafka y recuperación completa
 
-**Estado:** Parcial.
+**Estado:** Parcial; Phase 20 slice 2 acota una evidencia de recuperación de delivery, no el cumplimiento total de P7.
 
-Existe outbox bancario, retries y DLQ, pero falta demostrar recuperación completa con outbox durable, integración del perfil de eventos, caída y reinicio de Kafka, reordenamiento, recuperación de bancos, backup/restore, RPO/RTO y reconciliación posterior a interrupciones.
+Existe outbox bancario, retries y DLQ, pero falta demostrar recuperación completa con outbox durable, integración del perfil de eventos, caída y reinicio de Kafka, reordenamiento, recuperación de bancos, backup/restore, RPO/RTO y reconciliación posterior a interrupciones. Phase 20 slice 2 (`job-4`) aporta evidencia acotada para una entrega individual `FAILED`/`DELIVERY_DLQ`, su replay autenticado e idempotente y la reconciliación del transfer objetivo; no certifica el cumplimiento total de P7.
 
 **Límite:** Kafka no sustituirá a los ledgers PostgreSQL como fuente de verdad.
 

@@ -1,0 +1,218 @@
+"""Aceptación Docker-only de recuperación ante caída breve del receptor Sierra."""
+
+import os
+import sys
+import time
+import uuid
+
+import psycopg
+import urllib.error
+import urllib.request
+import json
+
+NETWORK_URL = "http://network:8080"
+NETWORK_SECRET = os.environ["NETWORK_ADAPTER_SECRET"]
+OPERATOR_TOKEN = os.environ["OPERATOR_CONSOLE_TOKEN"]
+DB_USER = os.environ["POSTGRES_USER"]
+DB_PASSWORD = os.environ["POSTGRES_PASSWORD"]
+COSTA = uuid.UUID("00000000-0000-4000-8000-000000000101")
+SIERRA = uuid.UUID("00000000-0000-4000-8000-000000000102")
+DESTINATION = uuid.UUID("00000000-0000-4000-8000-000000000013")
+CLEARING = uuid.UUID("00000000-0000-4000-8000-000000000012")
+PREFIX = "phase20-outage-"
+
+
+def http_json(method, url, body=None, token=None):
+    encoded = json.dumps(body).encode() if body is not None else None
+    request = urllib.request.Request(url, data=encoded, method=method)
+    if encoded is not None:
+        request.add_header("Content-Type", "application/json")
+    if token is not None:
+        request.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            payload = response.read()
+            return response.status, json.loads(payload) if payload else {}
+    except urllib.error.HTTPError as error:
+        payload = error.read()
+        return error.code, json.loads(payload) if payload else {}
+
+
+def db_query(host, dbname, query, params=()):
+    with psycopg.connect(host=host, dbname=dbname, user=DB_USER, password=DB_PASSWORD) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(query, params)
+            return cursor.fetchall()
+
+
+def wait_ready():
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        status, _ = http_json("GET", f"{NETWORK_URL}/health/ready")
+        if status == 200:
+            return
+        time.sleep(2)
+    raise AssertionError("CholoNet no estuvo disponible dentro del tiempo límite")
+
+
+def transfer():
+    rows = db_query(
+        "network-db", "cholopay_network",
+        "SELECT transfer_id,idempotency_key FROM transfer_instruction "
+        "WHERE idempotency_key LIKE %s ORDER BY created_at DESC LIMIT 1",
+        (PREFIX + "%",),
+    )
+    assert rows, "No existe la transferencia preparada de Phase 20"
+    return rows[0]
+
+
+def prepare():
+    wait_ready()
+    transfer_id = uuid.uuid4()
+    correlation_id = uuid.uuid4()
+    key = PREFIX + str(uuid.uuid4())
+    body = {
+        "transfer_id": str(transfer_id), "idempotency_key": key,
+        "source_participant_id": str(COSTA), "destination_participant_id": str(SIERRA),
+        "destination_account_id": str(DESTINATION), "clearing_account_id": str(CLEARING),
+        "amount_minor": 125, "currency": "USD", "correlation_id": str(correlation_id),
+    }
+    status, _ = http_json("POST", f"{NETWORK_URL}/internal/v1/transfers", body)
+    assert status == 202, ("crear transferencia", status)
+    for state in ("VALIDATING", "FUNDS_RESERVED", "READY_FOR_SETTLEMENT"):
+        status, _ = http_json(
+            "POST", f"{NETWORK_URL}/internal/v1/transfers/{transfer_id}/transitions",
+            {"state": state, "causation_id": str(uuid.uuid4())},
+        )
+        assert status == 204, (state, status)
+    print(f"PHASE20 PREPARE PASS: transfer_id={transfer_id} idempotency_key={key}")
+
+
+def settle():
+    transfer_id, key = transfer()
+    correlation_id = db_query(
+        "network-db", "cholopay_network",
+        "SELECT correlation_id FROM transfer_instruction WHERE transfer_id=%s", (transfer_id,),
+    )[0][0]
+    status, body = http_json(
+        "POST", f"{NETWORK_URL}/internal/v1/settlements",
+        {"transfer_id": str(transfer_id), "source_participant_id": str(COSTA),
+         "destination_participant_id": str(SIERRA), "destination_account_id": str(DESTINATION),
+         "clearing_account_id": str(CLEARING), "amount_minor": 125,
+         "idempotency_key": key + "-settlement", "correlation_id": str(correlation_id)},
+    )
+    assert status == 201 and body.get("state") == "SETTLED", (status, body)
+    print(f"PHASE20 SETTLE PASS: transfer_id={transfer_id} receptor no disponible esperado")
+
+
+def observe():
+    transfer_id, _ = transfer()
+    deadline = time.time() + 45
+    while time.time() < deadline:
+        rows = db_query(
+            "network-db", "cholopay_network",
+            "SELECT attempt_count,failure_detail,next_attempt_at,state FROM settlement_delivery WHERE transfer_id=%s",
+            (transfer_id,),
+        )
+        if rows and rows[0][0] > 1 and rows[0][1] and rows[0][2] is not None and rows[0][2].timestamp() > time.time() and rows[0][3] == "PENDING":
+            print(f"PHASE20 OBSERVE PASS: transfer_id={transfer_id} retry/backoff={rows[0]}")
+            return
+        time.sleep(1)
+    raise AssertionError(f"No se observó retry/backoff real para {transfer_id}: {rows}")
+
+
+def exhaust():
+    transfer_id, _ = transfer()
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        rows = db_query("network-db", "cholopay_network", "SELECT state,failure_code,attempt_count FROM settlement_delivery WHERE transfer_id=%s", (transfer_id,))
+        if rows and rows[0] == ("FAILED", "DELIVERY_DLQ", rows[0][2]):
+            assert rows[0][2] >= 5
+            print(f"PHASE20 DLQ PASS: transfer_id={transfer_id} state={rows[0][0]} failure_code={rows[0][1]} attempts={rows[0][2]}")
+            return
+        time.sleep(2)
+    raise AssertionError(f"No se alcanzó DELIVERY_DLQ para {transfer_id}: {rows}")
+
+
+def replay():
+    transfer_id, _ = transfer()
+    delivery_id, event_id, state, attempts = db_query("network-db", "cholopay_network", "SELECT delivery_id,event_id,state,attempt_count FROM settlement_delivery WHERE transfer_id=%s", (transfer_id,))[0]
+    status, body = http_json("POST", f"{NETWORK_URL}/internal/v1/settlement-deliveries/{delivery_id}/replay", token=OPERATOR_TOKEN)
+    assert status == 200 and body["state"] == "PENDING" and uuid.UUID(body["delivery_id"]) == delivery_id and uuid.UUID(body["event_id"]) == event_id and body["attempt_count"] == attempts, (status, body)
+    status2, body2 = http_json("POST", f"{NETWORK_URL}/internal/v1/settlement-deliveries/{delivery_id}/replay", token=OPERATOR_TOKEN)
+    assert status2 == 200 and body2 == body, (status2, body2)
+    print(f"PHASE20 REPLAY PASS: delivery_id={delivery_id} event_id={event_id} attempts={attempts}")
+
+
+def reconcile(expected_code=None):
+    transfer_id, _ = transfer()
+    status, body = http_json("POST", f"{NETWORK_URL}/internal/v1/reconciliation/runs")
+    assert status == 201, (status, body)
+    differences = body.get("Differences", body.get("differences", []))
+    target_differences = [
+        item for item in differences
+        if (item.get("TransferID") or item.get("transfer_id")) == str(transfer_id)
+    ]
+    codes = [item["Code"] if "Code" in item else item.get("code") for item in target_differences]
+    if expected_code:
+        assert expected_code in codes, (expected_code, transfer_id, target_differences)
+    else:
+        assert not codes, (transfer_id, target_differences)
+    print(f"PHASE20 RECONCILIATION PASS: transfer_id={transfer_id} expected={expected_code or 'clean'}")
+
+
+def complete():
+    transfer_id, _ = transfer()
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        delivery = db_query(
+            "network-db", "cholopay_network",
+            "SELECT delivery_id,event_id,state,attempt_count FROM settlement_delivery WHERE transfer_id=%s",
+            (transfer_id,),
+        )
+        instruction = db_query(
+            "network-db", "cholopay_network",
+            "SELECT state FROM transfer_instruction WHERE transfer_id=%s", (transfer_id,),
+        )
+        if delivery and instruction and delivery[0][2] == "APPLIED" and instruction[0][0] == "COMPLETED":
+            delivery_id, event_id, state, attempts = delivery[0]
+            assert attempts > 1
+            inbox_row = db_query(
+                "sierra-db", "cholopay_sierra",
+                "SELECT delivery_id,event_id,journal_id FROM receiver_credit_inbox WHERE delivery_id=%s",
+                (delivery_id,),
+            )
+            assert len(inbox_row) == 1 and inbox_row[0][0] == delivery_id and inbox_row[0][1] == event_id
+            inbox, journals = 1, 1
+            journal_rows = db_query(
+                "sierra-db", "cholopay_sierra",
+                "SELECT journal_id, COUNT(*), COALESCE(SUM(CASE WHEN direction='DEBIT' THEN amount_minor ELSE 0 END),0), "
+                "COALESCE(SUM(CASE WHEN direction='CREDIT' THEN amount_minor ELSE 0 END),0) "
+                "FROM journal_entry WHERE journal_id IN (SELECT journal_id FROM receiver_credit_inbox WHERE delivery_id=%s) GROUP BY journal_id",
+                (delivery_id,),
+            )
+            assert (inbox, journals) == (1, 1) and len(journal_rows) == 1
+            assert journal_rows[0][0] == inbox_row[0][2]
+            assert journal_rows[0][1:] == (2, 125, 125), journal_rows
+            stable = db_query(
+                "network-db", "cholopay_network",
+                "SELECT COUNT(*), COUNT(DISTINCT delivery_id), COUNT(DISTINCT event_id) FROM settlement_delivery WHERE transfer_id=%s",
+                (transfer_id,),
+            )[0]
+            assert stable == (1, 1, 1), stable
+            print(f"PHASE20 COMPLETE PASS: transfer_id={transfer_id} delivery_id={delivery_id} event_id={event_id} inbox=1 journal=1 balanced=125/125")
+            return
+        time.sleep(2)
+    raise AssertionError(f"No se completó la recuperación para {transfer_id}: instruction={instruction} delivery={delivery}")
+
+
+def main():
+    modes = {"prepare": prepare, "settle": settle, "observe": observe, "exhaust": exhaust, "replay": replay, "reconcile-dlq": lambda: reconcile("DELIVERY_DLQ"), "complete": complete, "reconcile-clean": reconcile}
+    mode = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("PHASE20_MODE", "prepare")
+    if mode not in modes:
+        raise SystemExit(f"Modo inválido: {mode}; use prepare|settle|observe|exhaust|replay|reconcile-dlq|complete|reconcile-clean")
+    modes[mode]()
+
+
+if __name__ == "__main__":
+    main()

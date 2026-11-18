@@ -1,0 +1,45 @@
+# Phase 20 — Recovery E2E ante caída y DLQ del receptor
+
+Fuente: `docs/spec-pending-work.md`, P2/P7; Phase 18 y ADRs 0006, 0008 y 0009.
+Alcance: demostrar dentro de Docker una caída real de un banco receptor durante una entrega de CholoNet, retry/backoff, agotamiento de intentos, DLQ observable, replay autenticado e idempotente, reconciliación y evidencia estable de settlement.
+
+## Specs
+
+1. **S1 — Solicitud del usuario:**
+   > listo dale con el slice 1
+
+2. **S2 — Alcance confirmado:**
+   > Recuperación ante caída breve
+   > Detener `bank-core-sierra` durante una entrega, observar retry/backoff real, reiniciarlo y verificar `APPLIED`, `COMPLETED`, `delivery_id/event_id` estables e inbox/journal únicos.
+
+3. **S3 — Límites:** El slice no define replay de DLQ ni una nueva semántica de reconciliación para entregas `FAILED`; esas decisiones quedan fuera de alcance.
+
+4. **S4 — Docker-only:** builds, servicios, migraciones, bases, parada/reinicio y aceptación se ejecutan dentro del entorno Docker/Compose.
+
+5. **S5 — Solicitud del usuario:**
+   > listo continua con el slice 2
+
+6. **S6 — Contrato aprobado para el slice 2:** Una entrega que agota retries permanece como `state=FAILED` con `failure_code=DELIVERY_DLQ`; un replay autenticado por `delivery_id` la pasa a `PENDING`, conserva `delivery_id`, `event_id` y `attempt_count`, mantiene la transferencia en `CREDIT_PENDING` hasta la aplicación, y la reconciliación reporta `DELIVERY_DLQ` hasta que la entrega se aplique.
+
+7. **S7 — Límites del slice 2:** Solo se recupera una entrega fallida individual de forma observable e idempotente. No se agregan un estado persistido `DLQ` separado, replay por lote, compensaciones financieras, cambios de ledger ni reconciliación de entregas `FAILED` con una semántica distinta de `DELIVERY_DLQ`.
+
+## Tasks
+
+- T1 [S1-S4] Crear runner/escenario de outage breve con stop/start externo de `bank-core-sierra` y observación de retry/backoff. Ruta: `infra/tests` + Compose. Commit: pendiente.
+- T2 [S1-S4] Verificar estado final `COMPLETED`/`APPLIED`, identidad estable de delivery/event y unicidad de inbox/journal receptor. Ruta: `infra/tests` + consultas Docker. Commit: pendiente.
+- T3 [S1-S4] Registrar evidencia, límites y resultado en documentación P2. Ruta: docs. Commit: pendiente.
+- T4 [S1-S4] Ejecutar checks, crear work unit y evaluar RDD. Ruta: Docker + Git. Commit: pendiente.
+- T5 [S5-S7] Agregar la transición autenticada e idempotente de replay individual `FAILED/DELIVERY_DLQ → PENDING`, conservando identidad y contador de intentos. Ruta: `network/internal/settlement` + migraciones nuevas si fueran estrictamente necesarias. Commit: pendiente.
+- T6 [S5-S7] Extender reconciliación para observar `DELIVERY_DLQ` y aceptar su desaparición solo después de `APPLIED`/`COMPLETED`. Ruta: `network/internal/settlement` + pruebas. Commit: pendiente.
+- T7 [S5-S7] Crear aceptación Docker-only de outage prolongada, DLQ, replay, recuperación, reconciliación limpia e inbox/journal únicos. Ruta: `infra/tests` + Compose. Commit: pendiente.
+- T8 [S5-S7] Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
+
+## Log
+
+- L1. Usuario: "listo dale con el slice 1"
+- L2. La exploración de Phase 18 confirmó que existen dispatcher, retry/backoff, leases, receiver inbox, aplicación idempotente y endpoints de settlement, pero nunca se detuvo/reinició un receptor real dentro de la aceptación E2E.
+- L3. Se eligió el slice de recuperación ante caída breve. DLQ prolongada y reconciliación de entregas `FAILED` quedan fuera porque el repositorio no define todavía una transición de recuperación/replay para ese estado.
+- L4. La exploración confirmó que `DELIVERY_DLQ` ya se persiste como `failure_code` junto con `state=FAILED`; no existe un estado `DLQ` separado ni una operación de replay.
+- L5. El usuario autorizó continuar con el slice 2: "listo continua con el slice 2".
+- L6. Se aprobó la semántica conservadora: replay autenticado por `delivery_id`, identidad `delivery_id/event_id` estable, `attempt_count` acumulado, transferencia `CREDIT_PENDING` hasta aplicar y diferencia de reconciliación `DELIVERY_DLQ` mientras la entrega siga fallida.
+- L7. La aceptación Docker-only `job-4` pasó con outage prolongada: retries agotados en `attempt_count=5`, replay idempotente conservando `delivery_id=f9a2d69d-4bd8-4582-89c6-f7a6fc95b901`, `event_id=97959977-b68a-4034-a803-9b6a3ba5afe0`, recuperación `APPLIED`/`COMPLETED`, inbox=1, journal=1 y balance `125/125`; la reconciliación final del transfer `bcab076e-cadc-45c4-9b13-bb9f598dca1d` quedó limpia.
