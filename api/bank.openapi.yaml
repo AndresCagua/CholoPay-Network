@@ -7,10 +7,26 @@ paths:
   /health/ready: {get: {security: [], responses: {'200': {description: Listo}, '503': {description: No está listo}}}}
   /v1/customers:
     post:
+      security: [{bearerAuth: []}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CustomerCreate'}}}}
-      responses: {'201': {description: Creado}, '422': {description: Datos sintéticos inválidos}}
+      responses:
+        '201': {description: Cliente y token sintéticos creados, content: {application/json: {schema: {$ref: '#/components/schemas/CustomerCreated'}}}}
+        '401': {description: Autorización bancaria ausente o inválida, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '422': {description: Datos sintéticos inválidos, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
   /v1/accounts:
-    get: {responses: {'200': {description: Cuentas pertenecientes al cliente autenticado}}}
+    get:
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Cuentas pertenecientes al cliente autenticado, content: {application/json: {schema: {$ref: '#/components/schemas/AccountList'}}}}
+        '401': {description: Token del cliente ausente o inválido, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /v1/accounts/{accountId}/balance:
+    get:
+      security: [{bearerAuth: []}]
+      parameters: [{in: path, name: accountId, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: Balance sintético de la cuenta propia, content: {application/json: {schema: {$ref: '#/components/schemas/AccountBalance'}}}}
+        '401': {description: Token del cliente ausente o inválido, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Cuenta no perteneciente al cliente autenticado}
   /v1/transfers/internal:
     post:
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
@@ -59,7 +75,11 @@ paths:
 components:
   securitySchemes: {bearerAuth: {type: http, scheme: bearer}}
   schemas:
-    CustomerCreate: {type: object, required: [synthetic_reference], properties: {synthetic_reference: {type: string}}}
+    CustomerCreate: {type: object, required: [synthetic_reference], properties: {synthetic_reference: {type: string, maxLength: 160}}}
+    CustomerCreated: {type: object, required: [customer_id, synthetic_reference, access_token, accounts], properties: {customer_id: {type: string, format: uuid}, synthetic_reference: {type: string}, access_token: {type: string}, accounts: {type: array, items: {$ref: '#/components/schemas/Account'}}}
+    AccountList: {type: object, required: [accounts], properties: {accounts: {type: array, items: {$ref: '#/components/schemas/Account'}}}}
+    Account: {type: object, required: [account_id, currency, balance_minor, available_balance_minor], properties: {account_id: {type: string, format: uuid}, currency: {type: string, const: USD}, balance_minor: {type: integer, format: int64}, available_balance_minor: {type: integer, format: int64}}}
+    AccountBalance: {$ref: '#/components/schemas/Account'}
     TransferInput: {type: object, required: [source_account_id, amount_minor, currency], properties: {source_account_id: {type: string, format: uuid}, destination_account_ref: {type: string}, amount_minor: {type: integer, format: int64, minimum: 1}, currency: {type: string, const: USD}, correlation_id: {type: string, format: uuid}}}
     ObligationPaymentInput: {type: object, required: [participant_id, source_account_id, biller, amount, currency], properties: {participant_id: {type: string}, participantId: {type: string}, source_account_id: {type: string, format: uuid}, sourceAccountId: {type: string, format: uuid, description: UUID sintético de cuenta; en electricidad sí respalda un débito local sintético}, biller: {type: string, enum: [utilities, transit]}, amount: {type: string}, currency: {type: string, enum: [USD, SYN]}, service: {type: string, enum: [electricity, water, internet, mobile, registration, traffic_fine]}, invoice_id: {type: string}, invoiceId: {type: string}}}
     ErrorResponse: {type: object, required: [error, message], properties: {error: {type: string, description: Código estable para máquinas}, message: {type: string, description: Mensaje humano en español}}}
