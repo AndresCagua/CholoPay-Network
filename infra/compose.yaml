@@ -222,6 +222,16 @@ services:
       bank-core: {condition: service_started}
     networks: [internal_services, default]
 
+  bank-openapi-test:
+    image: python:3.13-alpine
+    profiles: [test]
+    volumes:
+      - ../api/bank.openapi.yaml:/contract/api/bank.openapi.yaml:ro
+      - ../api/network.openapi.yaml:/contract/api/network.openapi.yaml:ro
+      - ./tests/test_bank_openapi.py:/contract/tests/test_bank_openapi.py:ro
+    working_dir: /contract
+    command: ["sh", "-c", "pip install --no-cache-dir PyYAML >/dev/null && python /contract/tests/test_bank_openapi.py"]
+
   bank-core-test:
     build:
       context: ../bank-core

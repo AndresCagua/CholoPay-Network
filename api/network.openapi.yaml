@@ -43,6 +43,75 @@ paths:
         '400': {description: Faltan metadatos contractuales}
         '401': {description: Se requiere autorización}
         '409': {$ref: '#/components/responses/Conflict'}
+  /internal/v1/directory/resolve:
+    post:
+      summary: Resolver una CholoKey para procesamiento interno sin listar el directorio
+      security: [{serviceBearer: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/DirectoryResolve'}}}}
+      responses:
+        '200': {description: Referencia mínima de destino resuelta, content: {application/json: {schema: {$ref: '#/components/schemas/DirectoryResolution'}}}}
+        '404': {description: Clave no encontrada}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /internal/v1/directory/keys:
+    post:
+      summary: Crear una CholoKey en el directorio interno
+      security: [{serviceBearer: []}]
+      parameters: [{in: header, name: Idempotency-Key, required: false, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/DirectoryKeyCreate'}}}}
+      responses:
+        '201': {description: CholoKey registrada, content: {application/json: {schema: {$ref: '#/components/schemas/DirectoryKey'}}}}
+        '400': {description: Solicitud interna inválida}
+        '401': {description: Se requiere autorización}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {description: Se excedió el límite de claves}
+  /internal/v1/directory/keys/{keyID}:
+    get:
+      summary: Consultar una CholoKey por identificador para una fachada autenticada
+      security: [{serviceBearer: []}]
+      parameters: [{in: path, name: keyID, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: Registro interno de CholoKey, content: {application/json: {schema: {$ref: '#/components/schemas/DirectoryKey'}}}}
+        '401': {description: Se requiere autorización}
+        '404': {description: Clave no encontrada}
+  /internal/v1/directory/keys/{keyID}/suspend:
+    post:
+      summary: Suspender una CholoKey en el directorio interno
+      security: [{serviceBearer: []}]
+      parameters: [{in: path, name: keyID, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/DirectoryLifecycle'}}}}
+      responses:
+        '202': {description: Suspensión aceptada}
+        '400': {description: Solicitud interna inválida}
+        '401': {description: Se requiere autorización}
+        '403': {description: El participante no está autorizado}
+        '404': {description: Clave no encontrada}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /internal/v1/directory/keys/{keyID}/block:
+    post:
+      summary: Bloquear una CholoKey en el directorio interno
+      security: [{serviceBearer: []}]
+      parameters: [{in: path, name: keyID, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/DirectoryLifecycle'}}}}
+      responses:
+        '202': {description: Bloqueo aceptado}
+        '400': {description: Solicitud interna inválida}
+        '401': {description: Se requiere autorización}
+        '403': {description: El participante no está autorizado}
+        '404': {description: Clave no encontrada}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /internal/v1/directory/keys/{keyID}/delete:
+    post:
+      summary: Dar de baja una CholoKey en el directorio interno
+      security: [{serviceBearer: []}]
+      parameters: [{in: path, name: keyID, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/DirectoryLifecycle'}}}}
+      responses:
+        '202': {description: Baja aceptada}
+        '400': {description: Solicitud interna inválida}
+        '401': {description: Se requiere autorización}
+        '403': {description: El participante no está autorizado}
+        '404': {description: Clave no encontrada}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/participants:
     post:
       summary: Registrar un participante simulado
@@ -72,6 +141,61 @@ components:
   securitySchemes:
     serviceBearer: {type: http, scheme: bearer}
   schemas:
+    DirectoryResolve:
+      type: object
+      required: [network_id, key_type, key_value, correlation_id, causation_id, idempotency_key]
+      properties:
+        network_id: {type: string, format: uuid}
+        key_type: {type: string}
+        key_value: {type: string}
+        correlation_id: {type: string, format: uuid}
+        causation_id: {type: string, format: uuid}
+        idempotency_key: {type: string, minLength: 1}
+    DirectoryResolution:
+      type: object
+      required: [key_id, participant_id, account_ref, schema_version, message_type, correlation_id, causation_id, idempotency_key, resolved_at]
+      properties:
+        key_id: {type: string, format: uuid}
+        participant_id: {type: string, format: uuid}
+        account_ref: {type: string}
+        schema_version: {type: string}
+        message_type: {type: string}
+        correlation_id: {type: string, format: uuid}
+        causation_id: {type: string, format: uuid}
+        idempotency_key: {type: string}
+        resolved_at: {type: string, format: date-time}
+    DirectoryKeyCreate:
+      type: object
+      required: [network_id, participant_id, key_type, key_value, account_ref]
+      properties:
+        key_id: {type: string, format: uuid}
+        network_id: {type: string, format: uuid}
+        participant_id: {type: string, format: uuid}
+        key_type: {type: string, enum: [PHONE, EMAIL, DOCUMENT, RANDOM]}
+        key_value: {type: string, minLength: 1}
+        account_ref: {type: string, minLength: 1}
+        account_kind: {type: string, enum: [PERSONAL, BUSINESS], default: PERSONAL}
+    DirectoryLifecycle:
+      type: object
+      required: [participant_id, idempotency_key]
+      properties:
+        participant_id: {type: string, format: uuid}
+        account_ref: {type: string}
+        reason: {type: string, maxLength: 256}
+        idempotency_key: {type: string, minLength: 1}
+    DirectoryKey:
+      type: object
+      required: [key_id, network_id, participant_id, key_type, key_value, account_ref, account_kind, status, version]
+      properties:
+        key_id: {type: string, format: uuid}
+        network_id: {type: string, format: uuid}
+        participant_id: {type: string, format: uuid}
+        key_type: {type: string}
+        key_value: {type: string}
+        account_ref: {type: string}
+        account_kind: {type: string, enum: [PERSONAL, BUSINESS]}
+        status: {type: string, enum: [ACTIVE, SUSPENDED, BLOCKED, DELETED]}
+        version: {type: integer, format: int64}
     PortRequest:
       type: object
       required: [schema_version, correlation_id, causation_id, requested_at, idempotency_key, new_key_id]

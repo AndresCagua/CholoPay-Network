@@ -126,7 +126,84 @@ paths:
         '404': {description: Intención inaccesible}
         '409': {description: Reembolso no permitido o conflicto de idempotencia, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
   /v1/keys:
-    post: {responses: {'201': {description: Registro solicitado}, '409': {description: La clave ya está activa}}}
+    post:
+      summary: Crear una CholoKey sintética para la cuenta del cliente autenticado
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: header, name: Idempotency-Key, required: true, schema: {type: string, minLength: 1}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CholoKeyCreate'}}}}
+      responses:
+        '201': {description: CholoKey sintética creada, content: {application/json: {schema: {$ref: '#/components/schemas/CholoKey'}}}}
+        '400': {description: Solicitud de CholoKey inválida, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '401': {description: Autorización del cliente inválida, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '409': {description: CholoKey no disponible o conflicto de idempotencia, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '503': {description: Configuración bancaria no disponible, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+  /v1/keys/{keyId}:
+    get:
+      summary: Consultar una CholoKey propia sin enumerar el directorio
+      security: [{bearerAuth: []}]
+      parameters: [{in: path, name: keyId, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: CholoKey propia, content: {application/json: {schema: {$ref: '#/components/schemas/CholoKey'}}}}
+        '404': {description: Clave no disponible; no revela existencia ajena, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '503': {description: Directorio no disponible, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+  /v1/keys/{keyId}/suspend:
+    post:
+      summary: Suspender una CholoKey propia
+      security: [{bearerAuth: []}]
+      parameters: [{in: path, name: keyId, required: true, schema: {type: string, format: uuid}}, {in: header, name: Idempotency-Key, required: true, schema: {type: string, minLength: 1}}]
+      responses:
+        '202': {description: Suspensión aceptada}
+        '400': {description: Falta la clave de idempotencia, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '404': {description: Clave no disponible, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '409': {description: Transición no permitida, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+  /v1/keys/{keyId}/block:
+    post:
+      summary: Bloquear una CholoKey propia
+      security: [{bearerAuth: []}]
+      parameters: [{in: path, name: keyId, required: true, schema: {type: string, format: uuid}}, {in: header, name: Idempotency-Key, required: true, schema: {type: string, minLength: 1}}]
+      responses:
+        '202': {description: Bloqueo aceptado}
+        '400': {description: Falta la clave de idempotencia, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '404': {description: Clave no disponible, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '409': {description: Transición no permitida, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+  /v1/keys/{keyId}/delete:
+    post:
+      summary: Dar de baja una CholoKey propia
+      security: [{bearerAuth: []}]
+      parameters: [{in: path, name: keyId, required: true, schema: {type: string, format: uuid}}, {in: header, name: Idempotency-Key, required: true, schema: {type: string, minLength: 1}}]
+      responses:
+        '202': {description: Baja aceptada}
+        '400': {description: Falta la clave de idempotencia, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '404': {description: Clave no disponible, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '409': {description: Transición no permitida, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+  /v1/keys/{keyId}/qr:
+    get:
+      summary: Obtener el QR estático sintético de una CholoKey propia
+      security: [{bearerAuth: []}]
+      parameters: [{in: path, name: keyId, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: QR estático sintético, content: {application/json: {schema: {$ref: '#/components/schemas/QrResponse'}}}}
+        '404': {description: Clave no disponible, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '409': {description: QR no disponible, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+  /v1/keys/{keyId}/qr/dynamic:
+    post:
+      summary: Crear un QR dinámico sintético de una CholoKey propia
+      security: [{bearerAuth: []}]
+      parameters: [{in: path, name: keyId, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/DynamicQrCreate'}}}}
+      responses:
+        '201': {description: QR dinámico sintético creado, content: {application/json: {schema: {$ref: '#/components/schemas/QrResponse'}}}}
+        '400': {description: QR dinámico inválido, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '404': {description: Clave no disponible, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+  /v1/qr/verify:
+    post:
+      summary: Verificar un QR sintético y consumir un QR dinámico una sola vez
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/QrVerify'}}}}
+      responses:
+        '200': {description: QR aceptado, content: {application/json: {schema: {$ref: '#/components/schemas/QrVerification'}}}}
+        '409': {description: QR inválido, expirado o ya utilizado, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
 components:
   securitySchemes: {bearerAuth: {type: http, scheme: bearer}}
   schemas:
@@ -159,3 +236,9 @@ components:
     ObligationPaymentResult: {type: object, required: [status], properties: {payment_intent_id: {type: string, format: uuid}, obligation_id: {type: string}, amount: {type: string}, currency: {type: string}, status: {type: string, enum: [APPLIED, PENDING_APPLICATION, UNKNOWN_PENDING_RECONCILIATION]}, journal_id: {type: string, format: uuid}, settlement: {type: string, const: not_claimed}}}
     RefundInput: {type: object, properties: {amount: {type: string, description: Debe coincidir con el importe total de la intención}}}
     RefundResult: {type: object, required: [refund_id, payment_intent_id, amount, currency, status, ledger_boundary], properties: {refund_id: {type: string, format: uuid}, payment_intent_id: {type: string, format: uuid}, amount: {type: string}, currency: {type: string, const: USD}, status: {type: string, const: SUCCEEDED}, ledger_boundary: {type: string, const: not_claimed}}}
+    CholoKeyCreate: {type: object, required: [accountId, keyType, keyValue], properties: {accountId: {type: string, format: uuid}, keyType: {type: string, enum: [PHONE, EMAIL, DOCUMENT, RANDOM]}, keyValue: {type: string, minLength: 1}, accountKind: {type: string, enum: [PERSONAL, BUSINESS], default: PERSONAL}}}
+    CholoKey: {type: object, required: [keyId, keyType, keyValue, accountId, accountKind, status, version], properties: {keyId: {type: string, format: uuid}, keyType: {type: string}, keyValue: {type: string}, accountId: {type: string, format: uuid}, accountKind: {type: string, enum: [PERSONAL, BUSINESS]}, status: {type: string, enum: [ACTIVE, SUSPENDED, BLOCKED, DELETED]}, version: {type: integer, format: int64}}}
+    DynamicQrCreate: {type: object, required: [amountMinor, reference, expiresAt], properties: {amountMinor: {type: integer, format: int64, minimum: 1}, reference: {type: string, minLength: 1, maxLength: 160}, expiresAt: {type: string, format: date-time}}}
+    QrResponse: {type: object, required: [payload, environment], properties: {payload: {type: string}, environment: {type: string, const: synthetic}}}
+    QrVerify: {type: object, required: [payload], properties: {payload: {type: string}}}
+    QrVerification: {type: object, required: [accepted, reason, keyId, amountMinor, reference, expiresAt], properties: {accepted: {type: boolean, const: true}, reason: {type: string}, keyId: {type: string, format: uuid, nullable: true}, amountMinor: {type: integer, format: int64}, reference: {type: string, nullable: true}, expiresAt: {type: string, format: date-time, nullable: true}}}

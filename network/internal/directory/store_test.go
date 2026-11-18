@@ -96,10 +96,12 @@ func TestPostgresDirectoryResolvesWithinOwningNetwork(t *testing.T) {
 		t.Fatalf("resolución inesperada: %+v", resolved)
 	}
 	body, _ := json.Marshal(map[string]any{"network_id": banking, "key_type": key.KeyType, "key_value": key.KeyValue, "correlation_id": uuid.New(), "causation_id": uuid.New(), "idempotency_key": "http-directory-test"})
+	t.Setenv("DIRECTORY_PORT_TOKEN", "directory-test-token")
 	mux := http.NewServeMux()
 	NewHandler(store).Register(mux)
 	req := httptest.NewRequest(http.MethodPost, "/internal/v1/directory/resolve", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer directory-test-token")
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, req)
 	if response.Code != http.StatusOK {

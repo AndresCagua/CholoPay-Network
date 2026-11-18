@@ -12,9 +12,9 @@ Fuente: `spec.md`, P3 pendiente y decisión del usuario de continuar con el sigu
 - T1 [S1-S4] Implementar customers sintéticos, cuentas y balance público con autorización y aislamiento. Ruta: bank-core + migración + pruebas Docker. Commit: `4cd6709`.
 - T2 [S1-S2] Añadir movimientos/journals, paginación cursor y Problem Details uniforme. Ruta: bank-core + OpenAPI + pruebas Docker. Commit: `7b50046`.
 - T3 [S1-S2] Completar payment intents públicos, refunds y participantes. Ruta: bank-core + OpenAPI + pruebas Docker. Commit: `17b46a3`. Autorización: token de cliente para consultas/refunds públicos; `BANK_API_TOKEN` para operaciones administrativas.
-- T4a [S1-S2] Completar lifecycle del directorio CholoKey: creación, suspensión/bloqueo, baja, límites, unicidad e historial append-only. Ruta: network + migración + pruebas Docker. Commit: pendiente.
+- T4a [S1-S2] Completar lifecycle del directorio CholoKey: creación, suspensión/bloqueo, baja, límites, unicidad e historial append-only. Ruta: network + migración + pruebas Docker. Commit: `8d8a720`.
 - T4b [S1-S2] Añadir facade bancaria participant/customer-scoped para CholoKey y QR sintético verificable. Ruta: bank-core/network + OpenAPI + pruebas Docker. Commit: `ee8e5cc`.
-- T4c [S1-S2] Validar OpenAPI de bank/network dentro de Docker y actualizar evidencia P4. Ruta: infra + docs + pruebas Docker. Commit: pendiente.
+- T4c [S1-S2] Validar OpenAPI de bank/network dentro de Docker y actualizar evidencia P4. Ruta: infra + docs + pruebas Docker. Commit: `PENDIENTE_T4C`.
 - T5 [S1-S4] Integrar evidencia, limitaciones y cierre de P3. Ruta: docs + aceptación Docker + review RDD. Commit: pendiente.
 
 ## Log
@@ -29,3 +29,5 @@ Fuente: `spec.md`, P3 pendiente y decisión del usuario de continuar con el sigu
 - L9. La exploración de P4 confirmó que el directorio CholoKey ya tiene límites 5/20, unicidad, suspensión y portabilidad internas en `network`, pero faltan creación/gestión pública, estados de baja/bloqueo, historial append-only, facade bancaria, QR backend, protección contra enumeración y validación OpenAPI Docker. T4 se divide en T4a lifecycle del directorio, T4b facade/QR y T4c contrato/evidencia.
 - L10. T4a implementa creación, suspensión, bloqueo, baja/tombstone, autorización por participante, unicidad activa, límites 5/20 e historial append-only con V9. `job-24` y `job-25` detectaron y permitieron corregir colisiones de idempotencia vacía y una inserción de historial de portabilidad mal formada; `job-26` pasó la suite completa `network-test` en Docker.
 - L11. T4b añade facade bancaria participant/customer-scoped, delegación autenticada al directorio, lifecycle público, QR sintético estático/dinámico versionado y replay/expiración durable mediante V15. `job-28` y `job-29` pasaron la suite bancaria estándar e integración Docker; `job-30` pasó `network-test` con las rutas internas del directorio. No se modificó el ledger.
+- L12. T4c actualiza los contratos OpenAPI 3.1 de bank/network para la fachada CholoKey, QR y lifecycle interno, conserva los contratos legacy `{error,message}`, excluye enumeración pública y añade un validador PyYAML Docker-only en el perfil `test`. El handler de resolución interna también exige `DIRECTORY_PORT_TOKEN`, alineado con el contrato `serviceBearer`.
+- L13. `job-33` pasó `network-test` completo después de exigir bearer en resolución interna; `job-34` pasó el validador Docker de OpenAPI bank/network (`OpenAPI T4c contract validation passed`). `git diff --check` pasó antes del commit.

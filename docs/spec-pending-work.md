@@ -30,19 +30,19 @@ Falta cerrar y demostrar el recorrido completo `Banco Costa → CholoNet → Ban
 
 ### P3. APIs bancarias completas
 
-**Estado:** Parcial.
+**Estado:** Parcial — superficies T1–T4c demostradas en alcance sintético.
 
-El contrato bancario versionado existe, pero todavía faltan o están incompletas superficies para customers/onboarding, cuentas, balances, movimientos, journals, payment intents públicos completos, refunds, participantes, CholoKey, paginación cursor y Problem Details uniforme.
+El contrato bancario versionado cubre customers/onboarding, cuentas, balances, movimientos, journals, payment intents públicos, refunds, participantes, CholoKey, QR, paginación cursor y Problem Details para las rutas nuevas. P3 sigue parcial porque no representa autenticación productiva ni dinero real.
 
-**Evidencia pendiente:** implementación pública, autorización, OpenAPI actualizado y validación automática del contrato en CI Docker.
+**Evidencia:** OpenAPI bank/network actualizado y validador PyYAML Docker-only en el perfil `test`; `job-34` confirma OpenAPI 3.1.0, rutas T3/T4b, lifecycle interno, seguridad, respuestas y referencias de schemas. `job-33` confirma la suite de red después de exigir `DIRECTORY_PORT_TOKEN` en resolución interna.
 
 ### P4. CholoKey y QR
 
-**Estado:** Parcial.
+**Estado:** Parcial — T4a–T4c completan el lifecycle sintético y el contrato de fachada/QR.
 
-Existe resolución y parte del directorio, pero falta completar creación pública, bloqueo, suspensión, baja, ownership claim, límites por cuenta, historial de portabilidad, alias sintéticos, QR estático y QR dinámico.
+Existe creación pública participant/customer-scoped, bloqueo, suspensión, baja, límites por cuenta, historial append-only, alias sintéticos y QR estático/dinámico; no se ofrece una ruta pública de enumeración. La autenticación sigue siendo bearer sintético y el alcance no es productivo.
 
-**Evidencia pendiente:** pruebas contra los casos de `spec.md`, protección contra enumeración y autorización participant-scoped.
+**Evidencia:** suites T4b, `network-test` (`job-33`) y validador OpenAPI Docker-only (`job-34`). La resolución interna exige bearer sintético y no existe una ruta pública de enumeración.
 
 ### P5. Seguridad de usuario y servicio
 

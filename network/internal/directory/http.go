@@ -199,6 +199,10 @@ func authorizedBearer(r *http.Request, expected string) bool {
 }
 
 func (h *Handler) resolve(w http.ResponseWriter, r *http.Request) {
+	if !authorizedBearer(r, os.Getenv("DIRECTORY_PORT_TOKEN")) {
+		http.Error(w, "se requiere autorización", http.StatusUnauthorized)
+		return
+	}
 	var request resolveRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "solicitud no válida", http.StatusBadRequest)
