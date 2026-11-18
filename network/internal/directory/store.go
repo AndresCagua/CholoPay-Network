@@ -13,16 +13,16 @@ import (
 )
 
 type Entry struct {
-	KeyID          uuid.UUID
-	NetworkID      uuid.UUID
-	ParticipantID  uuid.UUID
-	KeyType        string
-	KeyValue       string
-	AccountRef     string
-	AccountKind    string
-	Status         string
-	Version        int64
-	IdempotencyKey string
+	KeyID          uuid.UUID `json:"key_id"`
+	NetworkID      uuid.UUID `json:"network_id"`
+	ParticipantID  uuid.UUID `json:"participant_id"`
+	KeyType        string    `json:"key_type"`
+	KeyValue       string    `json:"key_value"`
+	AccountRef     string    `json:"account_ref"`
+	AccountKind    string    `json:"account_kind"`
+	Status         string    `json:"status"`
+	Version        int64     `json:"version"`
+	IdempotencyKey string    `json:"idempotency_key,omitempty"`
 }
 
 type Resolution struct {
@@ -213,6 +213,18 @@ func (s *Store) Create(ctx context.Context, entry Entry) (Entry, error) {
 		return Entry{}, err
 	}
 	return entry, nil
+}
+
+// Get is restricted to the authenticated internal facade; public callers only receive
+// a resolution and never a directory listing.
+func (s *Store) Get(ctx context.Context, keyID uuid.UUID) (Entry, error) {
+	var entry Entry
+	err := s.db.QueryRowContext(ctx, `SELECT key_id,network_id,participant_id,key_type,key_value,account_ref,account_kind,status,version FROM directory_key WHERE key_id=$1`, keyID).
+		Scan(&entry.KeyID, &entry.NetworkID, &entry.ParticipantID, &entry.KeyType, &entry.KeyValue, &entry.AccountRef, &entry.AccountKind, &entry.Status, &entry.Version)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Entry{}, ErrNotFound
+	}
+	return entry, err
 }
 
 func (s *Store) transition(ctx context.Context, request LifecycleRequest, operation, target string) error {
