@@ -16,16 +16,29 @@ func TestReplayHTTPRequiresOperatorBearer(t *testing.T) {
 	t.Setenv("OPERATOR_CONSOLE_TOKEN", "operator-test-token")
 	mux := http.NewServeMux()
 	NewHandler(nil).Register(mux)
-	for _, token := range []string{"", "wrong-token"} {
+	for _, authorization := range []string{"", "wrong-token", "operator-test-token", "Basic operator-test-token", "Bearer wrong-token"} {
 		req := httptest.NewRequest(http.MethodPost, "/internal/v1/settlement-deliveries/00000000-0000-4000-8000-000000000001/replay", nil)
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
+		if authorization != "" {
+			req.Header.Set("Authorization", authorization)
 		}
 		response := httptest.NewRecorder()
 		mux.ServeHTTP(response, req)
 		if response.Code != http.StatusUnauthorized {
-			t.Fatalf("token %q: se esperaba 401, se obtuvo %d", token, response.Code)
+			t.Fatalf("Authorization %q: se esperaba 401, se obtuvo %d", authorization, response.Code)
 		}
+	}
+}
+
+func TestReplayHTTPRejectsMissingOperatorTokenConfiguration(t *testing.T) {
+	t.Setenv("OPERATOR_CONSOLE_TOKEN", "")
+	mux := http.NewServeMux()
+	NewHandler(nil).Register(mux)
+	req := httptest.NewRequest(http.MethodPost, "/internal/v1/settlement-deliveries/00000000-0000-4000-8000-000000000001/replay", nil)
+	req.Header.Set("Authorization", "Bearer operator-test-token")
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, req)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("sin token configurado: se esperaba 401, se obtuvo %d", response.Code)
 	}
 }
 

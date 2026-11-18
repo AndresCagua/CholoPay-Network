@@ -62,9 +62,13 @@ func (h *Handler) replay(w http.ResponseWriter, r *http.Request) {
 }
 
 func authorizedReplayBearer(r *http.Request) bool {
-	expected := os.Getenv("OPERATOR_CONSOLE_TOKEN")
-	value := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
-	return expected != "" && len(value) == len(expected) && subtle.ConstantTimeCompare([]byte(value), []byte(expected)) == 1
+	expected := strings.TrimSpace(os.Getenv("OPERATOR_CONSOLE_TOKEN"))
+	header := strings.TrimSpace(r.Header.Get("Authorization"))
+	value, ok := strings.CutPrefix(header, "Bearer ")
+	if !ok || expected == "" || value == "" || strings.ContainsAny(value, " \t\r\n") {
+		return false
+	}
+	return len(value) == len(expected) && subtle.ConstantTimeCompare([]byte(value), []byte(expected)) == 1
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {

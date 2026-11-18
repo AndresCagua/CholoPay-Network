@@ -214,7 +214,7 @@ services:
     profiles: [phase20]
     environment:
       NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
-      OPERATOR_CONSOLE_TOKEN: ${OPERATOR_CONSOLE_TOKEN:-operator-local-only}
+      OPERATOR_CONSOLE_TOKEN: ${OPERATOR_CONSOLE_TOKEN:?OPERATOR_CONSOLE_TOKEN must be set}
       POSTGRES_USER: ${POSTGRES_USER:-cholopay}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
       PHASE20_MODE: ${PHASE20_MODE:-prepare}
@@ -290,7 +290,7 @@ services:
       DIRECTORY_PARTICIPANT_TOKENS: ${DIRECTORY_PARTICIPANT_TOKENS:-00000000-0000-4000-8000-000000000101=costa-directory-participant-local-only,00000000-0000-4000-8000-000000000102=sierra-directory-participant-local-only,00000000-0000-4000-8000-000000000103=oriente-directory-participant-local-only}
       CHOLONET_HMAC_SECRET: ${CHOLONET_HMAC_SECRET:-}
       NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
-      OPERATOR_CONSOLE_TOKEN: ${OPERATOR_CONSOLE_TOKEN:-operator-local-only}
+      OPERATOR_CONSOLE_TOKEN: ${OPERATOR_CONSOLE_TOKEN:?OPERATOR_CONSOLE_TOKEN must be set}
       BANK_RECEIVER_CREDIT_URL: http://bank-core:8080/internal/v1/receiver-credits
       BANK_RECEIVER_ROUTES: ${BANK_RECEIVER_ROUTES:-00000000-0000-4000-8000-000000000101=http://bank-core:8080/internal/v1/receiver-credits|local-test-only,00000000-0000-4000-8000-000000000102=http://bank-core-sierra:8080/internal/v1/receiver-credits|sierra-local-test-only,00000000-0000-4000-8000-000000000103=http://bank-core-oriente:8080/internal/v1/receiver-credits|oriente-local-test-only}
       DELIVERY_LEASE_SECONDS: ${DELIVERY_LEASE_SECONDS:-60}
