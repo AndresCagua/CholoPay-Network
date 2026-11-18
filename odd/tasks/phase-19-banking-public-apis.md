@@ -12,7 +12,9 @@ Fuente: `spec.md`, P3 pendiente y decisión del usuario de continuar con el sigu
 - T1 [S1-S4] Implementar customers sintéticos, cuentas y balance público con autorización y aislamiento. Ruta: bank-core + migración + pruebas Docker. Commit: `4cd6709`.
 - T2 [S1-S2] Añadir movimientos/journals, paginación cursor y Problem Details uniforme. Ruta: bank-core + OpenAPI + pruebas Docker. Commit: `7b50046`.
 - T3 [S1-S2] Completar payment intents públicos, refunds y participantes. Ruta: bank-core + OpenAPI + pruebas Docker. Commit: `17b46a3`. Autorización: token de cliente para consultas/refunds públicos; `BANK_API_TOKEN` para operaciones administrativas.
-- T4 [S1-S2] Completar CholoKey público y validación automática del contrato. Ruta: bank-core + OpenAPI + CI Docker. Commit: pendiente.
+- T4a [S1-S2] Completar lifecycle del directorio CholoKey: creación, suspensión/bloqueo, baja, límites, unicidad e historial append-only. Ruta: network + migración + pruebas Docker. Commit: pendiente.
+- T4b [S1-S2] Añadir facade bancaria participant/customer-scoped para CholoKey y QR sintético verificable. Ruta: bank-core/network + OpenAPI + pruebas Docker. Commit: pendiente.
+- T4c [S1-S2] Validar OpenAPI de bank/network dentro de Docker y actualizar evidencia P4. Ruta: infra + docs + pruebas Docker. Commit: pendiente.
 - T5 [S1-S4] Integrar evidencia, limitaciones y cierre de P3. Ruta: docs + aceptación Docker + review RDD. Commit: pendiente.
 
 ## Log
@@ -24,3 +26,4 @@ Fuente: `spec.md`, P3 pendiente y decisión del usuario de continuar con el sigu
 - L6. Tras normalizar títulos y detalles Problem Details al español, `job-12` pasó la suite estándar y `job-13` pasó `mvn -Pintegration test` en Docker. Las pruebas verifican cursor de dos páginas, aislamiento, límites, autorización y contenido Problem Details.
 - L7. La exploración de T3 confirmó que bank-core solo expone POST de obligation payment-intents; no existen consulta de estado, cancelación, refunds ni recursos públicos de participantes. Decisión del usuario: separar autorización; consultas/refunds públicos usarán token de cliente y operaciones administrativas usarán `BANK_API_TOKEN`.
 - L8. T3 añade consulta pública de intents, refunds sintéticos full-only idempotentes con `ledger_boundary: not_claimed` y consulta administrativa del participante configurado. Se excluyó cancelación porque `PENDING_APPLICATION` ya tiene débito/journal local y no admite una transición segura sin compensación. `job-17` y `job-18` pasaron las suites Docker; `job-20` validó el YAML OpenAPI después de corregir CustomerCreated y AccountList.
+- L9. La exploración de P4 confirmó que el directorio CholoKey ya tiene límites 5/20, unicidad, suspensión y portabilidad internas en `network`, pero faltan creación/gestión pública, estados de baja/bloqueo, historial append-only, facade bancaria, QR backend, protección contra enumeración y validación OpenAPI Docker. T4 se divide en T4a lifecycle del directorio, T4b facade/QR y T4c contrato/evidencia.
