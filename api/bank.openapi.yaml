@@ -27,6 +27,30 @@ paths:
         '200': {description: Balance sintético de la cuenta propia, content: {application/json: {schema: {$ref: '#/components/schemas/AccountBalance'}}}}
         '401': {description: Token del cliente ausente o inválido, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
         '404': {description: Cuenta no perteneciente al cliente autenticado}
+  /v1/accounts/{accountId}/movements:
+    get:
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: limit, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+        - {in: query, name: cursor, schema: {type: string, description: Opaque Base64URL cursor}}
+      responses:
+        '200': {description: Movimientos propios en orden created_at/id descendente, content: {application/json: {schema: {$ref: '#/components/schemas/MovementPage'}}}}
+        '400': {description: Cursor o límite inválido, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '401': {description: Token inválido, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '404': {description: Cuenta inaccesible, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+  /v1/accounts/{accountId}/journals:
+    get:
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: limit, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+        - {in: query, name: cursor, schema: {type: string, description: Opaque Base64URL cursor}}
+      responses:
+        '200': {description: Journals propios en orden created_at/id descendente, content: {application/json: {schema: {$ref: '#/components/schemas/JournalPage'}}}}
+        '400': {description: Cursor o límite inválido, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '401': {description: Token inválido, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '404': {description: Cuenta inaccesible, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
   /v1/transfers/internal:
     post:
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
@@ -83,4 +107,10 @@ components:
     TransferInput: {type: object, required: [source_account_id, amount_minor, currency], properties: {source_account_id: {type: string, format: uuid}, destination_account_ref: {type: string}, amount_minor: {type: integer, format: int64, minimum: 1}, currency: {type: string, const: USD}, correlation_id: {type: string, format: uuid}}}
     ObligationPaymentInput: {type: object, required: [participant_id, source_account_id, biller, amount, currency], properties: {participant_id: {type: string}, participantId: {type: string}, source_account_id: {type: string, format: uuid}, sourceAccountId: {type: string, format: uuid, description: UUID sintético de cuenta; en electricidad sí respalda un débito local sintético}, biller: {type: string, enum: [utilities, transit]}, amount: {type: string}, currency: {type: string, enum: [USD, SYN]}, service: {type: string, enum: [electricity, water, internet, mobile, registration, traffic_fine]}, invoice_id: {type: string}, invoiceId: {type: string}}}
     ErrorResponse: {type: object, required: [error, message], properties: {error: {type: string, description: Código estable para máquinas}, message: {type: string, description: Mensaje humano en español}}}
+    ProblemDetails: {type: object, required: [type, title, status, detail, code], properties: {type: {type: string, format: uri}, title: {type: string}, status: {type: integer}, detail: {type: string}, code: {type: string}}}
+    Movement: {type: object, required: [id, journal_id, account_id, amount_minor, direction, currency, created_at], properties: {id: {type: string, format: uuid}, journal_id: {type: string, format: uuid}, account_id: {type: string, format: uuid}, amount_minor: {type: integer, format: int64}, direction: {type: string, enum: [DEBIT, CREDIT]}, currency: {type: string, const: USD}, created_at: {type: string, format: date-time}}}
+    MovementPage: {type: object, required: [data, next_cursor], properties: {data: {type: array, items: {$ref: '#/components/schemas/Movement'}}, next_cursor: {type: [string, 'null']}}}
+    JournalEntry: {type: object, required: [account_id, amount_minor, direction, currency], properties: {account_id: {type: string, format: uuid}, amount_minor: {type: integer, format: int64}, direction: {type: string, enum: [DEBIT, CREDIT]}, currency: {type: string, const: USD}}}
+    Journal: {type: object, required: [id, transaction_id, idempotency_key, correlation_id, entries, created_at], properties: {id: {type: string, format: uuid}, transaction_id: {type: string, format: uuid}, idempotency_key: {type: string}, correlation_id: {type: string, format: uuid}, entries: {type: array, items: {$ref: '#/components/schemas/JournalEntry'}}, created_at: {type: string, format: date-time}}}
+    JournalPage: {type: object, required: [data, next_cursor], properties: {data: {type: array, items: {$ref: '#/components/schemas/Journal'}}, next_cursor: {type: [string, 'null']}}}
     ObligationPaymentResult: {type: object, required: [status], properties: {payment_intent_id: {type: string, format: uuid}, obligation_id: {type: string}, amount: {type: string}, currency: {type: string}, status: {type: string, enum: [APPLIED, PENDING_APPLICATION, UNKNOWN_PENDING_RECONCILIATION]}, journal_id: {type: string, format: uuid}, settlement: {type: string, const: not_claimed}}}

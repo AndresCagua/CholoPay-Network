@@ -27,7 +27,7 @@ public class JdbcPublicAccountService implements PublicAccountService {
         String token = UUID.randomUUID().toString();
         try {
             jdbc.update("INSERT INTO public_customer(id, participant_id, synthetic_reference, api_token_hash) VALUES (?, ?, ?, ?)",
-                    customerId, participantId, syntheticReference, hash(token));
+                    customerId, participantId, syntheticReference, hashToken(token));
         } catch (org.springframework.dao.DuplicateKeyException duplicate) {
             throw new IllegalArgumentException("la referencia sintética del cliente ya existe");
         }
@@ -59,10 +59,10 @@ public class JdbcPublicAccountService implements PublicAccountService {
 
     private String verifiedToken(String token) {
         if (token == null || token.isBlank()) throw new SecurityException("la autorización del cliente no es válida");
-        return hash(token);
+        return hashToken(token);
     }
 
-    private static String hash(String value) {
+    public static String hashToken(String value) {
         try { return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (Exception e) { throw new IllegalStateException("no se pudo validar el token sintético", e); }
     }
