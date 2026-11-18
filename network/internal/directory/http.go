@@ -84,13 +84,13 @@ func (h *Handler) block(w http.ResponseWriter, r *http.Request)   { h.lifecycle(
 func (h *Handler) delete(w http.ResponseWriter, r *http.Request)  { h.lifecycle(w, r, "DELETE") }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
-	if !authorizedBearer(r, os.Getenv("DIRECTORY_PORT_TOKEN")) {
-		http.Error(w, "se requiere autorización", http.StatusUnauthorized)
-		return
-	}
 	var request createRequest
 	if json.NewDecoder(r.Body).Decode(&request) != nil || request.NetworkID == uuid.Nil || request.ParticipantID == uuid.Nil || request.KeyType == "" || request.KeyValue == "" || request.AccountRef == "" {
-		http.Error(w, "solicitud no válida", http.StatusBadRequest)
+		http.Error(w, "se requiere autorización del participante", http.StatusUnauthorized)
+		return
+	}
+	if !authorizedParticipant(r, request.ParticipantID) {
+		http.Error(w, "se requiere autorización del participante", http.StatusUnauthorized)
 		return
 	}
 	entry, err := h.store.Create(r.Context(), Entry{KeyID: request.KeyID, NetworkID: request.NetworkID, ParticipantID: request.ParticipantID, KeyType: request.KeyType, KeyValue: request.KeyValue, AccountRef: request.AccountRef, AccountKind: request.AccountKind, Status: "ACTIVE", Version: 1, IdempotencyKey: r.Header.Get("Idempotency-Key")})
@@ -188,6 +188,20 @@ func (h *Handler) port(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func authorizedParticipant(r *http.Request, participantID uuid.UUID) bool {
+	value := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	if value == "" {
+		return false
+	}
+	for _, binding := range strings.Split(os.Getenv("DIRECTORY_PARTICIPANT_TOKENS"), ",") {
+		parts := strings.SplitN(binding, "=", 2)
+		if len(parts) == 2 && parts[0] == participantID.String() && subtle.ConstantTimeCompare([]byte(value), []byte(parts[1])) == 1 {
+			return true
+		}
+	}
+	return false
 }
 
 func authorizedBearer(r *http.Request, expected string) bool {

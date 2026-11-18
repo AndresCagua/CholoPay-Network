@@ -87,6 +87,7 @@ services:
       NETWORK_ID: 00000000-0000-4000-8000-000000000201
       CHOLONET_DIRECTORY_URL: http://network:8080/internal/v1/directory
       DIRECTORY_PORT_TOKEN: ${DIRECTORY_PORT_TOKEN:-}
+      DIRECTORY_PARTICIPANT_TOKEN: ${COSTA_DIRECTORY_PARTICIPANT_TOKEN:-costa-directory-participant-local-only}
       SERVER_PORT: 8080
       NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
       GATEWAY_URL: http://gateway:8090
@@ -114,6 +115,7 @@ services:
       NETWORK_ID: 00000000-0000-4000-8000-000000000202
       CHOLONET_DIRECTORY_URL: http://network:8080/internal/v1/directory
       DIRECTORY_PORT_TOKEN: ${DIRECTORY_PORT_TOKEN:-}
+      DIRECTORY_PARTICIPANT_TOKEN: ${SIERRA_DIRECTORY_PARTICIPANT_TOKEN:-sierra-directory-participant-local-only}
       SERVER_PORT: 8080
       NETWORK_ADAPTER_SECRET: ${SIERRA_NETWORK_ADAPTER_SECRET:-sierra-local-test-only}
       GATEWAY_URL: http://gateway:8090
@@ -141,6 +143,7 @@ services:
       NETWORK_ID: 00000000-0000-4000-8000-000000000203
       CHOLONET_DIRECTORY_URL: http://network:8080/internal/v1/directory
       DIRECTORY_PORT_TOKEN: ${DIRECTORY_PORT_TOKEN:-}
+      DIRECTORY_PARTICIPANT_TOKEN: ${ORIENTE_DIRECTORY_PARTICIPANT_TOKEN:-oriente-directory-participant-local-only}
       SERVER_PORT: 8080
       NETWORK_ADAPTER_SECRET: ${ORIENTE_NETWORK_ADAPTER_SECRET:-oriente-local-test-only}
       GATEWAY_URL: http://gateway:8090
@@ -264,6 +267,7 @@ services:
       NETWORK_DB_URL: postgres://${POSTGRES_USER:-cholopay}:${POSTGRES_PASSWORD:-cholopay_local_only}@network-db:5432/${NETWORK_DB_NAME:-cholopay_network}?sslmode=disable
       OPERATOR_CONSOLE_TOKEN: ${OPERATOR_CONSOLE_TOKEN:-}
       DIRECTORY_PORT_TOKEN: ${DIRECTORY_PORT_TOKEN:-}
+      DIRECTORY_PARTICIPANT_TOKENS: ${DIRECTORY_PARTICIPANT_TOKENS:-00000000-0000-4000-8000-000000000101=costa-directory-participant-local-only,00000000-0000-4000-8000-000000000102=sierra-directory-participant-local-only,00000000-0000-4000-8000-000000000103=oriente-directory-participant-local-only}
       CHOLONET_HMAC_SECRET: ${CHOLONET_HMAC_SECRET:-}
       NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
       BANK_RECEIVER_CREDIT_URL: http://bank-core:8080/internal/v1/receiver-credits

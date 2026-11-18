@@ -1,3 +1,10 @@
+CREATE TABLE public_cholokey_qr_static (
+  payload_hash CHAR(64) PRIMARY KEY,
+  key_id UUID NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX public_cholokey_qr_static_key ON public_cholokey_qr_static(key_id);
+
 CREATE TABLE public_cholokey_qr_dynamic (
   payload_id UUID PRIMARY KEY,
   key_id UUID NOT NULL,
