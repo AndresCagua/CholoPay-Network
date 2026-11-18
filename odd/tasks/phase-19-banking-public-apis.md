@@ -11,7 +11,7 @@ Fuente: `spec.md`, P3 pendiente y decisión del usuario de continuar con el sigu
 ## Tasks
 - T1 [S1-S4] Implementar customers sintéticos, cuentas y balance público con autorización y aislamiento. Ruta: bank-core + migración + pruebas Docker. Commit: `4cd6709`.
 - T2 [S1-S2] Añadir movimientos/journals, paginación cursor y Problem Details uniforme. Ruta: bank-core + OpenAPI + pruebas Docker. Commit: `7b50046`.
-- T3 [S1-S2] Completar payment intents públicos, refunds y participantes. Ruta: bank-core + OpenAPI + pruebas Docker. Commit: pendiente.
+- T3 [S1-S2] Completar payment intents públicos, refunds y participantes. Ruta: bank-core + OpenAPI + pruebas Docker. Commit: pendiente. Autorización: token de cliente para consultas/refunds públicos; `BANK_API_TOKEN` para operaciones administrativas.
 - T4 [S1-S2] Completar CholoKey público y validación automática del contrato. Ruta: bank-core + OpenAPI + CI Docker. Commit: pendiente.
 - T5 [S1-S4] Integrar evidencia, limitaciones y cierre de P3. Ruta: docs + aceptación Docker + review RDD. Commit: pendiente.
 
@@ -22,3 +22,5 @@ Fuente: `spec.md`, P3 pendiente y decisión del usuario de continuar con el sigu
 - L4. T1 quedó en `4cd6709 20261118: habilita cuentas públicas sintéticas`. `job-2` pasó la suite bancaria Docker estándar, `job-4` pasó `mvn -Pintegration test` en Docker y `git diff --check` pasó. La API devuelve tokens sintéticos de cliente y aplica aislamiento por participante/cliente; no representa autenticación productiva.
 - L5. T2 implementa movimientos y journals participant/customer-scoped, cursor Base64URL opaco con orden estable `(created_at,id)`, timestamps persistidos y Problem Details para las rutas nuevas. `job-8` pasó la suite bancaria estándar y `job-10` pasó `mvn -Pintegration test` en Docker. Los endpoints legacy conservan `{error,message}`.
 - L6. Tras normalizar títulos y detalles Problem Details al español, `job-12` pasó la suite estándar y `job-13` pasó `mvn -Pintegration test` en Docker. Las pruebas verifican cursor de dos páginas, aislamiento, límites, autorización y contenido Problem Details.
+- L7. La exploración de T3 confirmó que bank-core solo expone POST de obligation payment-intents; no existen consulta de estado, cancelación, refunds ni recursos públicos de participantes. Decisión del usuario: separar autorización; consultas/refunds públicos usarán token de cliente y operaciones administrativas usarán `BANK_API_TOKEN`.
+- L8. T3 añade consulta pública de intents, refunds sintéticos full-only idempotentes con `ledger_boundary: not_claimed` y consulta administrativa del participante configurado. Se excluyó cancelación porque `PENDING_APPLICATION` ya tiene débito/journal local y no admite una transición segura sin compensación. `job-17` y `job-18` pasaron las suites Docker; `job-20` validó el YAML OpenAPI después de corregir CustomerCreated y AccountList.

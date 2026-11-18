@@ -135,6 +135,60 @@ public class JdbcObligationPaymentService {
         return persisted;
     }
 
+    public Map<String, Object> retrieve(String participantId, String customerToken, UUID paymentId) {
+        String tokenHash = JdbcPublicAccountService.hashToken(requiredToken(customerToken));
+        return jdbc.query("SELECT p.id, p.obligation_id, p.amount_minor, p.currency, p.status, p.journal_id, p.application_result "
+                        + "FROM payment_intent p JOIN ledger_account a ON a.id=p.source_account_id "
+                        + "JOIN public_customer c ON c.id=a.customer_id WHERE p.id=? AND p.participant_id=? AND c.api_token_hash=?",
+                rs -> rs.next() ? paymentBody(rs.getObject(1, UUID.class), rs.getString(2), rs.getLong(3), rs.getString(4), rs.getString(5), rs.getObject(6, UUID.class), rs.getString(7)) : null,
+                paymentId, participantId, tokenHash);
+    }
+
+    public Map<String, Object> refund(String participantId, String customerToken, UUID paymentId, String idempotencyKey, String requestedAmount) {
+        String tokenHash = JdbcPublicAccountService.hashToken(requiredToken(customerToken));
+        if (isBlank(idempotencyKey)) throw new IllegalArgumentException("idempotency_key_required");
+        return transactions.execute(status -> {
+            RefundExisting prior = jdbc.query("SELECT r.id, r.payment_intent_id, r.amount_minor, r.currency, r.status, r.request_hash FROM payment_intent_refund r WHERE r.idempotency_key=? FOR UPDATE",
+                    (rs, row) -> new RefundExisting(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), rs.getLong(3), rs.getString(4), rs.getString(5), rs.getString(6)), idempotencyKey).stream().findFirst().orElse(null);
+            Payment payment = jdbc.query("SELECT p.id,p.amount_minor,p.currency,p.status FROM payment_intent p JOIN ledger_account a ON a.id=p.source_account_id JOIN public_customer c ON c.id=a.customer_id WHERE p.id=? AND p.participant_id=? AND c.api_token_hash=? FOR UPDATE",
+                    (rs, row) -> new Payment(rs.getObject(1, UUID.class), rs.getLong(2), rs.getString(3), rs.getString(4)), paymentId, participantId, tokenHash).stream().findFirst().orElse(null);
+            if (payment == null) return null;
+            long amount = payment.amountMinor();
+            if (requestedAmount != null) {
+                try { amount = new BigDecimal(requestedAmount).setScale(2, RoundingMode.UNNECESSARY).movePointRight(2).longValueExact(); }
+                catch (Exception e) { throw new IllegalArgumentException("refund_amount_invalid"); }
+            }
+            if (amount != payment.amountMinor()) throw new IllegalArgumentException("refund_must_be_full");
+            String hash = hash(paymentId + ":" + amount + ":USD");
+            if (prior != null) {
+                if (!hash.equals(prior.requestHash())) throw new IllegalStateException("idempotency_key_conflict");
+                return refundBody(prior.id(), paymentId, prior.amountMinor(), prior.currency(), prior.status());
+            }
+            if (!"APPLIED".equals(payment.status())) throw new IllegalStateException("payment_not_refundable");
+            RefundExisting existingForPayment = jdbc.query("SELECT id, payment_intent_id, amount_minor, currency, status, request_hash FROM payment_intent_refund WHERE payment_intent_id=? FOR UPDATE",
+                    (rs,row) -> new RefundExisting(rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),rs.getLong(3),rs.getString(4),rs.getString(5),rs.getString(6)), paymentId).stream().findFirst().orElse(null);
+            if (existingForPayment != null) throw new IllegalStateException("idempotency_key_conflict");
+            UUID refundId = UUID.randomUUID();
+            jdbc.update("INSERT INTO payment_intent_refund(id,payment_intent_id,idempotency_key,request_hash,amount_minor,currency,status) VALUES (?,?,?,?,?,'USD','SUCCEEDED')", refundId, paymentId, idempotencyKey, hash, amount);
+            return refundBody(refundId, paymentId, amount, "USD", "SUCCEEDED");
+        });
+    }
+
+    private Map<String, Object> retrieveById(UUID paymentId) {
+        return jdbc.queryForObject("SELECT id, obligation_id, amount_minor, currency, status, journal_id, application_result FROM payment_intent WHERE id=?", (rs,row) -> paymentBody(rs.getObject(1,UUID.class),rs.getString(2),rs.getLong(3),rs.getString(4),rs.getString(5),rs.getObject(6,UUID.class),rs.getString(7)), paymentId);
+    }
+    private Map<String, Object> paymentBody(UUID id, String obligation, long amount, String currency, String status, UUID journal, String applicationResult) {
+        if (applicationResult != null) try { return new LinkedHashMap<>(json.readValue(applicationResult, Map.class)); } catch (Exception ignored) { }
+        return new LinkedHashMap<>(Map.of("payment_intent_id", id, "obligation_id", obligation, "amount", BigDecimal.valueOf(amount, 2), "currency", currency, "status", status, "journal_id", journal, "settlement", "not_claimed"));
+    }
+    private Map<String,Object> refundBody(UUID id, UUID paymentId, long amount, String currency, String status) {
+        return Map.of("refund_id", id, "payment_intent_id", paymentId, "amount", BigDecimal.valueOf(amount, 2),
+                "currency", currency, "status", status, "ledger_boundary", "not_claimed");
+    }
+    private String requiredToken(String token) { if (isBlank(token)) throw new SecurityException("customer token required"); return token; }
+    private record Payment(UUID id, long amountMinor, String currency, String status) {}
+    private record RefundExisting(UUID id, UUID paymentIntentId, long amountMinor, String currency, String status, String requestHash) {}
+
     private Result readResult(Existing existing) {
         if (existing.applicationResult() != null) {
             try { return new Result(201, json.readValue(existing.applicationResult(), Map.class), null, existing.id()); } catch (Exception ignored) { }

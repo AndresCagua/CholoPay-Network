@@ -61,6 +61,16 @@ paths:
       parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TransferInput'}}}}
       responses: {'202': {description: Aceptado; no es prueba de liquidación}, '409': {description: Conflicto}}
+  /v1/participants/{participantId}:
+    get:
+      summary: Consultar la identidad sintética del participante configurado
+      security: [{bearerAuth: []}]
+      parameters: [{in: path, name: participantId, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: Identidad y metadatos sintéticos del banco, content: {application/json: {schema: {$ref: '#/components/schemas/Participant'}}}}
+        '401': {description: Autorización bancaria ausente o inválida, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '404': {description: Participante no disponible sin revelar si el identificador pertenece a otro banco, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '503': {description: Configuración bancaria incompleta, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
   /v1/participants/{participantId}/obligations/{obligationId}/payment-intents:
     post:
       security: [{bearerAuth: []}]
@@ -94,14 +104,47 @@ paths:
         '422': {description: Participante, cuenta de origen u obligación inválidos, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
         '503': {description: Configuración interna incompleta, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
         '502': {description: Gateway no disponible o no autenticado, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /v1/payment-intents/{paymentIntentId}:
+    get:
+      security: [{bearerAuth: []}]
+      parameters: [{in: path, name: paymentIntentId, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: Intención de pago propia, content: {application/json: {schema: {$ref: '#/components/schemas/ObligationPaymentResult'}}}}
+        '401': {description: Token del cliente inválido, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '404': {description: Intención inaccesible}
+  /v1/payment-intents/{paymentIntentId}/refunds:
+    post:
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: paymentIntentId, required: true, schema: {type: string, format: uuid}}
+        - {in: header, name: Idempotency-Key, required: true, schema: {type: string}}
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/RefundInput'}}}}
+      responses:
+        '201': {description: Reembolso completo sintético durable; no modifica el ledger, content: {application/json: {schema: {$ref: '#/components/schemas/RefundResult'}}}}
+        '400': {description: Importe parcial o clave ausente, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '401': {description: Token del cliente inválido, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
+        '404': {description: Intención inaccesible}
+        '409': {description: Reembolso no permitido o conflicto de idempotencia, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ProblemDetails'}}}}
   /v1/keys:
     post: {responses: {'201': {description: Registro solicitado}, '409': {description: La clave ya está activa}}}
 components:
   securitySchemes: {bearerAuth: {type: http, scheme: bearer}}
   schemas:
     CustomerCreate: {type: object, required: [synthetic_reference], properties: {synthetic_reference: {type: string, maxLength: 160}}}
-    CustomerCreated: {type: object, required: [customer_id, synthetic_reference, access_token, accounts], properties: {customer_id: {type: string, format: uuid}, synthetic_reference: {type: string}, access_token: {type: string}, accounts: {type: array, items: {$ref: '#/components/schemas/Account'}}}
-    AccountList: {type: object, required: [accounts], properties: {accounts: {type: array, items: {$ref: '#/components/schemas/Account'}}}}
+    Participant: {type: object, required: [participant_id, metadata], properties: {participant_id: {type: string}, metadata: {type: object, required: [environment, status], properties: {environment: {type: string, const: synthetic}, status: {type: string, const: ACTIVE}}}}}
+    CustomerCreated:
+      type: object
+      required: [customer_id, synthetic_reference, access_token, accounts]
+      properties:
+        customer_id: {type: string, format: uuid}
+        synthetic_reference: {type: string}
+        access_token: {type: string}
+        accounts: {type: array, items: {$ref: '#/components/schemas/Account'}}
+    AccountList:
+      type: object
+      required: [accounts]
+      properties:
+        accounts: {type: array, items: {$ref: '#/components/schemas/Account'}}
     Account: {type: object, required: [account_id, currency, balance_minor, available_balance_minor], properties: {account_id: {type: string, format: uuid}, currency: {type: string, const: USD}, balance_minor: {type: integer, format: int64}, available_balance_minor: {type: integer, format: int64}}}
     AccountBalance: {$ref: '#/components/schemas/Account'}
     TransferInput: {type: object, required: [source_account_id, amount_minor, currency], properties: {source_account_id: {type: string, format: uuid}, destination_account_ref: {type: string}, amount_minor: {type: integer, format: int64, minimum: 1}, currency: {type: string, const: USD}, correlation_id: {type: string, format: uuid}}}
@@ -114,3 +157,5 @@ components:
     Journal: {type: object, required: [id, transaction_id, idempotency_key, correlation_id, entries, created_at], properties: {id: {type: string, format: uuid}, transaction_id: {type: string, format: uuid}, idempotency_key: {type: string}, correlation_id: {type: string, format: uuid}, entries: {type: array, items: {$ref: '#/components/schemas/JournalEntry'}}, created_at: {type: string, format: date-time}}}
     JournalPage: {type: object, required: [data, next_cursor], properties: {data: {type: array, items: {$ref: '#/components/schemas/Journal'}}, next_cursor: {type: [string, 'null']}}}
     ObligationPaymentResult: {type: object, required: [status], properties: {payment_intent_id: {type: string, format: uuid}, obligation_id: {type: string}, amount: {type: string}, currency: {type: string}, status: {type: string, enum: [APPLIED, PENDING_APPLICATION, UNKNOWN_PENDING_RECONCILIATION]}, journal_id: {type: string, format: uuid}, settlement: {type: string, const: not_claimed}}}
+    RefundInput: {type: object, properties: {amount: {type: string, description: Debe coincidir con el importe total de la intención}}}
+    RefundResult: {type: object, required: [refund_id, payment_intent_id, amount, currency, status, ledger_boundary], properties: {refund_id: {type: string, format: uuid}, payment_intent_id: {type: string, format: uuid}, amount: {type: string}, currency: {type: string, const: USD}, status: {type: string, const: SUCCEEDED}, ledger_boundary: {type: string, const: not_claimed}}}
