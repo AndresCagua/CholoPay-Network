@@ -14,7 +14,7 @@ Fuente: `spec.md`, P3 pendiente y decisión del usuario de continuar con el sigu
 - T3 [S1-S2] Completar payment intents públicos, refunds y participantes. Ruta: bank-core + OpenAPI + pruebas Docker. Commit: `17b46a3`. Autorización: token de cliente para consultas/refunds públicos; `BANK_API_TOKEN` para operaciones administrativas.
 - T4a [S1-S2] Completar lifecycle del directorio CholoKey: creación, suspensión/bloqueo, baja, límites, unicidad e historial append-only. Ruta: network + migración + pruebas Docker. Commit: `8d8a720`.
 - T4b [S1-S2] Añadir facade bancaria participant/customer-scoped para CholoKey y QR sintético verificable. Ruta: bank-core/network + OpenAPI + pruebas Docker. Commit: `ee8e5cc`.
-- T4c [S1-S2] Validar OpenAPI de bank/network dentro de Docker y actualizar evidencia P4. Ruta: infra + docs + pruebas Docker. Commit: `PENDIENTE_T4C`.
+- T4c [S1-S2] Validar OpenAPI de bank/network dentro de Docker y actualizar evidencia P4. Ruta: infra + docs + pruebas Docker. Commit: `9d6388b`.
 - T5 [S1-S4] Integrar evidencia, limitaciones y cierre de P3. Ruta: docs + aceptación Docker + review RDD. Commit: pendiente.
 
 ## Log
