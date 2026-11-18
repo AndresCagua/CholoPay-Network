@@ -13,15 +13,16 @@ import (
 )
 
 type Entry struct {
-	KeyID         uuid.UUID
-	NetworkID     uuid.UUID
-	ParticipantID uuid.UUID
-	KeyType       string
-	KeyValue      string
-	AccountRef    string
-	AccountKind   string
-	Status        string
-	Version       int64
+	KeyID          uuid.UUID
+	NetworkID      uuid.UUID
+	ParticipantID  uuid.UUID
+	KeyType        string
+	KeyValue       string
+	AccountRef     string
+	AccountKind    string
+	Status         string
+	Version        int64
+	IdempotencyKey string
 }
 
 type Resolution struct {
@@ -54,7 +55,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		key_value VARCHAR(256) NOT NULL,
 		account_ref VARCHAR(128) NOT NULL,
 		account_kind VARCHAR(16) NOT NULL DEFAULT 'PERSONAL' CHECK (account_kind IN ('PERSONAL','BUSINESS')),
-		status VARCHAR(16) NOT NULL CHECK (status IN ('ACTIVE','SUSPENDED')),
+		status VARCHAR(16) NOT NULL CHECK (status IN ('ACTIVE','SUSPENDED','BLOCKED','DELETED')),
 		version BIGINT NOT NULL CHECK (version > 0),
 		created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE (network_id, key_type, key_value)
@@ -65,6 +66,16 @@ func (s *Store) Migrate(ctx context.Context) error {
 	_, err = s.db.ExecContext(ctx, `ALTER TABLE directory_key ADD COLUMN IF NOT EXISTS account_kind VARCHAR(16) NOT NULL DEFAULT 'PERSONAL'`)
 	if err != nil {
 		return err
+	}
+	for _, statement := range []string{
+		`ALTER TABLE directory_key DROP CONSTRAINT IF EXISTS directory_key_network_id_key_type_key_value_key`,
+		`ALTER TABLE directory_key DROP CONSTRAINT IF EXISTS directory_key_status_check`,
+		`ALTER TABLE directory_key ADD CONSTRAINT directory_key_status_check CHECK (status IN ('ACTIVE','SUSPENDED','BLOCKED','DELETED'))`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS directory_key_network_active_identity ON directory_key(network_id,key_type,key_value) WHERE status='ACTIVE'`,
+	} {
+		if _, err := s.db.ExecContext(ctx, statement); err != nil {
+			return err
+		}
 	}
 	_, err = s.db.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS directory_key_global_active_identity ON directory_key(key_type,key_value) WHERE status='ACTIVE' AND key_type IN ('EMAIL','PHONE','DOCUMENT')`)
 	if err != nil {
@@ -79,6 +90,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 		return err
 	}
 	for _, statement := range []string{
+		`ALTER TABLE directory_key_operations ADD COLUMN IF NOT EXISTS operation_type VARCHAR(32) NOT NULL DEFAULT 'PORT'`,
+		`ALTER TABLE directory_key_operations ADD COLUMN IF NOT EXISTS participant_id UUID`,
+		`ALTER TABLE directory_key_operations ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'COMPLETED'`,
 		`ALTER TABLE directory_key_operations ADD COLUMN IF NOT EXISTS schema_version VARCHAR(32) NOT NULL DEFAULT '1.0'`,
 		`ALTER TABLE directory_key_operations ADD COLUMN IF NOT EXISTS correlation_id UUID`,
 		`ALTER TABLE directory_key_operations ADD COLUMN IF NOT EXISTS causation_id UUID`,
@@ -89,11 +103,43 @@ func (s *Store) Migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	_, err = s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS directory_key_history (
+		history_id UUID PRIMARY KEY, key_id UUID NOT NULL REFERENCES directory_key(key_id), participant_id UUID NOT NULL REFERENCES network_participant(participant_id),
+		operation_type VARCHAR(32) NOT NULL, from_status VARCHAR(16), to_status VARCHAR(16) NOT NULL, reason VARCHAR(256) NOT NULL DEFAULT '',
+		idempotency_key VARCHAR(128), correlation_id UUID, causation_id UUID, schema_version VARCHAR(32) NOT NULL DEFAULT '1.0', occurred_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`)
+	if err != nil {
+		return err
+	}
+	for _, statement := range []string{
+		`CREATE INDEX IF NOT EXISTS directory_key_history_key_order ON directory_key_history(key_id, occurred_at, history_id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS directory_key_history_idempotency ON directory_key_history(idempotency_key) WHERE idempotency_key IS NOT NULL AND idempotency_key <> ''`,
+	} {
+		if _, err := s.db.ExecContext(ctx, statement); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 var ErrKeyLimit = errors.New("se excedió el límite de claves de directorio")
 var ErrKeyConflict = errors.New("la clave de directorio ya está activa")
+var ErrUnauthorized = errors.New("el participante no está autorizado para esta clave")
+var ErrInvalidTransition = errors.New("transición de estado de clave no permitida")
+
+// LifecycleRequest identifica al participante que solicita el cambio; nunca se autoriza solo por key_id.
+type LifecycleRequest struct {
+	KeyID, ParticipantID               uuid.UUID
+	AccountRef, Reason, IdempotencyKey string
+	CorrelationID, CausationID         uuid.UUID
+	SchemaVersion                      string
+}
+
+type HistoryEntry struct {
+	HistoryID, KeyID, ParticipantID                             uuid.UUID
+	OperationType, FromStatus, ToStatus, Reason, IdempotencyKey string
+	OccurredAt                                                  time.Time
+}
 
 func (s *Store) Register(ctx context.Context, entry Entry) error {
 	kind := entry.AccountKind
@@ -103,6 +149,15 @@ func (s *Store) Register(ctx context.Context, entry Entry) error {
 	limit := 5
 	if kind == "BUSINESS" {
 		limit = 20
+	}
+	if entry.KeyID == uuid.Nil {
+		entry.KeyID = uuid.New()
+	}
+	if entry.Status == "" {
+		entry.Status = "ACTIVE"
+	}
+	if entry.Status != "ACTIVE" {
+		return ErrInvalidTransition
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -114,7 +169,7 @@ func (s *Store) Register(ctx context.Context, entry Entry) error {
 		return err
 	}
 	var count int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM directory_key WHERE account_ref=$1 AND status='ACTIVE'`, entry.AccountRef).Scan(&count); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM directory_key WHERE participant_id=$1 AND account_ref=$2 AND status='ACTIVE'`, entry.ParticipantID, entry.AccountRef).Scan(&count); err != nil {
 		return err
 	}
 	if count >= limit {
@@ -129,10 +184,109 @@ func (s *Store) Register(ctx context.Context, entry Entry) error {
 			return ErrKeyConflict
 		}
 	}
+	if entry.IdempotencyKey != "" {
+		var existing uuid.UUID
+		if err := tx.QueryRowContext(ctx, `SELECT key_id FROM directory_key_history WHERE idempotency_key=$1`, entry.IdempotencyKey).Scan(&existing); err == nil {
+			if existing == entry.KeyID {
+				return tx.Commit()
+			}
+			return ErrPortConflict
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key(key_id,network_id,participant_id,key_type,key_value,account_ref,account_kind,status,version) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, entry.KeyID, entry.NetworkID, entry.ParticipantID, entry.KeyType, entry.KeyValue, entry.AccountRef, kind, entry.Status, entry.Version); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key_history(history_id,key_id,participant_id,operation_type,to_status,reason,idempotency_key) VALUES ($1,$2,$3,'CREATE',$4,$5,NULLIF($6,''))`, uuid.New(), entry.KeyID, entry.ParticipantID, entry.Status, "alta sintética", entry.IdempotencyKey); err != nil {
+		return err
+	}
 	return tx.Commit()
+}
+
+// Create genera la identidad sintética cuando el banco no proporciona key_id.
+func (s *Store) Create(ctx context.Context, entry Entry) (Entry, error) {
+	if entry.KeyID == uuid.Nil {
+		entry.KeyID = uuid.New()
+	}
+	if err := s.Register(ctx, entry); err != nil {
+		return Entry{}, err
+	}
+	return entry, nil
+}
+
+func (s *Store) transition(ctx context.Context, request LifecycleRequest, operation, target string) error {
+	if request.SchemaVersion == "" {
+		request.SchemaVersion = "1.0"
+	}
+	if request.IdempotencyKey == "" {
+		return errors.New("se requiere idempotency_key")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, request.KeyID.String()); err != nil {
+		return err
+	}
+	var old, account string
+	var owner uuid.UUID
+	if err = tx.QueryRowContext(ctx, `SELECT status,participant_id,account_ref FROM directory_key WHERE key_id=$1 FOR UPDATE`, request.KeyID).Scan(&old, &owner, &account); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+	if owner != request.ParticipantID || (request.AccountRef != "" && request.AccountRef != account) {
+		return ErrUnauthorized
+	}
+	var existing string
+	if err = tx.QueryRowContext(ctx, `SELECT to_status FROM directory_key_history WHERE idempotency_key=$1`, request.IdempotencyKey).Scan(&existing); err == nil {
+		if existing != target {
+			return ErrPortConflict
+		}
+		return nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if old == "DELETED" || (operation == "SUSPEND" && old != "ACTIVE") || (operation == "BLOCK" && old != "ACTIVE") || (operation == "DELETE" && old == "DELETED") {
+		return ErrInvalidTransition
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE directory_key SET status=$1,version=version+1 WHERE key_id=$2`, target, request.KeyID); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO directory_key_history(history_id,key_id,participant_id,operation_type,from_status,to_status,reason,idempotency_key,correlation_id,causation_id,schema_version) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, uuid.New(), request.KeyID, request.ParticipantID, operation, old, target, request.Reason, request.IdempotencyKey, request.CorrelationID, request.CausationID, request.SchemaVersion); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) Suspend(ctx context.Context, request LifecycleRequest) error {
+	return s.transition(ctx, request, "SUSPEND", "SUSPENDED")
+}
+func (s *Store) Block(ctx context.Context, request LifecycleRequest) error {
+	return s.transition(ctx, request, "BLOCK", "BLOCKED")
+}
+func (s *Store) Delete(ctx context.Context, request LifecycleRequest) error {
+	return s.transition(ctx, request, "DELETE", "DELETED")
+}
+
+func (s *Store) History(ctx context.Context, keyID, participantID uuid.UUID) ([]HistoryEntry, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT history_id,key_id,participant_id,operation_type,COALESCE(from_status,''),to_status,reason,COALESCE(idempotency_key,''),occurred_at FROM directory_key_history WHERE key_id=$1 AND participant_id=$2 ORDER BY occurred_at,history_id`, keyID, participantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []HistoryEntry
+	for rows.Next() {
+		var item HistoryEntry
+		if err := rows.Scan(&item.HistoryID, &item.KeyID, &item.ParticipantID, &item.OperationType, &item.FromStatus, &item.ToStatus, &item.Reason, &item.IdempotencyKey, &item.OccurredAt); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
 }
 
 type PortRequest struct {
@@ -222,10 +376,20 @@ func (s *Store) Port(ctx context.Context, request PortRequest) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE directory_key SET status='SUSPENDED', version=version+1 WHERE key_id=$1`, oldKeyID); err != nil {
 		return err
 	}
+	var oldParticipant uuid.UUID
+	if err := tx.QueryRowContext(ctx, `SELECT participant_id FROM directory_key WHERE key_id=$1`, oldKeyID).Scan(&oldParticipant); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key_history(history_id,key_id,participant_id,operation_type,from_status,to_status,reason,idempotency_key) VALUES ($1,$2,$3,'PORT','ACTIVE','SUSPENDED','portabilidad de clave',NULL)`, uuid.New(), oldKeyID, oldParticipant); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key(key_id,network_id,participant_id,key_type,key_value,account_ref,account_kind,status,version) VALUES ($1,$2,$3,$4,$5,$6,$7,'ACTIVE',1)`, request.NewKeyID, request.ToNetworkID, request.ToParticipantID, request.KeyType, request.KeyValue, request.AccountRef, request.AccountKind); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key_operations(idempotency_key,request_fingerprint,key_id,schema_version,correlation_id,causation_id,trace_id,requested_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, request.IdempotencyKey, fingerprint, request.NewKeyID, request.SchemaVersion, request.CorrelationID, request.CausationID, request.TraceID, request.RequestedAt); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key_operations(idempotency_key,request_fingerprint,key_id,operation_type,participant_id,schema_version,correlation_id,causation_id,trace_id,requested_at) VALUES ($1,$2,$3,'PORT',$4,$5,$6,$7,$8,$9)`, request.IdempotencyKey, fingerprint, request.NewKeyID, request.ToParticipantID, request.SchemaVersion, request.CorrelationID, request.CausationID, request.TraceID, request.RequestedAt); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_key_history(history_id,key_id,participant_id,operation_type,from_status,to_status,reason) VALUES ($1,$2,$3,'PORT','ACTIVE','ACTIVE','portabilidad de clave')`, uuid.New(), request.NewKeyID, request.ToParticipantID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -253,6 +417,10 @@ func (s *Store) Resolve(ctx context.Context, networkID uuid.UUID, keyType, keyVa
 	}
 	if len(entries) != 1 {
 		return Resolution{}, ErrAmbiguous
+	}
+	if entries[0].Status == "DELETED" {
+		// El tombstone no permite enumerar que la clave existió.
+		return Resolution{}, ErrNotFound
 	}
 	if entries[0].Status != "ACTIVE" {
 		return Resolution{}, ErrSuspended

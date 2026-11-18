@@ -148,4 +148,30 @@ func TestPostgresDirectoryResolvesWithinOwningNetwork(t *testing.T) {
 	if resolved, err := store.Resolve(ctx, fintech, portKey.KeyType, portValue, uuid.New(), uuid.New(), "directory-port-new"); err != nil || resolved.Entry.ParticipantID != walletParticipant {
 		t.Fatalf("se esperaba la resolución del nuevo propietario, se obtuvo %+v, %v", resolved, err)
 	}
+	otherParticipant := uuid.New()
+	if err := store.Suspend(ctx, LifecycleRequest{KeyID: portRequest.NewKeyID, ParticipantID: otherParticipant, IdempotencyKey: "suspend-unauthorized"}); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("se esperaba aislamiento del participante, se obtuvo %v", err)
+	}
+	if err := store.Suspend(ctx, LifecycleRequest{KeyID: portRequest.NewKeyID, ParticipantID: walletParticipant, AccountRef: portKey.AccountRef, Reason: "pausa sintética", IdempotencyKey: "suspend-authorized"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Resolve(ctx, fintech, portKey.KeyType, portValue, uuid.New(), uuid.New(), "directory-port-suspended"); !errors.Is(err, ErrSuspended) {
+		t.Fatalf("se esperaba resolución suspendida, se obtuvo %v", err)
+	}
+	if err := store.Block(ctx, LifecycleRequest{KeyID: portRequest.NewKeyID, ParticipantID: walletParticipant, IdempotencyKey: "block-suspended"}); !errors.Is(err, ErrInvalidTransition) {
+		t.Fatalf("se esperaba transición explícita inválida, se obtuvo %v", err)
+	}
+	if err := store.Delete(ctx, LifecycleRequest{KeyID: portRequest.NewKeyID, ParticipantID: walletParticipant, IdempotencyKey: "delete-key"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Resolve(ctx, fintech, portKey.KeyType, portValue, uuid.New(), uuid.New(), "directory-port-deleted"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("el tombstone no debe enumerarse, se obtuvo %v", err)
+	}
+	history, err := store.History(ctx, portRequest.NewKeyID, walletParticipant)
+	if err != nil || len(history) < 3 {
+		t.Fatalf("se esperaba historial append-only de portabilidad y lifecycle, se obtuvo %d, %v", len(history), err)
+	}
+	if err := store.Delete(ctx, LifecycleRequest{KeyID: portRequest.NewKeyID, ParticipantID: walletParticipant, IdempotencyKey: "delete-key"}); err != nil {
+		t.Fatalf("se esperaba repetición idempotente de baja, se obtuvo %v", err)
+	}
 }
