@@ -6,7 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -45,7 +45,7 @@ func SignedReceiverRequest(method, url, secret string, p ReceiverCreditPayload, 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-CholoPay-Request-Timestamp", ts)
 	req.Header.Set("X-CholoPay-Request-Id", requestID)
-	req.Header.Set("X-CholoPay-Signature", hex.EncodeToString(mac.Sum(nil)))
+	req.Header.Set("X-CholoPay-Signature", base64.StdEncoding.EncodeToString(mac.Sum(nil)))
 	return req, nil
 }
 

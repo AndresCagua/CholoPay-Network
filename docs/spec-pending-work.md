@@ -22,7 +22,7 @@ Existen bases PostgreSQL, frontends y configuración para Costa, Sierra y Orient
 
 ### P2. Transferencia interbancaria completa
 
-**Estado:** Parcial — routing configurable completado en Phase 17 (`odd/tasks/phase-17-interbank-delivery.md`); falta la aceptación Costa→Sierra/Oriente de extremo a extremo, retries observados contra receptores reales y lectura pública de balances/journals.
+**Estado:** Parcial completado en Phase 18 (`odd/tasks/phase-18-interbank-e2e-acceptance.md`). La aceptación Costa→Sierra/Oriente, entrega, replay e idempotencia pasaron; falta inyección E2E de caída real del receptor y las APIs públicas de balances/journals de P3.
 
 Falta cerrar y demostrar el recorrido completo `Banco Costa → CholoNet → Banco Sierra/Oriente → receiver inbox → ledger receptor → consulta desde UI`.
 
@@ -129,3 +129,6 @@ Cada punto se marcará como `Pendiente`, `En progreso`, `Parcial`, `Bloqueado` o
 - 2026-11-17: Phase 16 añadió las instancias Sierra y Oriente, fixtures V9 y una identidad interna protegida por token. La aceptación `job-2` pasó con tres identidades correctas y rechazo de todos los tokens cruzados. La suite completa `bank-core-test` pasó en Docker como `job-3`. ASSESS clasificó el candidato como riesgo medio con `reviewDue=false`, por lo que no se inició review nativa adicional. El routing completo por participante y la transferencia interbancaria permanecen en P2.
 - 2026-11-18: Usuario: "listo dale con el siguiente pendiente". Se inicia Phase 17 para enrutar entregas de settlement por participante hacia Costa, Sierra u Oriente, conservando at-least-once, retries, leases, `delivery_id`, `event_id` e idempotencia. Las APIs bancarias de lectura permanecen en P3.
 - 2026-11-18: Phase 17 completó el routing configurable por `receiver_participant_id`, con URLs y secretos sintéticos independientes para Costa, Sierra y Oriente. `job-4` pasó toda la suite de red Docker. P2 permanece parcial porque aún no existe una aceptación E2E que cree una liquidación y observe inbox, journal, retry y replay en Sierra/Oriente; las APIs públicas de lectura se mantienen en P3.
+- 2026-11-18: Usuario: "continua porfa". Se inicia Phase 18 para construir esa aceptación E2E dentro de Compose, sin convertir todavía las consultas de balances/journals en APIs públicas de P3.
+- 2026-11-18: Phase 18 pasó `job-11`: settlement y entrega idempotente completados para Sierra y Oriente, con delivery persistente, replay y un único inbox/journal por entrega. El dispatcher ahora usa Base64, compatible con bank-core. La caída real de un receptor no se inyectó en este slice y las APIs públicas de lectura permanecen en P3.
+- 2026-11-18: El work unit de Phase 18 es `499377c 20261118: acepta entrega interbancaria E2E`; `job-12` pasó nuevamente la suite Docker de red. ASSESS sobre `f25851d..499377c` reportó riesgo medio y `reviewDue=false`, por lo que no se inició review nativa adicional.

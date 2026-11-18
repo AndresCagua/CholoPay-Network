@@ -3,7 +3,7 @@ package settlement
 import (
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/hex"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"testing"
@@ -45,7 +45,7 @@ func TestSignedReceiverRequestUsesStableDeliveryIdentityAndCanonicalPayload(t *t
 	}
 	mac := hmac.New(sha256.New, []byte("secret"))
 	mac.Write([]byte("1700000000." + p.DeliveryID.String() + "." + p.Canonical()))
-	if req.Header.Get("X-CholoPay-Signature") != hex.EncodeToString(mac.Sum(nil)) {
+	if req.Header.Get("X-CholoPay-Signature") != base64.StdEncoding.EncodeToString(mac.Sum(nil)) {
 		t.Fatal("signature does not cover timestamp, request id, and canonical payload")
 	}
 	if len(body) == 0 {

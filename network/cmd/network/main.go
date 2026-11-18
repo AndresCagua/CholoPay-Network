@@ -203,7 +203,10 @@ func main() {
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 			for range ticker.C {
-				_, _ = dispatcher.DispatchOnce(context.Background())
+				_, dispatchErr := dispatcher.DispatchOnce(context.Background())
+				if dispatchErr != nil {
+					slog.Error("fallo en la entrega al banco receptor", "error", dispatchErr)
+				}
 			}
 		}()
 	}

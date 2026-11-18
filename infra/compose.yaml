@@ -159,6 +159,41 @@ services:
       bank-core-oriente: {condition: service_started}
     networks: [internal_services, default]
 
+  phase18-seed:
+    image: postgres:17-alpine
+    profiles: [phase18]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+    command:
+      - sh
+      - -c
+      - >-
+        until psql -h network-db -U ${POSTGRES_USER:-cholopay} -d ${NETWORK_DB_NAME:-cholopay_network} -c "SELECT 1 FROM network_participant LIMIT 1" >/dev/null 2>&1; do sleep 1; done;
+        psql -h network-db -U ${POSTGRES_USER:-cholopay} -d ${NETWORK_DB_NAME:-cholopay_network} -v ON_ERROR_STOP=1 -c "INSERT INTO payment_network(network_id,code,kind,status) VALUES ('00000000-0000-4000-8000-000000000201','network-costa','BANKING','ACTIVE'),('00000000-0000-4000-8000-000000000202','network-sierra','BANKING','ACTIVE'),('00000000-0000-4000-8000-000000000203','network-oriente','BANKING','ACTIVE') ON CONFLICT DO NOTHING; INSERT INTO network_participant(participant_id,network_id,code,status) VALUES ('00000000-0000-4000-8000-000000000101','00000000-0000-4000-8000-000000000201','BANCO_COSTA','ACTIVE'),('00000000-0000-4000-8000-000000000102','00000000-0000-4000-8000-000000000202','BANCO_SIERRA','ACTIVE'),('00000000-0000-4000-8000-000000000103','00000000-0000-4000-8000-000000000203','BANCO_ORIENTE','ACTIVE') ON CONFLICT DO NOTHING; INSERT INTO settlement_account(participant_id,balance_minor,currency) VALUES ('00000000-0000-4000-8000-000000000101',1000000,'USD'),('00000000-0000-4000-8000-000000000102',0,'USD'),('00000000-0000-4000-8000-000000000103',0,'USD') ON CONFLICT DO NOTHING;"
+    depends_on:
+      network-db: {condition: service_healthy}
+      network: {condition: service_started}
+
+  phase18-e2e:
+    image: python:3.13-alpine
+    profiles: [phase18]
+    environment:
+      NETWORK_ADAPTER_SECRET: ${NETWORK_ADAPTER_SECRET:-local-test-only}
+      POSTGRES_USER: ${POSTGRES_USER:-cholopay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+    volumes:
+      - ./tests/phase18_interbank_e2e.py:/tests/phase18_interbank_e2e.py:ro
+    command:
+      - sh
+      - -c
+      - pip install --no-cache-dir 'psycopg[binary]' >/dev/null && python /tests/phase18_interbank_e2e.py
+    depends_on:
+      phase18-seed: {condition: service_completed_successfully}
+      network: {condition: service_started}
+      bank-core-sierra: {condition: service_started}
+      bank-core-oriente: {condition: service_started}
+    networks: [internal_services, default]
+
   obligations-e2e:
     image: python:3.13-alpine
     profiles: [acceptance]
