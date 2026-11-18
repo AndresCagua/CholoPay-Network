@@ -22,7 +22,7 @@ Existen bases PostgreSQL, frontends y configuración para Costa, Sierra y Orient
 
 ### P2. Transferencia interbancaria completa
 
-**Estado:** Parcial.
+**Estado:** Parcial — routing configurable completado en Phase 17 (`odd/tasks/phase-17-interbank-delivery.md`); falta la aceptación Costa→Sierra/Oriente de extremo a extremo, retries observados contra receptores reales y lectura pública de balances/journals.
 
 Falta cerrar y demostrar el recorrido completo `Banco Costa → CholoNet → Banco Sierra/Oriente → receiver inbox → ledger receptor → consulta desde UI`.
 
@@ -127,3 +127,5 @@ Cada punto se marcará como `Pendiente`, `En progreso`, `Parcial`, `Bloqueado` o
 - 2026-11-17: Usuario: "Los 10 puntos que me marcaste me parecen importantes, anótalos en la parte donde documentas que esos son los puntos pendientes y vamos resolviendo uno por uno". Se crea este registro como fuente de seguimiento y se selecciona P1 como siguiente slice.
 - 2026-11-17: La exploración de P1 confirma que existen `costa-db`, `sierra-db` y `oriente-db`, pero `infra/compose.yaml` solo ejecuta una instancia `bank-core` conectada a Costa. El siguiente slice debe añadir las tres instancias parametrizadas, identidades y secretos independientes, routing de receiver credits por participante, fixtures diferenciados y una prueba Docker de aislamiento. Las webs quedan fuera de P1 porque sus proyecciones reales pertenecen a la brecha de APIs/web.
 - 2026-11-17: Phase 16 añadió las instancias Sierra y Oriente, fixtures V9 y una identidad interna protegida por token. La aceptación `job-2` pasó con tres identidades correctas y rechazo de todos los tokens cruzados. La suite completa `bank-core-test` pasó en Docker como `job-3`. ASSESS clasificó el candidato como riesgo medio con `reviewDue=false`, por lo que no se inició review nativa adicional. El routing completo por participante y la transferencia interbancaria permanecen en P2.
+- 2026-11-18: Usuario: "listo dale con el siguiente pendiente". Se inicia Phase 17 para enrutar entregas de settlement por participante hacia Costa, Sierra u Oriente, conservando at-least-once, retries, leases, `delivery_id`, `event_id` e idempotencia. Las APIs bancarias de lectura permanecen en P3.
+- 2026-11-18: Phase 17 completó el routing configurable por `receiver_participant_id`, con URLs y secretos sintéticos independientes para Costa, Sierra y Oriente. `job-4` pasó toda la suite de red Docker. P2 permanece parcial porque aún no existe una aceptación E2E que cree una liquidación y observe inbox, journal, retry y replay en Sierra/Oriente; las APIs públicas de lectura se mantienen en P3.

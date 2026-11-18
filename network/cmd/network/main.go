@@ -193,7 +193,12 @@ func main() {
 			slog.Error("configuración inválida del lease de entrega", "error", leaseErr)
 			os.Exit(1)
 		}
-		dispatcher := &settlement.DeliveryDispatcher{Store: settlementStore, ReceiverURL: receiverURL, Secret: os.Getenv("NETWORK_ADAPTER_SECRET"), Lease: lease}
+		receiverRoutes, routesErr := settlement.ParseReceiverRoutes(os.Getenv("BANK_RECEIVER_ROUTES"))
+		if routesErr != nil {
+			slog.Error("configuración inválida de rutas receptoras", "error", routesErr)
+			os.Exit(1)
+		}
+		dispatcher := &settlement.DeliveryDispatcher{Store: settlementStore, ReceiverURL: receiverURL, Secret: os.Getenv("NETWORK_ADAPTER_SECRET"), ReceiverTargets: receiverRoutes, Lease: lease}
 		go func() {
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()

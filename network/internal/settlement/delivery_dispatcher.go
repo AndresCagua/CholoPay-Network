@@ -56,14 +56,15 @@ func defaultReceiverHTTPClient() *http.Client {
 }
 
 type DeliveryDispatcher struct {
-	Store       *Store
-	Client      *http.Client
-	ReceiverURL string
-	Secret      string
-	Lease       time.Duration
-	MaxAttempts int
-	Backoff     func(int) time.Duration
-	Now         func() time.Time
+	Store           *Store
+	Client          *http.Client
+	ReceiverURL     string
+	Secret          string
+	ReceiverTargets map[uuid.UUID]ReceiverTarget
+	Lease           time.Duration
+	MaxAttempts     int
+	Backoff         func(int) time.Duration
+	Now             func() time.Time
 }
 
 func (d *DeliveryDispatcher) DispatchOnce(ctx context.Context) (bool, error) {
@@ -98,8 +99,12 @@ func (d *DeliveryDispatcher) DispatchOnce(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	target, err := d.receiverTarget(delivery.ReceiverParticipantID)
+	if err != nil {
+		return true, d.recordFailure(ctx, delivery, owner, "RECEIVER_ROUTE_NOT_FOUND", err.Error())
+	}
 	p := ReceiverCreditPayload{delivery.DeliveryID, delivery.EventID, delivery.TransferID, delivery.DestinationAccountID, delivery.ClearingAccountID, delivery.AmountMinor}
-	req, err := SignedReceiverRequest(http.MethodPost, d.ReceiverURL, d.Secret, p, d.Now())
+	req, err := SignedReceiverRequest(http.MethodPost, target.URL, target.Secret, p, d.Now())
 	if err != nil {
 		return true, d.recordFailure(ctx, delivery, owner, "CONTRACT", err.Error())
 	}
@@ -132,6 +137,20 @@ func (d *DeliveryDispatcher) recordRetry(ctx context.Context, delivery Delivery,
 func (d *DeliveryDispatcher) recordFailure(ctx context.Context, delivery Delivery, owner uuid.UUID, code, detail string) error {
 	_, err := d.Store.db.ExecContext(ctx, `UPDATE settlement_delivery SET state='FAILED',failure_code=$1,failure_detail=$2,lease_owner=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE delivery_id=$3 AND lease_owner=$4`, code, detail, delivery.DeliveryID, owner)
 	return err
+}
+
+func (d *DeliveryDispatcher) receiverTarget(participantID uuid.UUID) (ReceiverTarget, error) {
+	if len(d.ReceiverTargets) > 0 {
+		target, ok := d.ReceiverTargets[participantID]
+		if !ok || target.URL == "" || target.Secret == "" {
+			return ReceiverTarget{}, fmt.Errorf("no existe una ruta de entrega para el participante %s", participantID)
+		}
+		return target, nil
+	}
+	if d.ReceiverURL == "" || d.Secret == "" {
+		return ReceiverTarget{}, errors.New("la ruta de entrega del receptor no está configurada")
+	}
+	return ReceiverTarget{URL: d.ReceiverURL, Secret: d.Secret}, nil
 }
 
 var ErrNoDelivery = errors.New("no hay entrega pendiente")
