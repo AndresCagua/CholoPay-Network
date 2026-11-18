@@ -44,14 +44,14 @@ public class JdbcPublicLedgerService {
                         (after == null ? "" : "AND (j.created_at,j.id) < (?,?) ") +
                         "GROUP BY j.id,j.transaction_id,j.idempotency_key,j.correlation_id,j.created_at " +
                         "ORDER BY j.created_at DESC,j.id DESC LIMIT ?",
-                (rs, row) -> readJournal(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), rs.getString(3), rs.getObject(4, UUID.class), rs.getTimestamp(5).toInstant()),
+                (rs, row) -> readJournal(accountId, rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), rs.getString(3), rs.getObject(4, UUID.class), rs.getTimestamp(5).toInstant()),
                 parameters(accountId, participantId, tokenHash(customerToken), after, limit));
         return page(rows, limit, row -> new Cursor(row.createdAt(), row.id(), accountId, "journals"));
     }
 
-    private PublicJournal readJournal(UUID id, UUID transactionId, String key, UUID correlationId, Instant createdAt) {
-        List<PublicJournalEntry> entries = jdbc.query("SELECT account_id,amount_minor,direction,currency FROM journal_entry WHERE journal_id=? ORDER BY id",
-                (rs, row) -> new PublicJournalEntry(rs.getObject(1, UUID.class), rs.getLong(2), rs.getString(3), rs.getString(4)), id);
+    private PublicJournal readJournal(UUID accountId, UUID id, UUID transactionId, String key, UUID correlationId, Instant createdAt) {
+        List<PublicJournalEntry> entries = jdbc.query("SELECT account_id,amount_minor,direction,currency FROM journal_entry WHERE journal_id=? AND account_id=? ORDER BY id",
+                (rs, row) -> new PublicJournalEntry(rs.getObject(1, UUID.class), rs.getLong(2), rs.getString(3), rs.getString(4)), id, accountId);
         return new PublicJournal(id, transactionId, key, correlationId, entries, createdAt);
     }
 
