@@ -30,7 +30,7 @@ Falta cerrar y demostrar el recorrido completo `Banco Costa → CholoNet → Ban
 
 **Evidencia:** Phase 20 slice 3 (`job-2`) demostró dos transferencias independientes liquidadas en orden inverso, recuperación tras reinicio, 2 deliveries, 2 receiver inboxes, 2 journals únicos y totales balanceados `325/325`; los balances observados fueron clearing `998225` y destino `1775`.
 
-**Evidencia pendiente:** reordenamiento causal dentro de un mismo stream, si el protocolo futuro lo define, saldos y journals completos de emisor y receptor, además de una reconciliación global sin diferencias históricas preexistentes.
+**Evidencia pendiente:** reordenamiento causal dentro de un mismo stream, si el protocolo futuro lo define, saldos y journals completos de emisor y receptor, además de una reconciliación global sin diferencias históricas preexistentes. Phase 20 slice 4 agrega una ejecución interna opcionalmente acotada por `transfer_id`; no cambia la semántica del endpoint sin alcance y la aceptación Docker verifica settlement CholoNet y receiver Sierra exactos para el target.
 
 ### P3. APIs bancarias completas
 

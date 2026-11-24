@@ -76,6 +76,40 @@ func TestReconciliationDetectsAndClearsDeliveryDifferences(t *testing.T) {
 	}
 }
 
+func TestReconciliationCanScopeToOneTransferWithoutChangingUnscopedResults(t *testing.T) {
+	db, store := testStore(t)
+	defer db.Close()
+	ctx := context.Background()
+	first, second := uuid.New(), uuid.New()
+	for _, transferID := range []uuid.UUID{first, second} {
+		source, receiver := uuid.New(), uuid.New()
+		if err := store.CreateAccount(ctx, source, 100); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.CreateAccount(ctx, receiver, 0); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.Settle(ctx, transferID, source, receiver, 25, "scoped-"+transferID.String(), uuid.New()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	unscoped, err := store.Reconcile(ctx, uuid.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unscoped.DifferenceCount != 2 || len(unscoped.Differences) != 2 {
+		t.Fatalf("la reconciliación sin alcance debe conservar ambos resultados: %+v", unscoped)
+	}
+	scoped, err := store.ReconcileForTransfer(ctx, uuid.New(), &first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scoped.DifferenceCount != 1 || len(scoped.Differences) != 1 || scoped.Differences[0].TransferID == nil || *scoped.Differences[0].TransferID != first {
+		t.Fatalf("la reconciliación acotada debe devolver solo el target: %+v", scoped)
+	}
+}
+
 func hasCode(run ReconciliationRun, code string) bool {
 	for _, difference := range run.Differences {
 		if difference.Code == code {

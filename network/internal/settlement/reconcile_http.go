@@ -16,7 +16,16 @@ func (h *ReconciliationHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /internal/v1/reconciliation/runs/{id}", h.get)
 }
 func (h *ReconciliationHandler) create(w http.ResponseWriter, r *http.Request) {
-	result, err := h.store.Reconcile(r.Context(), uuid.New())
+	var targetTransferID *uuid.UUID
+	if raw := r.URL.Query().Get("transfer_id"); raw != "" {
+		parsed, err := uuid.Parse(raw)
+		if err != nil {
+			http.Error(w, "transfer_id inválido", http.StatusBadRequest)
+			return
+		}
+		targetTransferID = &parsed
+	}
+	result, err := h.store.ReconcileForTransfer(r.Context(), uuid.New(), targetTransferID)
 	if err != nil {
 		http.Error(w, "falló la conciliación", http.StatusInternalServerError)
 		return

@@ -225,7 +225,7 @@ def replay():
 
 def reconcile(expected_code=None):
     transfer_id, _ = transfer()
-    status, body = http_json("POST", f"{NETWORK_URL}/internal/v1/reconciliation/runs")
+    status, body = http_json("POST", f"{NETWORK_URL}/internal/v1/reconciliation/runs?transfer_id={transfer_id}")
     assert status == 201, (status, body)
     differences = body.get("Differences", body.get("differences", []))
     target_differences = [
@@ -273,12 +273,27 @@ def complete():
             assert (inbox, journals) == (1, 1) and len(journal_rows) == 1
             assert journal_rows[0][0] == inbox_row[0][2]
             assert journal_rows[0][1:] == (2, 125, 125), journal_rows
-            stable = db_query(
+            settlement_totals = db_query(
                 "network-db", "cholopay_network",
-                "SELECT COUNT(*), COUNT(DISTINCT delivery_id), COUNT(DISTINCT event_id) FROM settlement_delivery WHERE transfer_id=%s",
+                "SELECT COUNT(*), COALESCE(SUM(CASE WHEN direction='DEBIT' THEN amount_minor ELSE 0 END),0), COALESCE(SUM(CASE WHEN direction='CREDIT' THEN amount_minor ELSE 0 END),0) FROM settlement_entry WHERE journal_id=(SELECT journal_id FROM settlement_journal WHERE transfer_id=%s)",
                 (transfer_id,),
             )[0]
-            assert stable == (1, 1, 1), stable
+            assert settlement_totals == (2, 125, 125), settlement_totals
+            receiver_balances = db_query(
+                "sierra-db", "cholopay_sierra",
+                "SELECT id, posted_balance_minor-reserved_balance_minor FROM ledger_account WHERE id IN (%s,%s)",
+                (DESTINATION, CLEARING),
+            )
+            balance_values = dict(receiver_balances)
+            assert set(balance_values) == {DESTINATION, CLEARING}
+            assert balance_values[DESTINATION] >= 125 and balance_values[CLEARING] >= 0
+            assert balance_values[DESTINATION] + balance_values[CLEARING] == 1000000, receiver_balances
+            stable = db_query(
+                "network-db", "cholopay_network",
+                "SELECT COUNT(*), COUNT(DISTINCT delivery_id), COUNT(DISTINCT event_id), COUNT(*) FILTER (WHERE state='APPLIED') FROM settlement_delivery WHERE transfer_id=%s",
+                (transfer_id,),
+            )[0]
+            assert stable == (1, 1, 1, 1), stable
             print(f"PHASE20 COMPLETE PASS: transfer_id={transfer_id} delivery_id={delivery_id} event_id={event_id} inbox=1 journal=1 balanced=125/125")
             return
         time.sleep(2)

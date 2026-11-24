@@ -28,6 +28,10 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 
 9. **S9 — Alcance del slice 3:** Probar dos transferencias independientes entregadas en orden inverso, verificando que ambas se apliquen sin efectos duplicados, con una sola entrega/inbox/journal por transferencia y balances/journals finales correctos. No se afirma un orden global de eventos ni un secuenciamiento causal que el protocolo actual no persiste.
 
+10. **S10 — Solicitud del slice 4:** Mantener el endpoint interno de reconciliación sin alcance y sus semánticas actuales, agregando un `transfer_id` opcional para que la ejecución acotada solo devuelva diferencias del transfer objetivo.
+
+11. **S11 — Aceptación del slice 4:** Desde Docker, invocar la interfaz HTTP acotada y verificar para el target los totales autoritativos exactos del settlement CholoNet y los balances/journal del receiver Sierra. No se agregan fixtures de API pública, débitos de cuentas públicas de Costa, cleanup global, compensaciones ni semántica nueva de ledger.
+
 ## Tasks
 
 - T1 [S1-S4] Crear runner/escenario de outage breve con stop/start externo de `bank-core-sierra` y observación de retry/backoff. Ruta: `infra/tests` + Compose. Commit: pendiente.
@@ -41,6 +45,10 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - T9 [S8-S9] Agregar pruebas de dos transferencias independientes con llegada inversa y duplicados/retries idempotentes, sin introducir una garantía de orden global. Ruta: `network/internal/settlement`, `bank-core` y pruebas. Commit: pendiente.
 - T10 [S8-S9] Extender la aceptación Docker-only para entregar las dos transferencias en orden inverso y verificar balances, journals e inboxes únicos. Ruta: `infra/tests` + Compose. Commit: pendiente.
 - T11 [S8-S9] Ejecutar checks, registrar evidencia, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
+- T12 [S10] Agregar el filtro opcional `transfer_id` a la reconciliación interna, preservando la ejecución sin alcance. Ruta: `network/internal/settlement` + pruebas. Commit: pendiente.
+- T13 [S10] Verificar mediante pruebas Go que la reconciliación acotada devuelve solo el target y la no acotada conserva todos los resultados. Ruta: `network/internal/settlement`. Commit: pendiente.
+- T14 [S11] Extender la aceptación Docker-only para llamar la interfaz HTTP acotada y comprobar settlement, receiver inbox/journal y balances exactos de Sierra. Ruta: `infra/tests`. Commit: pendiente.
+- T15 [S10-S11] Ejecutar checks, registrar evidencia, actualizar documentación de alcance y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
 
 ## Log
 
@@ -54,3 +62,4 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - L8. Para resolver el finding `R3-replay-default-token`, el replay ahora falla cerrado si falta `OPERATOR_CONSOLE_TOKEN`, exige exactamente `Authorization: Bearer <token>` y Compose exige configurar el token sin fallback conocido. Las pruebas HTTP de settlement y `docker compose config` pasaron.
 - L9. El usuario eligió continuar con "Slice 3: reordenamiento e idempotencia". La exploración confirmó que el sistema ya prueba duplicados e idempotencia, pero no tiene secuencias ni causalidad persistidas; por eso el slice probará orden inverso entre transferencias independientes y no una garantía global.
 - L10. La aceptación Docker-only `job-2` pasó: dos transferencias independientes se liquidaron en orden inverso, se recuperaron tras reiniciar Sierra, produjeron 2 deliveries, 2 inboxes y 2 journals únicos, con totales balanceados `325/325` y balances observados de clearing `998225` y destino `1775`.
+- L11. Se aprueba el slice 4 acotado: reconciliación interna opcionalmente filtrada por `transfer_id`, con ejecución sin alcance intacta y evidencia Docker de settlement CholoNet y receiver Sierra exactos para el target. Quedan fuera APIs públicas, débitos públicos Costa, cleanup global, compensaciones y semántica nueva de ledger.

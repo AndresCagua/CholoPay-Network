@@ -20,6 +20,10 @@ type ReconciliationRun struct {
 }
 
 func (s *Store) Reconcile(ctx context.Context, runID uuid.UUID) (ReconciliationRun, error) {
+	return s.ReconcileForTransfer(ctx, runID, nil)
+}
+
+func (s *Store) ReconcileForTransfer(ctx context.Context, runID uuid.UUID, targetTransferID *uuid.UUID) (ReconciliationRun, error) {
 	if runID == uuid.Nil {
 		runID = uuid.New()
 	}
@@ -36,7 +40,13 @@ func (s *Store) Reconcile(ctx context.Context, runID uuid.UUID) (ReconciliationR
 		return nil
 	}
 
-	rows, err := s.db.QueryContext(ctx, `SELECT j.transfer_id,d.delivery_id,d.state,d.failure_code FROM settlement_journal j LEFT JOIN settlement_delivery d ON d.transfer_id=j.transfer_id`)
+	settlementQuery := `SELECT j.transfer_id,d.delivery_id,d.state,d.failure_code FROM settlement_journal j LEFT JOIN settlement_delivery d ON d.transfer_id=j.transfer_id`
+	settlementArgs := []any{}
+	if targetTransferID != nil {
+		settlementQuery += ` WHERE j.transfer_id=$1`
+		settlementArgs = append(settlementArgs, *targetTransferID)
+	}
+	rows, err := s.db.QueryContext(ctx, settlementQuery, settlementArgs...)
 	if err != nil {
 		return ReconciliationRun{}, err
 	}
@@ -73,7 +83,13 @@ func (s *Store) Reconcile(ctx context.Context, runID uuid.UUID) (ReconciliationR
 	}
 	rows.Close()
 
-	rows, err = s.db.QueryContext(ctx, `SELECT d.transfer_id,d.delivery_id,i.state FROM settlement_delivery d LEFT JOIN transfer_instruction i ON i.transfer_id=d.transfer_id WHERE d.state='APPLIED' AND (i.state IS NULL OR i.state <> 'COMPLETED')`)
+	completedQuery := `SELECT d.transfer_id,d.delivery_id,i.state FROM settlement_delivery d LEFT JOIN transfer_instruction i ON i.transfer_id=d.transfer_id WHERE d.state='APPLIED' AND (i.state IS NULL OR i.state <> 'COMPLETED')`
+	completedArgs := []any{}
+	if targetTransferID != nil {
+		completedQuery += ` AND d.transfer_id=$1`
+		completedArgs = append(completedArgs, *targetTransferID)
+	}
+	rows, err = s.db.QueryContext(ctx, completedQuery, completedArgs...)
 	if err != nil {
 		return ReconciliationRun{}, err
 	}
