@@ -23,6 +23,11 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 
 7. **S7 — Límites del slice 2:** Solo se recupera una entrega fallida individual de forma observable e idempotente. No se agregan un estado persistido `DLQ` separado, replay por lote, compensaciones financieras, cambios de ledger ni reconciliación de entregas `FAILED` con una semántica distinta de `DELIVERY_DLQ`.
 
+8. **S8 — Solicitud del usuario:**
+   > Slice 3: reordenamiento e idempotencia
+
+9. **S9 — Alcance del slice 3:** Probar dos transferencias independientes entregadas en orden inverso, verificando que ambas se apliquen sin efectos duplicados, con una sola entrega/inbox/journal por transferencia y balances/journals finales correctos. No se afirma un orden global de eventos ni un secuenciamiento causal que el protocolo actual no persiste.
+
 ## Tasks
 
 - T1 [S1-S4] Crear runner/escenario de outage breve con stop/start externo de `bank-core-sierra` y observación de retry/backoff. Ruta: `infra/tests` + Compose. Commit: pendiente.
@@ -33,6 +38,9 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - T6 [S5-S7] Extender reconciliación para observar `DELIVERY_DLQ` y aceptar su desaparición solo después de `APPLIED`/`COMPLETED`. Ruta: `network/internal/settlement` + pruebas. Commit: pendiente.
 - T7 [S5-S7] Crear aceptación Docker-only de outage prolongada, DLQ, replay, recuperación, reconciliación limpia e inbox/journal únicos. Ruta: `infra/tests` + Compose. Commit: pendiente.
 - T8 [S5-S7] Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
+- T9 [S8-S9] Agregar pruebas de dos transferencias independientes con llegada inversa y duplicados/retries idempotentes, sin introducir una garantía de orden global. Ruta: `network/internal/settlement`, `bank-core` y pruebas. Commit: pendiente.
+- T10 [S8-S9] Extender la aceptación Docker-only para entregar las dos transferencias en orden inverso y verificar balances, journals e inboxes únicos. Ruta: `infra/tests` + Compose. Commit: pendiente.
+- T11 [S8-S9] Ejecutar checks, registrar evidencia, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
 
 ## Log
 
@@ -44,3 +52,5 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - L6. Se aprobó la semántica conservadora: replay autenticado por `delivery_id`, identidad `delivery_id/event_id` estable, `attempt_count` acumulado, transferencia `CREDIT_PENDING` hasta aplicar y diferencia de reconciliación `DELIVERY_DLQ` mientras la entrega siga fallida.
 - L7. La aceptación Docker-only `job-4` pasó con outage prolongada: retries agotados en `attempt_count=5`, replay idempotente conservando `delivery_id=f9a2d69d-4bd8-4582-89c6-f7a6fc95b901`, `event_id=97959977-b68a-4034-a803-9b6a3ba5afe0`, recuperación `APPLIED`/`COMPLETED`, inbox=1, journal=1 y balance `125/125`; la reconciliación final del transfer `bcab076e-cadc-45c4-9b13-bb9f598dca1d` quedó limpia.
 - L8. Para resolver el finding `R3-replay-default-token`, el replay ahora falla cerrado si falta `OPERATOR_CONSOLE_TOKEN`, exige exactamente `Authorization: Bearer <token>` y Compose exige configurar el token sin fallback conocido. Las pruebas HTTP de settlement y `docker compose config` pasaron.
+- L9. El usuario eligió continuar con "Slice 3: reordenamiento e idempotencia". La exploración confirmó que el sistema ya prueba duplicados e idempotencia, pero no tiene secuencias ni causalidad persistidas; por eso el slice probará orden inverso entre transferencias independientes y no una garantía global.
+- L10. La aceptación Docker-only `job-2` pasó: dos transferencias independientes se liquidaron en orden inverso, se recuperaron tras reiniciar Sierra, produjeron 2 deliveries, 2 inboxes y 2 journals únicos, con totales balanceados `325/325` y balances observados de clearing `998225` y destino `1775`.

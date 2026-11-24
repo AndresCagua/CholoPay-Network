@@ -20,6 +20,7 @@ SIERRA = uuid.UUID("00000000-0000-4000-8000-000000000102")
 DESTINATION = uuid.UUID("00000000-0000-4000-8000-000000000013")
 CLEARING = uuid.UUID("00000000-0000-4000-8000-000000000012")
 PREFIX = "phase20-outage-"
+REVERSE_PREFIX = "phase20-reverse3-"
 
 
 def http_json(method, url, body=None, token=None):
@@ -86,6 +87,84 @@ def prepare():
         )
         assert status == 204, (state, status)
     print(f"PHASE20 PREPARE PASS: transfer_id={transfer_id} idempotency_key={key}")
+
+
+def reverse_transfers():
+    rows = db_query(
+        "network-db", "cholopay_network",
+        "SELECT transfer_id,idempotency_key,amount_minor FROM ("
+        "SELECT transfer_id,idempotency_key,amount_minor,created_at FROM transfer_instruction "
+        "WHERE idempotency_key LIKE %s ORDER BY created_at DESC LIMIT 2"
+        ") recent ORDER BY created_at",
+        (REVERSE_PREFIX + "%",),
+    )
+    assert len(rows) == 2, rows
+    # The second prepared transfer is settled first, making arrival order explicit and reverse
+    # relative to preparation. The transfers are independent; no event ordering is asserted.
+    for transfer_id, key, amount in reversed(rows):
+        correlation_id = db_query(
+            "network-db", "cholopay_network",
+            "SELECT correlation_id FROM transfer_instruction WHERE transfer_id=%s", (transfer_id,),
+        )[0][0]
+        status, body = http_json(
+            "POST", f"{NETWORK_URL}/internal/v1/settlements",
+            {"transfer_id": str(transfer_id), "source_participant_id": str(COSTA),
+             "destination_participant_id": str(SIERRA), "destination_account_id": str(DESTINATION),
+             "clearing_account_id": str(CLEARING), "amount_minor": amount,
+             "idempotency_key": key + "-settlement", "correlation_id": str(correlation_id)},
+        )
+        assert status == 201 and body.get("state") == "SETTLED", (status, body)
+    print(f"PHASE20 REVERSE SETTLE PASS: transfers={[str(row[0]) for row in rows]}")
+
+
+def prepare_reverse():
+    wait_ready()
+    for amount in (125, 200):
+        transfer_id = uuid.uuid4()
+        correlation_id = uuid.uuid4()
+        key = REVERSE_PREFIX + str(uuid.uuid4())
+        body = {
+            "transfer_id": str(transfer_id), "idempotency_key": key,
+            "source_participant_id": str(COSTA), "destination_participant_id": str(SIERRA),
+            "destination_account_id": str(DESTINATION), "clearing_account_id": str(CLEARING),
+            "amount_minor": amount, "currency": "USD", "correlation_id": str(correlation_id),
+        }
+        status, _ = http_json("POST", f"{NETWORK_URL}/internal/v1/transfers", body)
+        assert status == 202, ("crear transferencia", status)
+        for state in ("VALIDATING", "FUNDS_RESERVED", "READY_FOR_SETTLEMENT"):
+            status, _ = http_json("POST", f"{NETWORK_URL}/internal/v1/transfers/{transfer_id}/transitions", {"state": state, "causation_id": str(uuid.uuid4())})
+            assert status == 204, (state, status)
+    print("PHASE20 REVERSE PREPARE PASS: two independent transfers")
+
+
+def complete_reverse():
+    rows = db_query(
+        "network-db", "cholopay_network",
+        "SELECT transfer_id FROM (SELECT transfer_id,created_at FROM transfer_instruction "
+        "WHERE idempotency_key LIKE %s ORDER BY created_at DESC LIMIT 2) recent ORDER BY created_at",
+        (REVERSE_PREFIX + "%",),
+    )
+    assert len(rows) == 2, rows
+    transfer_ids = [row[0] for row in rows]
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        deliveries = db_query("network-db", "cholopay_network", "SELECT transfer_id, state FROM settlement_delivery WHERE transfer_id = ANY(%s)", (transfer_ids,))
+        states = {row[0]: row[1] for row in deliveries}
+        instructions = db_query("network-db", "cholopay_network", "SELECT transfer_id, state FROM transfer_instruction WHERE transfer_id = ANY(%s)", (transfer_ids,))
+        if len(deliveries) == 2 and all(states.get(t) == "APPLIED" for t in transfer_ids) and all(dict(instructions).get(t) == "COMPLETED" for t in transfer_ids):
+            delivery_counts = db_query("network-db", "cholopay_network", "SELECT COUNT(DISTINCT d.delivery_id), COUNT(DISTINCT d.delivery_id), COUNT(DISTINCT d.event_id), COALESCE(SUM(CASE WHEN e.direction='DEBIT' THEN e.amount_minor ELSE 0 END),0), COALESCE(SUM(CASE WHEN e.direction='CREDIT' THEN e.amount_minor ELSE 0 END),0) FROM settlement_delivery d JOIN settlement_entry e ON e.journal_id=(SELECT journal_id FROM settlement_journal WHERE transfer_id=d.transfer_id) WHERE d.transfer_id = ANY(%s)", (transfer_ids,))[0]
+            assert delivery_counts == (2, 2, 2, 325, 325), delivery_counts
+            inbox = db_query("sierra-db", "cholopay_sierra", "SELECT COUNT(*), COUNT(DISTINCT delivery_id), COUNT(DISTINCT journal_id) FROM receiver_credit_inbox WHERE transfer_id = ANY(%s)", (transfer_ids,))[0]
+            totals = db_query("sierra-db", "cholopay_sierra", "SELECT COUNT(DISTINCT j.id), COALESCE(SUM(CASE WHEN e.direction='DEBIT' THEN e.amount_minor ELSE 0 END),0), COALESCE(SUM(CASE WHEN e.direction='CREDIT' THEN e.amount_minor ELSE 0 END),0) FROM journal j JOIN journal_entry e ON e.journal_id=j.id WHERE j.transaction_id = ANY(%s)", (transfer_ids,))[0]
+            assert inbox == (2, 2, 2), inbox
+            assert totals == (2, 325, 325), totals
+            balances = db_query("sierra-db", "cholopay_sierra", "SELECT id, posted_balance_minor-reserved_balance_minor FROM ledger_account WHERE id IN (%s,%s)", (DESTINATION, CLEARING))
+            balance_values = [value for _, value in balances]
+            assert len(balance_values) == 2 and sum(balance_values) == 1000000 and max(balance_values) >= 325, balances
+            print(f"PHASE20 REVERSE COMPLETE PASS: transfers={len(transfer_ids)} deliveries=2 inbox=2 journals=2 balanced=325/325 balances={balances}")
+            return
+        time.sleep(2)
+    raise AssertionError(f"No se completaron las entregas inversas: instructions={instructions} deliveries={deliveries}")
 
 
 def settle():
@@ -207,10 +286,10 @@ def complete():
 
 
 def main():
-    modes = {"prepare": prepare, "settle": settle, "observe": observe, "exhaust": exhaust, "replay": replay, "reconcile-dlq": lambda: reconcile("DELIVERY_DLQ"), "complete": complete, "reconcile-clean": reconcile}
+    modes = {"prepare": prepare, "settle": settle, "observe": observe, "exhaust": exhaust, "replay": replay, "reconcile-dlq": lambda: reconcile("DELIVERY_DLQ"), "complete": complete, "reconcile-clean": reconcile, "prepare-reverse": prepare_reverse, "settle-reverse": reverse_transfers, "complete-reverse": complete_reverse}
     mode = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("PHASE20_MODE", "prepare")
     if mode not in modes:
-        raise SystemExit(f"Modo inválido: {mode}; use prepare|settle|observe|exhaust|replay|reconcile-dlq|complete|reconcile-clean")
+        raise SystemExit(f"Modo inválido: {mode}; use prepare|settle|observe|exhaust|replay|reconcile-dlq|complete|reconcile-clean|prepare-reverse|settle-reverse|complete-reverse")
     modes[mode]()
 
 

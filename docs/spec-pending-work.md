@@ -28,7 +28,9 @@ Falta cerrar y demostrar el recorrido completo `Banco Costa → CholoNet → Ban
 
 **Evidencia:** Phase 20 slice 2 (`job-4`) demostró outage prolongada, agotamiento en 5 intentos, `FAILED/DELIVERY_DLQ`, replay autenticado e idempotente conservando `delivery_id/event_id`, recuperación `APPLIED`/`COMPLETED`, inbox/journal únicos, balance `125/125` y reconciliación limpia para la transferencia objetivo.
 
-**Evidencia pendiente:** reordenamiento, saldos y journals completos de emisor y receptor, además de una reconciliación global sin diferencias históricas preexistentes.
+**Evidencia:** Phase 20 slice 3 (`job-2`) demostró dos transferencias independientes liquidadas en orden inverso, recuperación tras reinicio, 2 deliveries, 2 receiver inboxes, 2 journals únicos y totales balanceados `325/325`; los balances observados fueron clearing `998225` y destino `1775`.
+
+**Evidencia pendiente:** reordenamiento causal dentro de un mismo stream, si el protocolo futuro lo define, saldos y journals completos de emisor y receptor, además de una reconciliación global sin diferencias históricas preexistentes.
 
 ### P3. APIs bancarias completas
 

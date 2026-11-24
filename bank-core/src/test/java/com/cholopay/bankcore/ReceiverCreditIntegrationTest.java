@@ -84,6 +84,29 @@ class ReceiverCreditIntegrationTest {
     }
 
     @Test
+    void appliesIndependentDeliveriesInReverseArrivalOrderExactlyOnce() {
+        UUID firstDelivery = UUID.randomUUID(), firstEvent = UUID.randomUUID(), firstTransfer = UUID.randomUUID();
+        UUID secondDelivery = UUID.randomUUID(), secondEvent = UUID.randomUUID(), secondTransfer = UUID.randomUUID();
+
+        var second = credits.apply(secondDelivery, secondEvent, secondTransfer, destination, clearing, 300);
+        var first = credits.apply(firstDelivery, firstEvent, firstTransfer, destination, clearing, 200);
+        var secondRetry = credits.apply(secondDelivery, secondEvent, secondTransfer, destination, clearing, 300);
+        var firstRetry = credits.apply(firstDelivery, firstEvent, firstTransfer, destination, clearing, 200);
+
+        assertEquals(second.journalId(), secondRetry.journalId());
+        assertEquals(first.journalId(), firstRetry.journalId());
+        assertEquals(500, balance(clearing));
+        assertEquals(500, balance(destination));
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM receiver_credit_inbox", Integer.class));
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM journal", Integer.class));
+        assertEquals(4, jdbc.queryForObject("SELECT COUNT(*) FROM journal_entry", Integer.class));
+        assertEquals(500, jdbc.queryForObject("SELECT COALESCE(SUM(amount_minor),0) FROM journal_entry WHERE direction='DEBIT'", Long.class));
+        assertEquals(500, jdbc.queryForObject("SELECT COALESCE(SUM(amount_minor),0) FROM journal_entry WHERE direction='CREDIT'", Long.class));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM receiver_credit_inbox WHERE delivery_id = ?", Integer.class, firstDelivery));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM receiver_credit_inbox WHERE delivery_id = ?", Integer.class, secondDelivery));
+    }
+
+    @Test
     void rejectsConflictingPayloadWithoutSideEffects() {
         UUID delivery = UUID.randomUUID(), event = UUID.randomUUID(), transfer = UUID.randomUUID();
         credits.apply(delivery, event, transfer, destination, clearing, 200);
