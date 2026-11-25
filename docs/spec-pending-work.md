@@ -138,6 +138,8 @@ Cada punto se marcará como `Pendiente`, `En progreso`, `Parcial`, `Bloqueado` o
 
 ## Registro de progreso
 
+- 2026-11-25: La tanda funcional posterior añadió control-plane operator de redes/participantes, funding sintético auditable, consultas de settlement, replay auditado, reconciliación protegida, incidencias de deliveries, lectura/claim de mensajes inter-network, transición explícita `FUNDS_RESERVED → READY_FOR_SETTLEMENT`, coordinador `READY_FOR_SETTLEMENT → SETTLED` y reserva bancaria sintética con endpoint HMAC. Los commits funcionales son `77b671f`, `843a4e8`, `8806fe6`, `60c86d0`, `222f362`, `01fee55` y `b934dd3`. `network-test` y `bank-core-test` pasaron en Docker. Los límites siguen siendo sintéticos: no se afirma dinero real, ordering global, exactly-once universal, OAuth productivo, RPO/RTO ni ledger receptor no exportado. El acknowledgement automático banco→network permanece fuera de este slice por falta de un transporte/contrato adicional definido.
+
 - 2026-11-25: Phase 6 T1-T2 (T1-T2, S1-S5) extendió la persistencia PostgreSQL aislada a `bill-internet-2025-001` junto con electricidad, agua y mobile; intents/idempotencia y eventos HMAC deduplicados sobreviven la recreación de `utilities`. El probe verifica identidad post-reinicio, estado `paid/APPLIED`, unicidad durable, catálogo completo y los cuatro billers visibles. Settlement/ledgers bancarios, gateway y dinero real siguen fuera del alcance. T3 (checks, work unit y RDD) queda pendiente.
 - 2026-11-25: Phase 6 tránsito (T1-T2, S1-S5) agregó `transit-db`, repositorio PostgreSQL transaccional para el aggregate sintético, aceptación de recreación/replay y runbook. T3 (checks, work unit y RDD) queda pendiente; no se agregan conexiones a bancos/utilities ni claims productivos.
 
