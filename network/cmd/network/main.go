@@ -67,6 +67,7 @@ func operatorOverviewHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		var overview operatorOverview
+		var latestDifferenceCount sql.NullInt64
 		overview.SchemaVersion = "1.0"
 		overview.Source = "cholonet-network-read-model"
 		overview.ReconciliationStatus = "UNKNOWN"
@@ -80,7 +81,8 @@ func operatorOverviewHandler(db *sql.DB) http.HandlerFunc {
 				(SELECT COUNT(*) FROM network_participant WHERE status='ACTIVE'),
 				(SELECT COUNT(*) FROM network_participant WHERE status='SUSPENDED'),
 				(SELECT COUNT(*) FROM directory_key WHERE status='ACTIVE'),
-				(SELECT COUNT(*) FROM directory_key WHERE status='SUSPENDED')
+				(SELECT COUNT(*) FROM directory_key WHERE status='SUSPENDED'),
+				(SELECT difference_count FROM reconciliation_run WHERE completed_at IS NOT NULL ORDER BY completed_at DESC, run_id DESC LIMIT 1)
 		`).Scan(
 			&overview.Health.NetworksTotal,
 			&overview.Health.NetworksActive,
@@ -90,6 +92,7 @@ func operatorOverviewHandler(db *sql.DB) http.HandlerFunc {
 			&overview.Health.ParticipantsSuspended,
 			&overview.Health.ActiveKeys,
 			&overview.Health.SuspendedKeys,
+			&latestDifferenceCount,
 		); err != nil {
 			http.Error(w, "la proyección del operador no está disponible", http.StatusServiceUnavailable)
 			return
@@ -98,6 +101,13 @@ func operatorOverviewHandler(db *sql.DB) http.HandlerFunc {
 		overview.Participants = overview.Health.ParticipantsTotal
 		overview.ActiveKeys = overview.Health.ActiveKeys
 		overview.SuspendedKeys = overview.Health.SuspendedKeys
+		if latestDifferenceCount.Valid {
+			if latestDifferenceCount.Int64 == 0 {
+				overview.ReconciliationStatus = "CLEAN"
+			} else {
+				overview.ReconciliationStatus = "DIFFERENCES"
+			}
+		}
 		rows, err := db.QueryContext(r.Context(), `
 			SELECT 'PARTICIPANT_SUSPENDED', COUNT(*), 'network_participant' FROM network_participant WHERE status='SUSPENDED' HAVING COUNT(*) > 0
 			UNION ALL
@@ -189,6 +199,15 @@ func main() {
 	instruction.NewHandler(instruction.NewStore(db)).Register(mux)
 	settlementStore := settlement.NewStore(db)
 	settlement.NewHandler(settlementStore).Register(mux)
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if _, settleErr := settlementStore.SettleReadyOnce(context.Background()); settleErr != nil {
+				slog.Error("falló la liquidación automática de una transferencia lista", "error", settleErr)
+			}
+		}
+	}()
 	if receiverURL := os.Getenv("BANK_RECEIVER_CREDIT_URL"); receiverURL != "" {
 		lease, leaseErr := deliveryLeaseFromEnv(os.Getenv("DELIVERY_LEASE_SECONDS"))
 		if leaseErr != nil {
@@ -214,6 +233,7 @@ func main() {
 	}
 	settlement.NewReconciliationHandler(settlementStore).Register(mux)
 	routing.NewHandler(routingStore).Register(mux)
+	routing.NewOperatorHandler(routingStore, os.Getenv("OPERATOR_CONSOLE_TOKEN")).Register(mux)
 	directoryStore := directory.NewStore(db)
 	if err := directoryStore.Migrate(ctx); err != nil {
 		slog.Error("migrar la base de datos de directorio", "error", err)

@@ -63,6 +63,31 @@ public class JdbcInternalTransferService {
                         new LedgerEntry(destinationId, amountMinor, LedgerEntry.Direction.CREDIT, "USD")), Instant.now());
     }
 
+    @Transactional
+    public InterNetworkTransferService.ReservationResult reserveInterNetwork(InterNetworkTransferService.ReservationRequest request) {
+        if (request.amountMinor() <= 0) throw new IllegalArgumentException("amount_minor debe ser positivo");
+        String requestHash = hash(request.transferId() + ":" + request.sourceAccountId() + ":" + request.sourceParticipantId() + ":" + request.destinationParticipantId() + ":" + request.amountMinor() + ":" + request.currency());
+        ExistingReservation existing = jdbc.query("SELECT id, account_id, amount_minor, request_hash FROM balance_reservation WHERE transfer_id = ? FOR UPDATE",
+                (rs, row) -> new ExistingReservation(rs.getObject("id", UUID.class), rs.getObject("account_id", UUID.class), rs.getLong("amount_minor"), rs.getString("request_hash")), request.transferId()).stream().findFirst().orElse(null);
+        if (existing != null) {
+            if (!requestHash.equals(existing.requestHash()) || !existing.accountId().equals(request.sourceAccountId()) || existing.amountMinor() != request.amountMinor()) {
+                throw new InternalTransferService.IdempotencyConflictException();
+            }
+            return new InterNetworkTransferService.ReservationResult(request.transferId(), existing.id(), "FUNDS_RESERVED", true);
+        }
+        List<UUID> locked = jdbc.query("SELECT id FROM ledger_account WHERE id = ? FOR UPDATE",
+                (org.springframework.jdbc.core.RowMapper<UUID>) (rs, row) -> rs.getObject("id", UUID.class), request.sourceAccountId());
+        if (locked.isEmpty()) throw new IllegalArgumentException("cuenta no encontrada");
+        Balance source = balance(request.sourceAccountId());
+        if (source == null) throw new IllegalArgumentException("cuenta no encontrada");
+        if (source.postedMinor() - source.reservedMinor() < request.amountMinor()) throw new IllegalStateException("fondos disponibles insuficientes");
+        UUID reservationId = UUID.randomUUID();
+        jdbc.update("INSERT INTO balance_reservation(id, account_id, transfer_id, amount_minor, status, request_hash, currency) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)", reservationId, request.sourceAccountId(), request.transferId(), request.amountMinor(), requestHash, request.currency());
+        int reserved = jdbc.update("UPDATE ledger_account SET reserved_balance_minor = reserved_balance_minor + ? WHERE id = ? AND posted_balance_minor - reserved_balance_minor >= ?", request.amountMinor(), request.sourceAccountId(), request.amountMinor());
+        if (reserved != 1) throw new IllegalStateException("fondos disponibles insuficientes");
+        return new InterNetworkTransferService.ReservationResult(request.transferId(), reservationId, "FUNDS_RESERVED", false);
+    }
+
     /** Executes the local journal and its inter-network outbox insert in one transaction. */
     @Transactional
     public InterNetworkTransferService.OrderResult transferInterNetwork(InterNetworkTransferService.OrderRequest request) {
@@ -122,6 +147,7 @@ public class JdbcInternalTransferService {
     }
 
     private record ExistingJournal(UUID transactionId, String requestHash) {}
+    private record ExistingReservation(UUID id, UUID accountId, long amountMinor, String requestHash) {}
     private record JournalHeader(UUID id, String idempotencyKey, UUID correlationId) {}
     private record Balance(long postedMinor, long reservedMinor) {}
 }

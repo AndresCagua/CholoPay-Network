@@ -32,9 +32,19 @@ type AcceptedMessage struct {
 	Replayed    bool
 }
 
+type ClaimedMessage struct {
+	MessageID        uuid.UUID `json:"message_id"`
+	TransferID       uuid.UUID `json:"transfer_id"`
+	MessageStatus    string    `json:"message_status"`
+	InstructionState string    `json:"instruction_state"`
+	Replayed         bool      `json:"replayed"`
+}
+
 var (
-	ErrConflict = errors.New("la clave de idempotencia del mensaje entra en conflicto con otro sobre")
-	ErrBoundary = errors.New("el límite de red del mensaje no es válido")
+	ErrConflict      = errors.New("la clave de idempotencia del mensaje entra en conflicto con otro sobre")
+	ErrBoundary      = errors.New("el límite de red del mensaje no es válido")
+	ErrNotFound      = errors.New("mensaje no encontrado")
+	ErrClaimConflict = errors.New("el mensaje no puede reclamarse en su estado actual")
 )
 
 type Store struct{ db *sql.DB }
@@ -53,7 +63,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 		causation_id UUID NOT NULL,
 		payload_hash CHAR(64) NOT NULL,
 		payload JSONB NOT NULL,
-		status VARCHAR(16) NOT NULL CHECK (status IN ('ACCEPTED')),
+		status VARCHAR(16) NOT NULL CHECK (status IN ('ACCEPTED','PROCESSED')),
+		processed_at TIMESTAMPTZ,
+		processed_causation_id UUID,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		CHECK (sender_network_id <> destination_network_id)
 	)`)
@@ -61,12 +73,97 @@ func (s *Store) Migrate(ctx context.Context) error {
 		return err
 	}
 	_, err = s.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS inter_network_message_route ON inter_network_message(sender_network_id,destination_network_id,created_at)`)
-	return err
+	if err != nil {
+		return err
+	}
+	for _, q := range []string{
+		`ALTER TABLE inter_network_message ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ`,
+		`ALTER TABLE inter_network_message ADD COLUMN IF NOT EXISTS processed_causation_id UUID`,
+		`ALTER TABLE inter_network_message DROP CONSTRAINT IF EXISTS inter_network_message_status_check`,
+		`ALTER TABLE inter_network_message ADD CONSTRAINT inter_network_message_status_check CHECK (status IN ('ACCEPTED','PROCESSED'))`,
+	} {
+		if _, err := s.db.ExecContext(ctx, q); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func PayloadHash(payload json.RawMessage) string {
 	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:])
+}
+
+func (s *Store) ClaimTransferRequest(ctx context.Context, messageID, causationID uuid.UUID) (ClaimedMessage, error) {
+	if messageID == uuid.Nil || causationID == uuid.Nil {
+		return ClaimedMessage{}, ErrBoundary
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return ClaimedMessage{}, err
+	}
+	defer tx.Rollback()
+	var envelope Envelope
+	var payloadHash, status string
+	var processedCausation *uuid.UUID
+	if err := tx.QueryRowContext(ctx, `SELECT message_id,idempotency_key,sender_network_id,destination_network_id,schema_version,message_type,correlation_id,causation_id,payload_hash,payload,status,processed_causation_id FROM inter_network_message WHERE message_id=$1 FOR UPDATE`, messageID).Scan(&envelope.MessageID, &envelope.IdempotencyKey, &envelope.SenderNetworkID, &envelope.DestinationNetworkID, &envelope.SchemaVersion, &envelope.MessageType, &envelope.CorrelationID, &envelope.CausationID, &payloadHash, &envelope.Payload, &status, &processedCausation); errors.Is(err, sql.ErrNoRows) {
+		return ClaimedMessage{}, ErrNotFound
+	} else if err != nil {
+		return ClaimedMessage{}, err
+	}
+	var payload struct {
+		TransferID uuid.UUID `json:"transfer_id"`
+	}
+	if envelope.MessageType != "TRANSFER_REQUESTED" || json.Unmarshal(envelope.Payload, &payload) != nil || payload.TransferID == uuid.Nil {
+		return ClaimedMessage{}, ErrClaimConflict
+	}
+	if status == "PROCESSED" {
+		if processedCausation == nil || *processedCausation != causationID {
+			return ClaimedMessage{}, ErrClaimConflict
+		}
+		return ClaimedMessage{MessageID: messageID, TransferID: payload.TransferID, MessageStatus: status, InstructionState: "VALIDATING", Replayed: true}, nil
+	}
+	if status != "ACCEPTED" {
+		return ClaimedMessage{}, ErrClaimConflict
+	}
+	var instructionState string
+	if err := tx.QueryRowContext(ctx, `SELECT state FROM transfer_instruction WHERE transfer_id=$1 FOR UPDATE`, payload.TransferID).Scan(&instructionState); err != nil {
+		return ClaimedMessage{}, ErrClaimConflict
+	}
+	if instructionState != "CREATED" {
+		return ClaimedMessage{}, ErrClaimConflict
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE transfer_instruction SET state='VALIDATING', causation_id=$1, updated_at=CURRENT_TIMESTAMP WHERE transfer_id=$2`, causationID, payload.TransferID); err != nil {
+		return ClaimedMessage{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE inter_network_message SET status='PROCESSED', processed_at=CURRENT_TIMESTAMP, processed_causation_id=$1 WHERE message_id=$2`, causationID, messageID); err != nil {
+		return ClaimedMessage{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return ClaimedMessage{}, err
+	}
+	return ClaimedMessage{MessageID: messageID, TransferID: payload.TransferID, MessageStatus: "PROCESSED", InstructionState: "VALIDATING"}, nil
+}
+
+func (s *Store) Get(ctx context.Context, messageID uuid.UUID) (AcceptedMessage, error) {
+	if messageID == uuid.Nil {
+		return AcceptedMessage{}, ErrNotFound
+	}
+	var envelope Envelope
+	var accepted AcceptedMessage
+	err := s.db.QueryRowContext(ctx, `SELECT message_id,idempotency_key,sender_network_id,destination_network_id,schema_version,message_type,correlation_id,causation_id,payload_hash,payload,status,created_at FROM inter_network_message WHERE message_id=$1`, messageID).Scan(
+		&envelope.MessageID, &envelope.IdempotencyKey, &envelope.SenderNetworkID, &envelope.DestinationNetworkID,
+		&envelope.SchemaVersion, &envelope.MessageType, &envelope.CorrelationID, &envelope.CausationID,
+		&accepted.PayloadHash, &envelope.Payload, &accepted.Status, &accepted.CreatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return AcceptedMessage{}, ErrNotFound
+	}
+	if err != nil {
+		return AcceptedMessage{}, err
+	}
+	accepted.Envelope = envelope
+	return accepted, nil
 }
 
 func (s *Store) Accept(ctx context.Context, envelope Envelope) (AcceptedMessage, error) {

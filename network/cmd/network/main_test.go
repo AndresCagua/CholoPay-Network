@@ -214,8 +214,8 @@ func (c *operatorTestConn) QueryContext(_ context.Context, query string, _ []dri
 	}
 	if strings.Contains(query, "COUNT(*) FROM payment_network") {
 		return &operatorTestRows{
-			columns: []string{"networks_total", "networks_active", "networks_suspended", "participants_total", "participants_active", "participants_suspended", "active_keys", "suspended_keys"},
-			values:  [][]driver.Value{{int64(1), int64(1), int64(0), int64(3), int64(2), int64(1), int64(2), int64(1)}},
+				columns: []string{"networks_total", "networks_active", "networks_suspended", "participants_total", "participants_active", "participants_suspended", "active_keys", "suspended_keys", "difference_count"},
+			values:  [][]driver.Value{{int64(1), int64(1), int64(0), int64(3), int64(2), int64(1), int64(2), int64(1), nil}},
 		}, nil
 	}
 	return &operatorTestRows{

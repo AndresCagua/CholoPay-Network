@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -13,6 +14,8 @@ type Handler struct{ store *Store }
 func NewHandler(store *Store) *Handler { return &Handler{store: store} }
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /internal/v1/inter-network/messages", h.accept)
+	mux.HandleFunc("GET /internal/v1/inter-network/messages/{message_id}", h.get)
+	mux.HandleFunc("POST /internal/v1/inter-network/messages/{message_id}/claim", h.claim)
 }
 
 type acceptRequest struct {
@@ -34,6 +37,71 @@ type acceptResponse struct {
 	PayloadHash    string    `json:"payload_hash"`
 	Replayed       bool      `json:"replayed"`
 	CreatedAt      string    `json:"created_at"`
+}
+
+func (h *Handler) claim(w http.ResponseWriter, r *http.Request) {
+	messageID, err := uuid.Parse(r.PathValue("message_id"))
+	if err != nil {
+		http.Error(w, "message_id inválido", http.StatusBadRequest)
+		return
+	}
+	var request struct {
+		CausationID uuid.UUID `json:"causation_id"`
+	}
+	if json.NewDecoder(r.Body).Decode(&request) != nil || request.CausationID == uuid.Nil {
+		http.Error(w, "causation_id inválido", http.StatusBadRequest)
+		return
+	}
+	claimed, err := h.store.ClaimTransferRequest(r.Context(), messageID, request.CausationID)
+	if errors.Is(err, ErrNotFound) {
+		http.Error(w, "mensaje no encontrado", http.StatusNotFound)
+		return
+	}
+	if errors.Is(err, ErrBoundary) {
+		http.Error(w, "límite de mensaje inválido", http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, ErrClaimConflict) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if err != nil {
+		http.Error(w, "no se pudo reclamar el mensaje", http.StatusServiceUnavailable)
+		return
+	}
+	status := http.StatusAccepted
+	if claimed.Replayed {
+		status = http.StatusOK
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(claimed)
+}
+
+func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
+	messageID, err := uuid.Parse(r.PathValue("message_id"))
+	if err != nil {
+		http.Error(w, "message_id inválido", http.StatusBadRequest)
+		return
+	}
+	accepted, err := h.store.Get(r.Context(), messageID)
+	if errors.Is(err, ErrNotFound) {
+		http.Error(w, "mensaje no encontrado", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "el mensaje no está disponible", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(acceptedResponse{Envelope: accepted.Envelope, PayloadHash: accepted.PayloadHash, Status: accepted.Status, CreatedAt: accepted.CreatedAt.UTC().Format(time.RFC3339Nano)})
+}
+
+type acceptedResponse struct {
+	Envelope
+	PayloadHash string `json:"payload_hash"`
+	Status      string `json:"status"`
+	CreatedAt   string `json:"created_at"`
 }
 
 func (h *Handler) accept(w http.ResponseWriter, r *http.Request) {

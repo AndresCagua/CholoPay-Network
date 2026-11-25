@@ -7,6 +7,29 @@ import (
 	"time"
 )
 
+type OperatorIncident struct {
+	DeliveryID            uuid.UUID `json:"delivery_id"`
+	TransferID            uuid.UUID `json:"transfer_id"`
+	ReceiverParticipantID uuid.UUID `json:"receiver_participant_id"`
+	EventID               uuid.UUID `json:"event_id"`
+	State                 string    `json:"state"`
+	FailureCode           *string   `json:"failure_code,omitempty"`
+	AttemptCount          int       `json:"attempt_count"`
+	Replayable            bool      `json:"replayable"`
+}
+
+type OperatorAction struct {
+	ActionID            uuid.UUID `json:"action_id"`
+	ActionType          string    `json:"action_type"`
+	DeliveryID          uuid.UUID `json:"delivery_id"`
+	TransferID          uuid.UUID `json:"transfer_id"`
+	EventID             uuid.UUID `json:"event_id"`
+	PreviousState       string    `json:"previous_state"`
+	PreviousFailureCode *string   `json:"previous_failure_code,omitempty"`
+	ResultingState      string    `json:"resulting_state"`
+	OccurredAt          time.Time `json:"occurred_at"`
+}
+
 type Delivery struct {
 	DeliveryID            uuid.UUID
 	TransferID            uuid.UUID
@@ -78,6 +101,45 @@ func (s *Store) EnqueueDelivery(ctx context.Context, transferID, receiverID uuid
 	return d, nil
 }
 
+func (s *Store) ListOperatorIncidents(ctx context.Context) ([]OperatorIncident, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT delivery_id, transfer_id, receiver_participant_id, event_id, state, failure_code, attempt_count
+		FROM settlement_delivery
+		WHERE state='PENDING' OR (state='FAILED' AND failure_code='DELIVERY_DLQ')
+		ORDER BY updated_at, delivery_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	incidents := []OperatorIncident{}
+	for rows.Next() {
+		var incident OperatorIncident
+		if err := rows.Scan(&incident.DeliveryID, &incident.TransferID, &incident.ReceiverParticipantID, &incident.EventID, &incident.State, &incident.FailureCode, &incident.AttemptCount); err != nil {
+			return nil, err
+		}
+		incident.Replayable = incident.State == "FAILED" && incident.FailureCode != nil && *incident.FailureCode == "DELIVERY_DLQ"
+		incidents = append(incidents, incident)
+	}
+	return incidents, rows.Err()
+}
+
+func (s *Store) ListOperatorActions(ctx context.Context, deliveryID uuid.UUID) ([]OperatorAction, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT action_id, action_type, delivery_id, transfer_id, event_id, previous_state, previous_failure_code, resulting_state, occurred_at FROM settlement_operator_action WHERE delivery_id=$1 ORDER BY occurred_at, action_id`, deliveryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	actions := []OperatorAction{}
+	for rows.Next() {
+		var action OperatorAction
+		if err := rows.Scan(&action.ActionID, &action.ActionType, &action.DeliveryID, &action.TransferID, &action.EventID, &action.PreviousState, &action.PreviousFailureCode, &action.ResultingState, &action.OccurredAt); err != nil {
+			return nil, err
+		}
+		actions = append(actions, action)
+	}
+	return actions, rows.Err()
+}
+
 // ReplayDelivery reopens one exhausted delivery without creating a new delivery or event.
 func (s *Store) ReplayDelivery(ctx context.Context, deliveryID uuid.UUID) (Delivery, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -99,6 +161,9 @@ func (s *Store) ReplayDelivery(ctx context.Context, deliveryID uuid.UUID) (Deliv
 		return Delivery{}, ErrDeliveryNotReplayable
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE settlement_delivery SET state='PENDING',failure_code=NULL,failure_detail=NULL,next_attempt_at=CURRENT_TIMESTAMP,lease_owner=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE delivery_id=$1`, deliveryID); err != nil {
+		return Delivery{}, err
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO settlement_operator_action(action_id,action_type,delivery_id,transfer_id,event_id,previous_state,previous_failure_code,resulting_state) VALUES ($1,'DELIVERY_REPLAY',$2,$3,$4,$5,$6,'PENDING')`, uuid.New(), d.DeliveryID, d.TransferID, d.EventID, d.State, *failureCode); err != nil {
 		return Delivery{}, err
 	}
 	d.State = "PENDING"

@@ -16,6 +16,10 @@ func (h *ReconciliationHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /internal/v1/reconciliation/runs/{id}", h.get)
 }
 func (h *ReconciliationHandler) create(w http.ResponseWriter, r *http.Request) {
+	if !authorizedReplayBearer(r) {
+		http.Error(w, "autenticación requerida", http.StatusUnauthorized)
+		return
+	}
 	var targetTransferID *uuid.UUID
 	if raw := r.URL.Query().Get("transfer_id"); raw != "" {
 		parsed, err := uuid.Parse(raw)
@@ -33,6 +37,10 @@ func (h *ReconciliationHandler) create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, result)
 }
 func (h *ReconciliationHandler) get(w http.ResponseWriter, r *http.Request) {
+	if !authorizedReplayBearer(r) {
+		http.Error(w, "autenticación requerida", http.StatusUnauthorized)
+		return
+	}
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		http.Error(w, "identificador de ejecución inválido", http.StatusBadRequest)

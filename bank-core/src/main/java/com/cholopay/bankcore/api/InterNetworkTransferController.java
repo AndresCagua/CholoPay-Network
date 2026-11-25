@@ -12,6 +12,15 @@ public class InterNetworkTransferController {
     private final InterNetworkTransferService service;
     public InterNetworkTransferController(InterNetworkTransferService service) { this.service = service; }
 
+    @PostMapping("/reserve")
+    public ResponseEntity<InterNetworkTransferService.ReservationResult> reserve(
+            @RequestHeader("Idempotency-Key") String key, @RequestBody ReservationRequest request) {
+        return ResponseEntity.accepted().body(service.reserve(new InterNetworkTransferService.ReservationRequest(
+                request.transferId(), request.sourceAccountId(), request.sourceParticipantId(),
+                request.destinationParticipantId(), request.amountMinor(), request.currency(), key,
+                request.correlationId(), request.causationId())));
+    }
+
     @PostMapping
     public ResponseEntity<InterNetworkTransferService.OrderResult> order(
             @RequestHeader("Idempotency-Key") String key, @RequestBody Request request) {
@@ -21,6 +30,10 @@ public class InterNetworkTransferController {
                 request.amountMinor(), request.currency(), key, request.correlationId(), request.causationId(),
                 request.traceId(), request.occurredAt())));
     }
+
+    public record ReservationRequest(UUID transferId, UUID sourceAccountId, UUID sourceParticipantId,
+                                     UUID destinationParticipantId, long amountMinor, String currency,
+                                     UUID correlationId, UUID causationId) {}
 
     public record Request(UUID sourceAccountId, UUID destinationAccountId, UUID sourceParticipantId,
                           UUID destinationParticipantId, UUID sourceNetworkId, UUID destinationNetworkId,

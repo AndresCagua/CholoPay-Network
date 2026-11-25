@@ -2,9 +2,13 @@ package settlement
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/cholopay/network/internal/instruction"
 	"github.com/google/uuid"
 )
@@ -39,7 +43,191 @@ type Journal struct {
 
 type Store struct{ db *sql.DB }
 
+type OperatorAccountRequest struct {
+	ParticipantID       uuid.UUID
+	OpeningBalanceMinor int64
+	Currency            string
+	IdempotencyKey      string
+	Reason              string
+}
+
+type OperatorAccountResult struct {
+	OperationID      uuid.UUID
+	FundingJournalID uuid.UUID
+	ParticipantID    uuid.UUID
+	BalanceMinor     int64
+	Currency         string
+	Status           string
+	Replayed         bool
+}
+
+type SettlementAccountView struct {
+	ParticipantID uuid.UUID
+	BalanceMinor  int64
+	Currency      string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type SettlementHistoryEntry struct {
+	EventID                  string    `json:"event_id"`
+	EventType                string    `json:"event_type"`
+	OperationID              string    `json:"operation_id,omitempty"`
+	TransferID               string    `json:"transfer_id,omitempty"`
+	JournalID                string    `json:"journal_id"`
+	SourceParticipantID      string    `json:"source_participant_id,omitempty"`
+	DestinationParticipantID string    `json:"destination_participant_id,omitempty"`
+	Direction                string    `json:"direction"`
+	AmountMinor              int64     `json:"amount_minor"`
+	Currency                 string    `json:"currency"`
+	Reason                   string    `json:"reason,omitempty"`
+	OccurredAt               time.Time `json:"occurred_at"`
+}
+
+var (
+	ErrAccountExists              = errors.New("la cuenta de liquidación ya existe")
+	ErrFundingIdempotencyConflict = errors.New("la clave de fondeo ya se usó con una solicitud diferente")
+	ErrInvalidFunding             = errors.New("la solicitud de fondeo es inválida")
+	ErrParticipantUnavailable     = errors.New("el participante o la red no están disponibles")
+)
+
 func NewStore(db *sql.DB) *Store { return &Store{db: db} }
+
+func (s *Store) SettlementAccount(ctx context.Context, participantID uuid.UUID) (SettlementAccountView, error) {
+	var account SettlementAccountView
+	err := s.db.QueryRowContext(ctx, `SELECT participant_id, balance_minor, currency, created_at, updated_at FROM settlement_account WHERE participant_id=$1`, participantID).Scan(
+		&account.ParticipantID, &account.BalanceMinor, &account.Currency, &account.CreatedAt, &account.UpdatedAt,
+	)
+	return account, err
+}
+
+func (s *Store) SettlementHistory(ctx context.Context, participantID uuid.UUID, limit int) ([]SettlementHistoryEntry, error) {
+	if participantID == uuid.Nil || limit < 1 || limit > 500 {
+		return nil, ErrInvalidFunding
+	}
+	var exists bool
+	if err := s.db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM settlement_account WHERE participant_id=$1)`, participantID).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, sql.ErrNoRows
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT event_id, event_type, operation_id, transfer_id, journal_id,
+		       source_participant_id, destination_participant_id, direction,
+		       amount_minor, currency, reason, occurred_at
+		FROM (
+			SELECT fe.entry_id AS event_id, 'FUNDING' AS event_type,
+			       fo.operation_id, NULL::uuid AS transfer_id, fj.journal_id,
+			       NULL::uuid AS source_participant_id, fe.participant_id AS destination_participant_id,
+			       fe.direction, fe.amount_minor, fe.currency, fj.reason, fe.created_at AS occurred_at
+			FROM settlement_funding_entry fe
+			JOIN settlement_funding_journal fj ON fj.journal_id=fe.journal_id
+			JOIN settlement_funding_operation fo ON fo.operation_id=fj.operation_id
+			WHERE fe.participant_id=$1
+			UNION ALL
+			SELECT se.entry_id, 'SETTLEMENT', NULL::uuid, sj.transfer_id, sj.journal_id,
+			       sj.source_participant_id, sj.destination_participant_id,
+			       se.direction, se.amount_minor, se.currency, NULL::varchar, se.created_at
+			FROM settlement_entry se
+			JOIN settlement_journal sj ON sj.journal_id=se.journal_id
+			WHERE se.participant_id=$1
+		) history
+		ORDER BY occurred_at DESC, event_id DESC
+		LIMIT $2`, participantID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	entries := []SettlementHistoryEntry{}
+	for rows.Next() {
+		var entry SettlementHistoryEntry
+		var operationID, transferID, sourceID, destinationID, reason sql.NullString
+		if err := rows.Scan(&entry.EventID, &entry.EventType, &operationID, &transferID, &entry.JournalID, &sourceID, &destinationID, &entry.Direction, &entry.AmountMinor, &entry.Currency, &reason, &entry.OccurredAt); err != nil {
+			return nil, err
+		}
+		entry.OperationID, entry.TransferID = operationID.String, transferID.String
+		entry.SourceParticipantID, entry.DestinationParticipantID, entry.Reason = sourceID.String, destinationID.String, reason.String
+		entries = append(entries, entry)
+	}
+	return entries, rows.Err()
+}
+
+func (s *Store) CreateOperatorAccount(ctx context.Context, request OperatorAccountRequest) (OperatorAccountResult, error) {
+	if request.ParticipantID == uuid.Nil || request.OpeningBalanceMinor < 0 || request.Currency != "USD" || request.IdempotencyKey == "" || len(request.IdempotencyKey) > 160 || request.Reason == "" || len(request.Reason) > 256 {
+		return OperatorAccountResult{}, ErrInvalidFunding
+	}
+	requestHash := fundingRequestHash(request)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return OperatorAccountResult{}, err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, request.IdempotencyKey); err != nil {
+		return OperatorAccountResult{}, err
+	}
+	var existing OperatorAccountResult
+	var existingHash string
+	err = tx.QueryRowContext(ctx, `SELECT operation_id, participant_id, amount_minor, currency, request_hash FROM settlement_funding_operation WHERE idempotency_key=$1`, request.IdempotencyKey).Scan(&existing.OperationID, &existing.ParticipantID, &existing.BalanceMinor, &existing.Currency, &existingHash)
+	if err == nil {
+		if existingHash != requestHash {
+			return OperatorAccountResult{}, ErrFundingIdempotencyConflict
+		}
+		existing.Status = "ACTIVE"
+		_ = tx.QueryRowContext(ctx, `SELECT journal_id FROM settlement_funding_journal WHERE operation_id=$1`, existing.OperationID).Scan(&existing.FundingJournalID)
+		existing.Replayed = true
+		return existing, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return OperatorAccountResult{}, err
+	}
+	var participantStatus, networkStatus string
+	err = tx.QueryRowContext(ctx, `SELECT p.status, n.status FROM network_participant p JOIN payment_network n ON n.network_id=p.network_id WHERE p.participant_id=$1 FOR SHARE`, request.ParticipantID).Scan(&participantStatus, &networkStatus)
+	if errors.Is(err, sql.ErrNoRows) {
+		return OperatorAccountResult{}, ErrInvalidFunding
+	}
+	if err != nil {
+		return OperatorAccountResult{}, err
+	}
+	if participantStatus != "ACTIVE" || networkStatus != "ACTIVE" {
+		return OperatorAccountResult{}, ErrParticipantUnavailable
+	}
+	var accountExists bool
+	err = tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM settlement_account WHERE participant_id=$1)`, request.ParticipantID).Scan(&accountExists)
+	if err != nil {
+		return OperatorAccountResult{}, err
+	}
+	if accountExists {
+		return OperatorAccountResult{}, ErrAccountExists
+	}
+	operationID := uuid.New()
+	if _, err = tx.ExecContext(ctx, `INSERT INTO settlement_account(participant_id,balance_minor,currency) VALUES ($1,$2,$3)`, request.ParticipantID, request.OpeningBalanceMinor, request.Currency); err != nil {
+		return OperatorAccountResult{}, err
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO settlement_funding_operation(operation_id,participant_id,idempotency_key,request_hash,amount_minor,currency,reason) VALUES ($1,$2,$3,$4,$5,$6,$7)`, operationID, request.ParticipantID, request.IdempotencyKey, requestHash, request.OpeningBalanceMinor, request.Currency, request.Reason); err != nil {
+		return OperatorAccountResult{}, err
+	}
+	var journalID uuid.UUID
+	if request.OpeningBalanceMinor > 0 {
+		journalID = uuid.New()
+		if _, err = tx.ExecContext(ctx, `INSERT INTO settlement_funding_journal(journal_id,operation_id,participant_id,amount_minor,currency,reason) VALUES ($1,$2,$3,$4,$5,$6)`, journalID, operationID, request.ParticipantID, request.OpeningBalanceMinor, request.Currency, request.Reason); err != nil {
+			return OperatorAccountResult{}, err
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO settlement_funding_entry(entry_id,journal_id,account_ref,participant_id,amount_minor,direction,currency) VALUES ($1,$2,'SYNTHETIC_OPERATOR_ISSUANCE',NULL,$3,'DEBIT',$4),($5,$2,'SETTLEMENT_PARTICIPANT',$6,$3,'CREDIT',$4)`, uuid.New(), journalID, request.OpeningBalanceMinor, request.Currency, uuid.New(), request.ParticipantID); err != nil {
+			return OperatorAccountResult{}, err
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return OperatorAccountResult{}, err
+	}
+	return OperatorAccountResult{OperationID: operationID, FundingJournalID: journalID, ParticipantID: request.ParticipantID, BalanceMinor: request.OpeningBalanceMinor, Currency: request.Currency, Status: "ACTIVE"}, nil
+}
+
+func fundingRequestHash(request OperatorAccountRequest) string {
+	value := fmt.Sprintf("%s|%d|%s|%s|%s", request.ParticipantID, request.OpeningBalanceMinor, request.Currency, request.IdempotencyKey, request.Reason)
+	hash := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(hash[:])
+}
 
 func (s *Store) CreateAccount(ctx context.Context, participantID uuid.UUID, balanceMinor int64) error {
 	if balanceMinor < 0 {
@@ -47,6 +235,28 @@ func (s *Store) CreateAccount(ctx context.Context, participantID uuid.UUID, bala
 	}
 	_, err := s.db.ExecContext(ctx, `INSERT INTO settlement_account(participant_id,balance_minor,currency) VALUES ($1,$2,'USD')`, participantID, balanceMinor)
 	return err
+}
+
+func (s *Store) SettleReadyOnce(ctx context.Context) (bool, error) {
+	var transferID, sourceID, destinationID, destinationAccountID, clearingAccountID, correlationID uuid.UUID
+	var instructionKey string
+	var amount int64
+	err := s.db.QueryRowContext(ctx, `
+		SELECT transfer_id, idempotency_key, source_participant_id, destination_participant_id,
+		       COALESCE(destination_account_id, destination_participant_id),
+		       COALESCE(clearing_account_id, source_participant_id), amount_minor, correlation_id
+		FROM transfer_instruction
+		WHERE state='READY_FOR_SETTLEMENT'
+		ORDER BY updated_at, transfer_id
+		LIMIT 1`).Scan(&transferID, &instructionKey, &sourceID, &destinationID, &destinationAccountID, &clearingAccountID, &amount, &correlationID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	_, err = s.Settle(ctx, transferID, sourceID, destinationID, amount, "settlement:"+instructionKey, correlationID, destinationAccountID, clearingAccountID)
+	return true, err
 }
 
 func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID uuid.UUID, amountMinor int64, idempotencyKey string, correlationID uuid.UUID, deliveryAccounts ...uuid.UUID) (Journal, error) {
@@ -88,6 +298,13 @@ func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID 
 	if !errors.Is(err, sql.ErrNoRows) {
 		return Journal{}, err
 	}
+	var instructionState string
+	if err = tx.QueryRowContext(ctx, `SELECT state FROM transfer_instruction WHERE transfer_id=$1 FOR UPDATE`, transferID).Scan(&instructionState); err != nil {
+		return Journal{}, err
+	}
+	if instructionState != "READY_FOR_SETTLEMENT" {
+		return Journal{}, errors.New("la transferencia no está lista para liquidación")
+	}
 
 	rows, err := tx.QueryContext(ctx, `SELECT participant_id,balance_minor FROM settlement_account WHERE participant_id IN ($1,$2) ORDER BY participant_id FOR UPDATE`, sourceID, destinationID)
 	if err != nil {
@@ -128,7 +345,7 @@ func (s *Store) Settle(ctx context.Context, transferID, sourceID, destinationID 
 	if _, err = tx.ExecContext(ctx, `INSERT INTO settlement_entry(entry_id,journal_id,participant_id,amount_minor,direction,currency) VALUES ($1,$2,$3,$4,'DEBIT','USD'),($5,$2,$6,$4,'CREDIT','USD')`, uuid.New(), journalID, sourceID, amountMinor, uuid.New(), destinationID); err != nil {
 		return Journal{}, err
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE transfer_instruction SET state='SETTLED',updated_at=CURRENT_TIMESTAMP WHERE transfer_id=$1 AND state IN ('READY_FOR_SETTLEMENT','FUNDS_RESERVED')`, transferID); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE transfer_instruction SET state='SETTLED',updated_at=CURRENT_TIMESTAMP WHERE transfer_id=$1 AND state='READY_FOR_SETTLEMENT'`, transferID); err != nil {
 		return Journal{}, err
 	}
 	result := Journal{JournalID: journalID, TransferID: transferID, IdempotencyKey: idempotencyKey, RequestHash: requestHash, SourceParticipantID: sourceID, DestinationParticipantID: destinationID, AmountMinor: amountMinor, Currency: "USD", CorrelationID: correlationID, DestinationAccountID: destinationAccountID, ClearingAccountID: clearingAccountID, Entries: []Entry{{sourceID, amountMinor, Debit, "USD"}, {destinationID, amountMinor, Credit, "USD"}}}

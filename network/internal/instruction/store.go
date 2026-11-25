@@ -91,6 +91,14 @@ func (s *Store) CreateTx(ctx context.Context, tx *sql.Tx, instruction Instructio
 	}
 	return existing, nil
 }
+func (s *Store) MarkFundsReserved(ctx context.Context, id, causation uuid.UUID) error {
+	return s.Advance(ctx, id, transfer.FundsReserved, causation)
+}
+
+func (s *Store) MarkReadyForSettlement(ctx context.Context, id, causation uuid.UUID) error {
+	return s.Advance(ctx, id, transfer.ReadyForSettlement, causation)
+}
+
 func (s *Store) Advance(ctx context.Context, id uuid.UUID, next transfer.State, causation uuid.UUID) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -100,6 +108,16 @@ func (s *Store) Advance(ctx context.Context, id uuid.UUID, next transfer.State, 
 	var current transfer.State
 	if err = tx.QueryRowContext(ctx, "SELECT state FROM transfer_instruction WHERE transfer_id=$1 FOR UPDATE", id).Scan(&current); err != nil {
 		return err
+	}
+	if current == next {
+		var previous uuid.UUID
+		if err = tx.QueryRowContext(ctx, "SELECT causation_id FROM transfer_instruction WHERE transfer_id=$1", id).Scan(&previous); err != nil {
+			return err
+		}
+		if previous == causation {
+			return tx.Commit()
+		}
+		return errors.New("la transición ya fue aplicada con otra causación")
 	}
 	if err = transfer.Advance(current, next); err != nil {
 		return err

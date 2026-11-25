@@ -31,6 +31,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /internal/v1/transfers", h.create)
 	mux.HandleFunc("GET /internal/v1/transfers/{id}", h.get)
 	mux.HandleFunc("POST /internal/v1/transfers/{id}/transitions", h.transition)
+	mux.HandleFunc("POST /internal/v1/transfers/{id}/funds-reserved", h.fundsReserved)
+	mux.HandleFunc("POST /internal/v1/transfers/{id}/ready-for-settlement", h.readyForSettlement)
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +65,46 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) fundsReserved(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "identificador de transferencia no válido", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		CausationID uuid.UUID `json:"causation_id"`
+	}
+	if json.NewDecoder(r.Body).Decode(&req) != nil || req.CausationID == uuid.Nil {
+		http.Error(w, "causation_id inválido", http.StatusBadRequest)
+		return
+	}
+	if err := h.store.MarkFundsReserved(r.Context(), id, req.CausationID); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) readyForSettlement(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "identificador de transferencia no válido", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		CausationID uuid.UUID `json:"causation_id"`
+	}
+	if json.NewDecoder(r.Body).Decode(&req) != nil || req.CausationID == uuid.Nil {
+		http.Error(w, "causation_id inválido", http.StatusBadRequest)
+		return
+	}
+	if err := h.store.MarkReadyForSettlement(r.Context(), id, req.CausationID); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
