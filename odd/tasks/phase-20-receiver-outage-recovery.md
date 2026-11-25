@@ -64,6 +64,12 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 
 27. **S27 — Límites históricos P2:** No implementar ni inferir orden global, causalidad entre transferencias independientes, sequence de stream, ordering por timestamp/Kafka offset ni evidencia histórica de ledger receptor no exportada por el banco.
 
+28. **S28 — P2 public receiver evidence:** La aceptación debe consultar por HTTP público el balance y journals de la cuenta receptora Sierra usando una identidad sintética autorizada y correlacionar el journal con `transfer_id`.
+
+29. **S29 — Alcance de la evidencia pública:** La consulta debe verificar un único `CREDIT` receptor por `125`, balance receptor y repetición estable; el `DEBIT` de la cuenta compensadora permanece fuera de esa vista por cuenta.
+
+30. **S30 — Límites:** No se afirma UI completa, ordering global, exactly-once, causalidad, dinero real ni exportación del ledger receptor completo.
+
 ## Tasks
 
 - T1 [S1-S4] Crear runner/escenario de outage breve con stop/start externo de `bank-core-sierra` y observación de retry/backoff. Ruta: `infra/tests` + Compose. Commit: pendiente.
@@ -100,6 +106,9 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - T32 [S25-S27] Ampliar aceptación de outage/replay para conservar y verificar runs históricos de reconciliación. Ruta: `infra/tests/phase20_receiver_outage.py`. Commit: pendiente.
 - T33 [S25-S27] Añadir tests de persistencia histórica de reconciliación y documentación de límites. Ruta: `network/internal/settlement`, docs. Commit: pendiente.
 - T34 [S25-S27] Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
+- T35 [S28-S30] Crear fixture público sintético para asociar la cuenta receptora Sierra con un customer/token sin tocar migraciones aplicadas. Ruta: `bank-core/src/main/resources/db/migration`. Commit: pendiente.
+- T36 [S28-S30] Extender la aceptación Phase 20 para consultar balance/journals públicos, correlacionar `transaction_id` y verificar crédito/repetición estable. Ruta: `infra/tests` + Compose. Commit: pendiente.
+- T37 [S28-S30] Ejecutar checks, documentar evidencia y límites P2 y evaluar RDD del nuevo target. Ruta: Docker + docs + Git. Commit: pendiente.
 
 ## Log
 
@@ -125,3 +134,6 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - L20. P8.2 implementó T28-T30: `/metrics` bounded en network y bank-core, profile Compose explícito `observability`, Prometheus/Grafana privados sin puertos publicados, almacenamiento efímero, scrape config y provisioning reproducibles. `p8_observability_acceptance.sh` verificó targets up, métrica scrapeada, datasource/dashboard y emitió PASS. No implica métricas de negocio, SLO/SLI, alertas, tracing, HA, retención durable, seguridad productiva ni monitoreo remoto.
 - L21. El usuario eligió P2 como siguiente brecha; la exploración determinó que el primer slice verificable debe ser reconciliación histórica append-only, no causalidad de stream, porque todavía no existe un contrato de sequence/order para transferencias.
 - L22. T32-T33 amplían la aceptación Docker para ejecutar una reconciliación `DELIVERY_DLQ`, conservar su `run_id`/`difference_id`, recuperar el mismo delivery, ejecutar una reconciliación posterior sin alcance limpia y consultar nuevamente el primer run; el test de settlement verifica que la diferencia histórica conserva identidad y detalle. `CHOLONET_HMAC_SECRET=local-test-hmac SIERRA_CHOLONET_HMAC_SECRET=sierra-test-hmac ORIENTE_CHOLONET_HMAC_SECRET=oriente-test-hmac sh infra/tests/phase20_receiver_outage.sh` pasó: `DELIVERY_DLQ`, replay idempotente, `APPLIED`/`COMPLETED`, delivery/inbox/journal `1/1/1`, `125/125`, run histórico consultable sin mutación y reverse-arrival `2/2/2` con `325/325`. El límite sigue siendo S25-S27: no se implementan garantías de ordering, sequence o exportación adicional de ledger receptor.
+- L23. El usuario aprobó continuar con P2 agregando evidencia end-to-end por la frontera HTTP pública del banco receptor. Se creó `V18__public_receiver_fixture.sql` para asociar la cuenta receptora Sierra a un customer/token sintético sin tocar migraciones aplicadas.
+- L24. El runner Phase 20 consulta `GET /v1/accounts/{account_id}/balance` y `GET /v1/accounts/{account_id}/journals` en Sierra, verifica `transaction_id=transfer_id`, un único `CREDIT` receptor por `125`, balance receptor y repetición estable. La aceptación `job-102` pasó y mantuvo las verificaciones internas de settlement `125/125`, replay, reconciliación y reverse-arrival.
+- L25. El límite es deliberado: la API pública por cuenta expone el crédito de la cuenta receptora, no el débito de la cuenta compensadora; no se afirma UI completa, ordering global, exactly-once ni dinero real.

@@ -20,7 +20,7 @@ Existen bases PostgreSQL, frontends y configuración para Costa, Sierra y Orient
 
 ### P2. Transferencia interbancaria completa
 
-**Estado:** Parcial completado en Phase 18 y Phase 20 (`odd/tasks/phase-18-interbank-e2e-acceptance.md`, `odd/tasks/phase-20-receiver-outage-recovery.md`). La aceptación Costa→Sierra/Oriente, entrega, replay e idempotencia pasaron; Phase 20 demostró caída breve y prolongada del receptor, retry/backoff, agotamiento de retries, DLQ y recuperación. Permanecen fuera del alcance demostrado la consulta desde UI y cualquier evidencia de ledger receptor no exportada por el banco.
+**Estado:** Parcial completado en Phase 18 y Phase 20 (`odd/tasks/phase-18-interbank-e2e-acceptance.md`, `odd/tasks/phase-20-receiver-outage-recovery.md`). La aceptación Costa→Sierra/Oriente, entrega, replay e idempotencia pasaron; Phase 20 demostró caída breve y prolongada del receptor, retry/backoff, agotamiento de retries, DLQ y recuperación. Permanecen fuera del alcance demostrado la UI completa y cualquier evidencia de ledger receptor no exportada por el banco. Este slice agrega evidencia HTTP pública acotada para la cuenta receptora Sierra, que es la frontera que consumiría una UI.
 
 El recorrido bajo outage prolongada —DLQ observable, replay individual autenticado e idempotente, recuperación y reconciliación posterior— quedó demostrado para las transferencias objetivo en Phase 20. La evidencia no afirma garantías globales de ordering, causalidad, exactly-once ni completitud de la consulta desde UI.
 
@@ -31,6 +31,8 @@ El recorrido bajo outage prolongada —DLQ observable, replay individual autenti
 **Evidencia:** Phase 20 slice 4 agrega una ejecución interna opcionalmente acotada por `transfer_id`; no cambia la semántica del endpoint sin alcance y la aceptación Docker verifica settlement CholoNet y receiver Sierra exactos para el target.
 
 **Evidencia:** Phase 20 P2 histórico (T32-T33, S25-S27) conserva el `run_id` y `difference_id` de una reconciliación `DELIVERY_DLQ`, recupera el mismo delivery y ejecuta una reconciliación posterior sin alcance limpia; el endpoint GET vuelve a consultar la diferencia original sin mutación. La aceptación compara `transfer_id`, `delivery_id`, `event_id`, conteos de delivery/inbox/journal y PostgreSQL es la fuente autoritativa.
+
+**Evidencia:** El runner Phase 20 consulta por HTTP público el balance y los journals de la cuenta receptora Sierra con un token sintético asociado por `V18__public_receiver_fixture.sql`. `job-102` verificó `transaction_id=transfer_id`, un único `CREDIT` receptor por `125`, balance receptor, repetición estable de la consulta y conservó las comprobaciones internas de settlement `125/125`. La API pública es una frontera de lectura; no se afirma que exponga el débito de la cuenta compensadora.
 
 **Límites:** No se implementan sequence de stream, orden global, causalidad entre transferencias independientes, orden por timestamp/Kafka offset ni exportación de evidencia de ledger receptor no disponible.
 

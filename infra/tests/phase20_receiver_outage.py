@@ -11,6 +11,8 @@ import urllib.request
 import json
 
 NETWORK_URL = "http://network:8080"
+SIERRA_PUBLIC_URL = "http://bank-core-sierra:8080"
+SIERRA_PUBLIC_TOKEN = "phase20-public-receiver-token"
 NETWORK_SECRET = os.environ["NETWORK_ADAPTER_SECRET"]
 OPERATOR_TOKEN = os.environ["OPERATOR_CONSOLE_TOKEN"]
 DB_USER = os.environ["POSTGRES_USER"]
@@ -284,6 +286,30 @@ def historical_reconciliation():
     print(f"PHASE20 HISTORICAL RECONCILIATION PASS: first_run_id={first_run_id} difference_id={first_difference_id} transfer_id={transfer_id} delivery_id={delivery_id} event_id={event_id} original=DELIVERY_DLQ unchanged_after_clean_run={clean_runs[0][0]}")
 
 
+def public_receiver_evidence(transfer_id):
+    status, balance = http_json(
+        "GET", f"{SIERRA_PUBLIC_URL}/v1/accounts/{DESTINATION}/balance", token=SIERRA_PUBLIC_TOKEN
+    )
+    assert status == 200 and balance.get("account_id") == str(DESTINATION), (status, balance)
+    assert balance.get("balance_minor", 0) >= 125, balance
+
+    status, journals = http_json(
+        "GET", f"{SIERRA_PUBLIC_URL}/v1/accounts/{DESTINATION}/journals?limit=100", token=SIERRA_PUBLIC_TOKEN
+    )
+    assert status == 200 and isinstance(journals.get("data"), list), (status, journals)
+    matches = [journal for journal in journals["data"] if journal.get("transaction_id") == str(transfer_id)]
+    assert len(matches) == 1, (transfer_id, matches)
+    entries = matches[0].get("entries", [])
+    assert len(entries) == 1, entries
+    assert entries[0].get("direction") == "CREDIT" and entries[0].get("amount_minor") == 125, entries
+
+    repeat_status, repeat_journals = http_json(
+        "GET", f"{SIERRA_PUBLIC_URL}/v1/accounts/{DESTINATION}/journals?limit=100", token=SIERRA_PUBLIC_TOKEN
+    )
+    assert repeat_status == 200 and repeat_journals == journals, (repeat_status, repeat_journals)
+    print(f"PHASE20 PUBLIC RECEIVER PASS: transfer_id={transfer_id} account_id={DESTINATION} journal_entries=1 credit=125 repeat_stable=true")
+
+
 def complete():
     transfer_id, _ = transfer()
     deadline = time.time() + 120
@@ -338,7 +364,8 @@ def complete():
                 (transfer_id,),
             )[0]
             assert stable == (1, 1, 1, 1), stable
-            print(f"PHASE20 COMPLETE PASS: transfer_id={transfer_id} delivery_id={delivery_id} event_id={event_id} inbox=1 journal=1 balanced=125/125")
+            public_receiver_evidence(transfer_id)
+            print(f"PHASE20 COMPLETE PASS: transfer_id={transfer_id} delivery_id={delivery_id} event_id={event_id} inbox=1 journal=1 balanced=125/125 public_read=true")
             return
         time.sleep(2)
     raise AssertionError(f"No se completó la recuperación para {transfer_id}: instruction={instruction} delivery={delivery}")
