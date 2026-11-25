@@ -11,7 +11,11 @@ usage() { echo "Uso: $0 backup|restore <file>" >&2; exit 2; }
 backup() {
   local stamp file service
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
-  for service in network-db costa-db sierra-db oriente-db; do
+  local services=(network-db costa-db sierra-db oriente-db)
+  if [[ -n "${BACKUP_SERVICES:-}" ]]; then
+    read -r -a services <<< "$BACKUP_SERVICES"
+  fi
+  for service in "${services[@]}"; do
     file="$BACKUP_DIR/${service}-${stamp}.sql"
     local db
     case "$service" in

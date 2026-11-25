@@ -38,6 +38,12 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 
 14. **S14 — Límites de P7:** Demostrar solo recuperación at-least-once ante una caída/reinicio de Kafka y deduplicación del boundary. No afirmar exactly-once, orden global, DLQ Kafka, backup/restore, RPO/RTO ni disponibilidad productiva.
 
+15. **S15 — Siguiente slice aprobado:** Demostrar backup/restore lógico de un solo PostgreSQL sintético, usando `network-db` como fuente durable y preservando sus invariantes observables.
+
+16. **S16 — Contrato del slice de backup/restore:** Crear un registro sintético identificable, capturar su baseline, ejecutar `pg_dump`, mutar/eliminar solo el registro objetivo, restaurar con `psql` y verificar identidad, payload hash, idempotencia y disponibilidad posterior.
+
+17. **S17 — Límites del slice de backup/restore:** No afirmar consistencia entre las cuatro bases, RPO/RTO, PITR/WAL, cifrado, retención, rotación, backup de Kafka ni garantías productivas.
+
 ## Tasks
 
 - T1 [S1-S4] Crear runner/escenario de outage breve con stop/start externo de `bank-core-sierra` y observación de retry/backoff. Ruta: `infra/tests` + Compose. Commit: pendiente.
@@ -59,6 +65,10 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - T17 [S10] Verificar mediante pruebas Go que la reconciliación acotada devuelve solo el target y la no acotada conserva todos los resultados. Ruta: `network/internal/settlement`. Commit: pendiente.
 - T18 [S11] Extender la aceptación Docker-only para llamar la interfaz HTTP acotada y comprobar settlement, receiver inbox/journal y balances exactos de Sierra. Ruta: `infra/tests`. Commit: pendiente.
 - T19 [S10-S11] Ejecutar checks, registrar evidencia, actualizar documentación de alcance y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
+- T20 [S15-S17] Crear runner Docker-only para generar baseline, backup lógico, mutación controlada y restore de un registro sintético en `network-db`. Ruta: `infra/tests` + `infra/scripts/backup-restore.sh`. Commit: pendiente.
+- T21 [S15-S17] Verificar identidad, hash, idempotencia, constraints y readiness después del restore; sin afirmar consistencia cross-database o RPO/RTO. Ruta: `infra/tests` + SQL/HTTP. Commit: pendiente.
+- T22 [S15-S17] Documentar evidencia y límites del slice en P7/runbook. Ruta: docs. Commit: pendiente.
+- T23 [S15-S17] Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
 
 ## Log
 
@@ -75,3 +85,6 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - L11. El usuario indicó continuar con el siguiente slice. La exploración P7 confirmó que Kafka era solo un placeholder y que el outbox durable existente usa HTTP/HMAC y PostgreSQL.
 - L12. Se aprobó definir un adapter Kafka mínimo para un evento interbancario, con PostgreSQL como fuente de verdad y un consumer de prueba que entregue al boundary PostgreSQL. Quedan fuera exactly-once, DLQ Kafka, orden global, backup/restore y RPO/RTO.
 - L13. Se aprueba el slice 4 acotado: reconciliación interna opcionalmente filtrada por `transfer_id`, con ejecución sin alcance intacta y evidencia Docker de settlement CholoNet y receiver Sierra exactos para el target. Quedan fuera APIs públicas, débitos públicos Costa, cleanup global, compensaciones y semántica nueva de ledger.
+- L14. La aceptación P7 Kafka pasó en Docker: identidad estable `event_id`/key, recuperación tras reinicio, replay at-least-once y una sola fila durable en el boundary PostgreSQL.
+- L15. Se aprueba el siguiente slice: backup/restore lógico de un solo `network-db` sintético, con baseline y restore verificable. Quedan fuera consistencia entre bases, RPO/RTO, PITR/WAL, cifrado, retención, rotación, backup de Kafka y garantías productivas.
+- L16. La aceptación Docker `phase20_backup_restore.sh` pasó: creó un registro sintético, obtuvo backup `network-db`, eliminó el objetivo, restauró con `psql` y verificó identidad, payload hash, idempotencia, constraint y readiness.
