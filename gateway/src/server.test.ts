@@ -62,6 +62,28 @@ test('las rutas contractuales protegidas rechazan credenciales ausentes e insufi
   });
 });
 
+test('limita por API key después de autorizar, sin contar rechazos previos, y permite avanzar la ventana', async () => {
+  let now = 1_000_000;
+  await withServer(async (baseUrl) => {
+    const request = (apiKey: string, idempotencyKey: string, body: unknown = { amount_minor: 100, currency: 'USD', merchant_order_id: idempotencyKey }) => fetch(`${baseUrl}/v1/payment-intents`, {
+      method: 'POST',
+      headers: { 'X-Api-Key': apiKey, 'Idempotency-Key': idempotencyKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    assert.equal((await request('sk_sandbox_merchant_rw', 'invalid', { amount_minor: 0 })).status, 400);
+    assert.equal((await request('sk_sandbox_merchant_rw', 'rate-1')).status, 201);
+    assert.equal((await request('sk_sandbox_merchant_rw', 'rate-2')).status, 429);
+    const limited = await request('sk_sandbox_merchant_rw', 'rate-3');
+    assert.equal(limited.status, 429);
+    assert.match(limited.headers.get('retry-after') ?? '', /^[1-9][0-9]*$/);
+    assert.deepEqual(await limited.json(), { error: 'rate_limited', message: 'Se excedió el límite local de solicitudes; inténtelo después' });
+    assert.equal((await request('sk_sandbox_merchant_ro', 'read-only')).status, 403);
+    assert.equal((await fetch(`${baseUrl}/health/live`)).status, 200);
+    now += 60_000;
+    assert.equal((await request('sk_sandbox_merchant_rw', 'rate-4')).status, 201);
+  }, { rateLimitMaxRequests: 1, rateLimitWindowSeconds: 60, clock: () => now });
+});
+
 test('crea y consulta una intención de pago sintética sin escribir diarios', async () => {
   await withServer(async (baseUrl) => {
     const headers = {

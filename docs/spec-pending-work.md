@@ -54,11 +54,13 @@ Existe creación pública participant/customer-scoped, bloqueo, suspensión, baj
 
 ### P5. Seguridad de usuario y servicio
 
-**Estado:** Parcial.
+**Estado:** Parcial — slice de rate limiting sintético local implementado en `Spec: odd/tasks/phase-5-rate-limiting.md, T1-T2, S1-S5`.
 
-Existen mecanismos sintéticos como HMAC, bearer y API key, pero falta cubrir OIDC/OAuth 2.1, PKCE, MFA/step-up, JWT completo, mTLS operativo, TLS, rotación y hash de secretos, rate limiting, CORS/CSRF y autorización exhaustiva por cuenta y participante.
+El gateway limita `POST /v1/payment-intents` por API key, en memoria, después de auth/scope y antes de la mutación. Los defaults locales explícitos son 2 solicitudes por 60 segundos (`RATE_LIMIT_MAX_REQUESTS`, `RATE_LIMIT_WINDOW_SECONDS`); son configurables, reinician con el proceso y no son globales ni distribuidos. La aceptación Docker-only verifica `201,201,429`, `Retry-After`, ausencia de mutación, `403` read-only, health y red sin puertos host ni Redis/Kafka.
 
-**Límite:** Las implementaciones seguirán siendo educativas y no se presentarán como certificación de cumplimiento normativo.
+Siguen pendientes OIDC/OAuth 2.1, PKCE, MFA/step-up, JWT completo, mTLS operativo, TLS, rotación y hash de secretos, CORS/CSRF y autorización exhaustiva por cuenta y participante.
+
+**Límite:** Las implementaciones seguirán siendo educativas y no se presentarán como certificación de cumplimiento normativo. Este slice no afirma protección productiva, precisión global/distribuida ni modifica el runtime ledger.
 
 ### P6. Facturadores persistentemente respaldados
 
@@ -129,6 +131,7 @@ Cada punto se marcará como `Pendiente`, `En progreso`, `Parcial`, `Bloqueado` o
 
 ## Registro de progreso
 
+- 2026-11-25: Phase 5 T1-T2 implementó el rate limiting local por API key del gateway y la aceptación Docker-only `p5`; la documentación queda en `docs/runbooks/p5-rate-limiting.md`. Defaults explícitos: 2 solicitudes por ventana de 60 segundos, configurables solo para ejecución local; no se agregan Redis/Kafka ni puertos host y el runtime ledger permanece intacto.
 - 2026-11-17: se registran los diez bloques pendientes después de cerrar Phase 15. La repetición T7 posterior a `cdc1fce` queda como evidencia no disponible debido al agotamiento del pool de redes Docker; la T7 previa y la suite `bank-core` permanecen documentadas por separado.
 - 2026-11-25: P10 T3 cerró el slice documental: `infra/tests/p10_traceability_check.sh` pasó en Docker verificando P1-P9, 14 ADRs, 3 OpenAPI, límites de tracing y Compose privado. Commit `a98284a`; review `review-dde11eef11f9ea1d` aprobada y burned. P10 sigue parcial porque la matriz debe reconciliarse cuando cambien P1-P9 y no implementa OpenTelemetry.
 - 2026-11-17: Usuario: "Los 10 puntos que me marcaste me parecen importantes, anótalos en la parte donde documentas que esos son los puntos pendientes y vamos resolviendo uno por uno". Se crea este registro como fuente de seguimiento y se selecciona P1 como siguiente slice.

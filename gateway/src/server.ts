@@ -128,7 +128,24 @@ function verifyWebhookSignature(header: string | undefined, secret: string, rawB
   return { timestamp, signature };
 }
 
-export type GatewayOptions = { billerBaseUrl?: string; utilitiesBaseUrl?: string; transitBaseUrl?: string; billerEventSecret?: string };
+export type GatewayOptions = {
+  billerBaseUrl?: string;
+  utilitiesBaseUrl?: string;
+  transitBaseUrl?: string;
+  billerEventSecret?: string;
+  rateLimitMaxRequests?: number;
+  rateLimitWindowSeconds?: number;
+  clock?: () => number;
+};
+
+function positiveInteger(value: number | undefined, fallback: number): number {
+  return Number.isSafeInteger(value) && (value as number) > 0 ? value as number : fallback;
+}
+
+function environmentPositiveInteger(name: string, fallback: number): number {
+  const value = Number.parseInt(process.env[name] ?? '', 10);
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
 
 export function createServer(options: GatewayOptions = {}): Server {
   const intents = new Map<string, PaymentIntent>();
@@ -148,6 +165,23 @@ export function createServer(options: GatewayOptions = {}): Server {
   const webhookDeliveries = new Map<string, WebhookDelivery>();
   const deadLetterQueue: WebhookDelivery[] = [];
   const ledgerBoundary = 'Esta pasarela nunca escribe saldos ni diarios.';
+  const rateLimitMaxRequests = positiveInteger(options.rateLimitMaxRequests, environmentPositiveInteger('RATE_LIMIT_MAX_REQUESTS', 2));
+  const rateLimitWindowSeconds = positiveInteger(options.rateLimitWindowSeconds, environmentPositiveInteger('RATE_LIMIT_WINDOW_SECONDS', 60));
+  const clock = options.clock ?? (() => Date.now());
+  const rateLimitBuckets = new Map<string, number[]>();
+  const allowPaymentIntentRequest = (apiKey: string): { allowed: true } | { allowed: false; retryAfter: number } => {
+    const now = clock();
+    const windowMilliseconds = rateLimitWindowSeconds * 1000;
+    const recent = (rateLimitBuckets.get(apiKey) ?? []).filter((timestamp) => now - timestamp < windowMilliseconds);
+    if (recent.length >= rateLimitMaxRequests) {
+      const retryAfter = Math.max(1, Math.ceil(((recent[0] ?? now) + windowMilliseconds - now) / 1000));
+      rateLimitBuckets.set(apiKey, recent);
+      return { allowed: false, retryAfter };
+    }
+    recent.push(now);
+    rateLimitBuckets.set(apiKey, recent);
+    return { allowed: true };
+  };
 
   return createHttpServer(async (request, response) => {
     const method = request.method ?? 'GET';
@@ -433,6 +467,17 @@ export function createServer(options: GatewayOptions = {}): Server {
       const input = body as Record<string, unknown>;
       if (!body || typeof body !== 'object' || Array.isArray(body) || !Number.isSafeInteger(input.amount_minor) || (input.amount_minor as number) <= 0 || typeof input.currency !== 'string' || !/^[A-Z]{3}$/.test(input.currency) || typeof input.merchant_order_id !== 'string' || input.merchant_order_id.length === 0 || (input.description !== undefined && typeof input.description !== 'string')) {
         sendJson(response, 400, errorBody('invalid_request', 'Se requieren amount_minor, currency y merchant_order_id'));
+        return;
+      }
+      const apiKey = apiKeyFrom(request);
+      if (!apiKey) {
+        sendJson(response, 401, errorBody('unauthorized', 'Se requiere una clave API válida del entorno aislado'));
+        return;
+      }
+      const limit = allowPaymentIntentRequest(apiKey);
+      if (!limit.allowed) {
+        response.writeHead(429, { 'content-type': 'application/json; charset=utf-8', 'retry-after': String(limit.retryAfter) });
+        response.end(JSON.stringify(errorBody('rate_limited', 'Se excedió el límite local de solicitudes; inténtelo después')));
         return;
       }
       const intent: PaymentIntent = {
