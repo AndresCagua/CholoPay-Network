@@ -113,6 +113,7 @@ Los cinco servicios exponen `/health/live` y `/health/ready`, Compose tiene heal
 - [`docs/traceability-matrix.md`](traceability-matrix.md) cubre P1-P9 con requisito, tarea ODD, ADR, código, prueba, evidencia Docker, commit, estado y limitación.
 - [`adr/README.md`](../adr/README.md) indexa los 14 ADR existentes.
 - [`README.md`](../README.md) enlaza la matriz, el índice ADR, los tres contratos OpenAPI (`api/bank.openapi.yaml`, `api/network.openapi.yaml`, `api/gateway.openapi.yaml`) y runbooks relevantes.
+- [`infra/tests/README.md`](../infra/tests/README.md) inventaría los runners Docker-only P6-P10 y Phase 20, diferenciando evidencia histórica de ejecuciones frescas y límites explícitos.
 - [`infra/tests/p10_traceability_check.sh`](../infra/tests/p10_traceability_check.sh) ejecuta el checker dentro de Docker; [`p10_traceability_check.py`](../infra/tests/p10_traceability_check.py) verifica cobertura P1-P9, referencias actuales P7/P8, ADRs, OpenAPI, exclusión de tracing/OpenTelemetry y Compose sin puertos publicados por defecto.
 - La matriz documenta como metadatos contractuales sintéticos `event_id`, `transfer_id`, `correlation_id`, `causation_id` y `trace_id`; no los presenta como spans ni tracing distribuido.
 

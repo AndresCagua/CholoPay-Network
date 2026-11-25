@@ -12,7 +12,7 @@ Alcance: actualizar la matriz y el validador para reflejar evidencia actual, sin
 
 - T1 [S1-S2] Reconciliar filas P6-P8 y fortalecer checker de referencias actuales. Ruta: docs/infra/tests. Commit: `3f7d2f1`.
 - T2 [S3] Registrar límites y evidencia del slice. Ruta: docs. Commit: `3f7d2f1`.
-- T3 [S1-S3] Ejecutar checker Docker, crear work unit y evaluar RDD. Ruta: Docker + Git. Commit: pendiente (review RDD pendiente).
+- T3 [S1-S3] Ejecutar checker Docker, crear work unit y evaluar RDD. Ruta: Docker + Git. Commit: `e91b4c3`; review `review-be6647750c8cce94` aprobada y burned.
 
 ## Log
 
