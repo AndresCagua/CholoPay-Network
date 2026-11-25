@@ -32,6 +32,12 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 
 11. **S11 — Aceptación del slice 4:** Desde Docker, invocar la interfaz HTTP acotada y verificar para el target los totales autoritativos exactos del settlement CholoNet y los balances/journal del receiver Sierra. No se agregan fixtures de API pública, débitos de cuentas públicas de Costa, cleanup global, compensaciones ni semántica nueva de ledger.
 
+12. **S12 — Solicitud aprobada para P7:** Definir un adapter Kafka mínimo para un evento interbancario versionado, con PostgreSQL como fuente de verdad y un consumer de prueba que entregue al boundary PostgreSQL.
+
+13. **S13 — Contrato mínimo de P7:** Publicar el envelope persistido del outbox en `cholonet.inter-network.v1`, usando `event_id` como key estable, consumer group `cholonet-network-boundary` y commit del offset solo después de aceptación durable por PostgreSQL.
+
+14. **S14 — Límites de P7:** Demostrar solo recuperación at-least-once ante una caída/reinicio de Kafka y deduplicación del boundary. No afirmar exactly-once, orden global, DLQ Kafka, backup/restore, RPO/RTO ni disponibilidad productiva.
+
 ## Tasks
 
 - T1 [S1-S4] Crear runner/escenario de outage breve con stop/start externo de `bank-core-sierra` y observación de retry/backoff. Ruta: `infra/tests` + Compose. Commit: pendiente.
@@ -45,10 +51,14 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - T9 [S8-S9] Agregar pruebas de dos transferencias independientes con llegada inversa y duplicados/retries idempotentes, sin introducir una garantía de orden global. Ruta: `network/internal/settlement`, `bank-core` y pruebas. Commit: pendiente.
 - T10 [S8-S9] Extender la aceptación Docker-only para entregar las dos transferencias en orden inverso y verificar balances, journals e inboxes únicos. Ruta: `infra/tests` + Compose. Commit: pendiente.
 - T11 [S8-S9] Ejecutar checks, registrar evidencia, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
-- T12 [S10] Agregar el filtro opcional `transfer_id` a la reconciliación interna, preservando la ejecución sin alcance. Ruta: `network/internal/settlement` + pruebas. Commit: pendiente.
-- T13 [S10] Verificar mediante pruebas Go que la reconciliación acotada devuelve solo el target y la no acotada conserva todos los resultados. Ruta: `network/internal/settlement`. Commit: pendiente.
-- T14 [S11] Extender la aceptación Docker-only para llamar la interfaz HTTP acotada y comprobar settlement, receiver inbox/journal y balances exactos de Sierra. Ruta: `infra/tests`. Commit: pendiente.
-- T15 [S10-S11] Ejecutar checks, registrar evidencia, actualizar documentación de alcance y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
+- T12 [S12-S14] Definir el contrato mínimo del adapter Kafka: evento versionado, topic, key, consumer y confirmación posterior a persistencia PostgreSQL. Ruta: ADR + `network`/`infra`. Commit: pendiente.
+- T13 [S12-S14] Implementar producer/consumer de prueba sobre el outbox existente, con deduplicación en el boundary PostgreSQL y configuración solo bajo profile `events`. Ruta: `network`, `bank-core` y Compose. Commit: pendiente.
+- T14 [S12-S14] Crear aceptación Docker de un evento durante caída/reinicio de Kafka y verificar identidad estable, persistencia durable y ausencia de doble efecto financiero. Ruta: `infra/tests` + Compose. Commit: pendiente.
+- T15 [S12-S14] Ejecutar checks, documentar límites, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
+- T16 [S10] Agregar el filtro opcional `transfer_id` a la reconciliación interna, preservando la ejecución sin alcance. Ruta: `network/internal/settlement` + pruebas. Commit: pendiente.
+- T17 [S10] Verificar mediante pruebas Go que la reconciliación acotada devuelve solo el target y la no acotada conserva todos los resultados. Ruta: `network/internal/settlement`. Commit: pendiente.
+- T18 [S11] Extender la aceptación Docker-only para llamar la interfaz HTTP acotada y comprobar settlement, receiver inbox/journal y balances exactos de Sierra. Ruta: `infra/tests`. Commit: pendiente.
+- T19 [S10-S11] Ejecutar checks, registrar evidencia, actualizar documentación de alcance y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
 
 ## Log
 
@@ -62,4 +72,6 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - L8. Para resolver el finding `R3-replay-default-token`, el replay ahora falla cerrado si falta `OPERATOR_CONSOLE_TOKEN`, exige exactamente `Authorization: Bearer <token>` y Compose exige configurar el token sin fallback conocido. Las pruebas HTTP de settlement y `docker compose config` pasaron.
 - L9. El usuario eligió continuar con "Slice 3: reordenamiento e idempotencia". La exploración confirmó que el sistema ya prueba duplicados e idempotencia, pero no tiene secuencias ni causalidad persistidas; por eso el slice probará orden inverso entre transferencias independientes y no una garantía global.
 - L10. La aceptación Docker-only `job-2` pasó: dos transferencias independientes se liquidaron en orden inverso, se recuperaron tras reiniciar Sierra, produjeron 2 deliveries, 2 inboxes y 2 journals únicos, con totales balanceados `325/325` y balances observados de clearing `998225` y destino `1775`.
-- L11. Se aprueba el slice 4 acotado: reconciliación interna opcionalmente filtrada por `transfer_id`, con ejecución sin alcance intacta y evidencia Docker de settlement CholoNet y receiver Sierra exactos para el target. Quedan fuera APIs públicas, débitos públicos Costa, cleanup global, compensaciones y semántica nueva de ledger.
+- L11. El usuario indicó continuar con el siguiente slice. La exploración P7 confirmó que Kafka era solo un placeholder y que el outbox durable existente usa HTTP/HMAC y PostgreSQL.
+- L12. Se aprobó definir un adapter Kafka mínimo para un evento interbancario, con PostgreSQL como fuente de verdad y un consumer de prueba que entregue al boundary PostgreSQL. Quedan fuera exactly-once, DLQ Kafka, orden global, backup/restore y RPO/RTO.
+- L13. Se aprueba el slice 4 acotado: reconciliación interna opcionalmente filtrada por `transfer_id`, con ejecución sin alcance intacta y evidencia Docker de settlement CholoNet y receiver Sierra exactos para el target. Quedan fuera APIs públicas, débitos públicos Costa, cleanup global, compensaciones y semántica nueva de ledger.

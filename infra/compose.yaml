@@ -97,6 +97,10 @@ services:
       CHOLONET_URL: http://network:8080/internal/v1/inter-network/transfers
       CHOLONET_HMAC_SECRET: ${CHOLONET_HMAC_SECRET:-}
       OUTBOX_ENABLED: ${OUTBOX_ENABLED:-false}
+      OUTBOX_TRANSPORT: ${OUTBOX_TRANSPORT:-http}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-cholonet.inter-network.v1}
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-bank-core-outbox}
     expose: ["8080"]
     depends_on:
       costa-db: {condition: service_healthy}
@@ -299,6 +303,32 @@ services:
       network-db: {condition: service_healthy}
     networks: [internal_services, default]
 
+  phase20-kafka-order:
+    image: python:3.13-alpine
+    profiles: [events]
+    volumes:
+      - ./tests/phase20_kafka_order.py:/tests/phase20_kafka_order.py:ro
+    command: ["python", "/tests/phase20_kafka_order.py"]
+    depends_on:
+      bank-core: {condition: service_started}
+    networks: [internal_services, default]
+
+  phase20-kafka-consumer:
+    image: python:3.13-alpine
+    profiles: [events]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-cholonet.inter-network.v1}
+      CHOLONET_HMAC_SECRET: ${CHOLONET_HMAC_SECRET:?CHOLONET_HMAC_SECRET must be set}
+      NETWORK_DB_URL: postgres://${POSTGRES_USER:-cholopay}:${POSTGRES_PASSWORD:-cholopay_local_only}@network-db:5432/${NETWORK_DB_NAME:-cholopay_network}
+    volumes:
+      - ./tests/phase20_kafka_consumer.py:/tests/phase20_kafka_consumer.py:ro
+    command: ["sh", "-c", "pip install --no-cache-dir kafka-python psycopg[binary] >/dev/null && python /tests/phase20_kafka_consumer.py"]
+    depends_on:
+      kafka: {condition: service_started}
+      network: {condition: service_started}
+    networks: [internal_services, default]
+
   network-test:
     build:
       context: ../network
@@ -318,7 +348,7 @@ services:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:${KAFKA_HOST_PORT:-19092}
+      KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS:-PLAINTEXT://kafka:9092}
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1

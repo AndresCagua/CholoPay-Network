@@ -66,9 +66,9 @@ Utilities y tránsito son servicios sintéticos; electricidad cuenta con aplicac
 
 ### P7. Outbox, Kafka y recuperación completa
 
-**Estado:** Parcial; Phase 20 slice 2 acota una evidencia de recuperación de delivery, no el cumplimiento total de P7.
+**Estado:** Parcial; se aprobó un slice acotado para introducir el adapter Kafka mínimo.
 
-Existe outbox bancario, retries y DLQ, pero falta demostrar recuperación completa con outbox durable, integración del perfil de eventos, caída y reinicio de Kafka, reordenamiento, recuperación de bancos, backup/restore, RPO/RTO y reconciliación posterior a interrupciones. Phase 20 slice 2 (`job-4`) aporta evidencia acotada para una entrega individual `FAILED`/`DELIVERY_DLQ`, su replay autenticado e idempotente y la reconciliación del transfer objetivo; no certifica el cumplimiento total de P7.
+Existe outbox bancario durable, retries y DLQ HTTP, pero Kafka era hasta ahora un placeholder sin producer/consumer de aplicación. El slice P7 en curso definirá un evento interbancario versionado, un topic/key/consumer mínimos y un boundary PostgreSQL deduplicante, para demostrar una caída/reinicio de Kafka sin reemplazar el ledger. No certificará exactly-once, DLQ Kafka, orden global, backup/restore, RPO/RTO ni disponibilidad productiva. Phase 20 slices 2–4 aportan evidencia de delivery, replay, reordenamiento entre transferencias independientes y reconciliación target-scoped, pero no cumplimiento total de P7.
 
 **Límite:** Kafka no sustituirá a los ledgers PostgreSQL como fuente de verdad.
 

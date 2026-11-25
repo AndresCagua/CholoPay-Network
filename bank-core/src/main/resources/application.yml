@@ -25,3 +25,8 @@ cholopay:
     enabled: ${OUTBOX_ENABLED:false}
     poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:1000}
     http-timeout: ${OUTBOX_HTTP_TIMEOUT:2s}
+    transport: ${OUTBOX_TRANSPORT:http}
+    kafka:
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:}
+      topic: ${KAFKA_TOPIC:cholonet.inter-network.v1}
+      client-id: ${KAFKA_CLIENT_ID:${PARTICIPANT_ID:bank-core}-outbox}

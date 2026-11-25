@@ -1,6 +1,7 @@
 package com.cholopay.bankcore.outbox;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
@@ -16,6 +17,7 @@ import java.util.HexFormat;
 import java.util.UUID;
 
 @Component
+@ConditionalOnProperty(name = "cholopay.outbox.transport", havingValue = "http", matchIfMissing = true)
 public class HttpOutboxClient implements OutboxClient {
     private final HttpClient http = HttpClient.newHttpClient();
     private final String endpoint;
