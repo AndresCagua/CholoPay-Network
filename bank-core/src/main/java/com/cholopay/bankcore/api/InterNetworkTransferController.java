@@ -20,7 +20,10 @@ public class InterNetworkTransferController {
             @RequestHeader("X-CholoPay-Request-Id") String requestId,
             @RequestHeader("X-CholoPay-Signature") String signature,
             @RequestHeader("Idempotency-Key") String key, @RequestBody ReservationRequest request) {
-        if (!authenticator.verify(timestamp, requestId, canonical(request), signature)) return ResponseEntity.status(401).build();
+        if (request.transferId() == null || request.sourceAccountId() == null || request.sourceParticipantId() == null || request.destinationParticipantId() == null || request.correlationId() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (!authenticator.verify(timestamp, requestId, canonical(request, key), signature)) return ResponseEntity.status(401).build();
         return ResponseEntity.accepted().body(service.reserve(new InterNetworkTransferService.ReservationRequest(
                 request.transferId(), request.sourceAccountId(), request.sourceParticipantId(),
                 request.destinationParticipantId(), request.amountMinor(), request.currency(), key,
@@ -41,10 +44,10 @@ public class InterNetworkTransferController {
                                      UUID destinationParticipantId, long amountMinor, String currency,
                                      UUID correlationId, UUID causationId) {}
 
-    static String canonical(ReservationRequest request) {
+    static String canonical(ReservationRequest request, String idempotencyKey) {
         return String.join(":", request.transferId().toString(), request.sourceAccountId().toString(),
                 request.sourceParticipantId().toString(), request.destinationParticipantId().toString(),
-                Long.toString(request.amountMinor()), request.currency());
+                Long.toString(request.amountMinor()), request.currency(), idempotencyKey);
     }
 
     public record Request(UUID sourceAccountId, UUID destinationAccountId, UUID sourceParticipantId,
