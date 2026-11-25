@@ -1,5 +1,7 @@
 FROM python:3.12-alpine AS runtime
 WORKDIR /app
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py ./app.py
 ENV PYTHONUNBUFFERED=1 PORT=8082
 EXPOSE 8082
@@ -8,6 +10,8 @@ CMD ["python", "app.py"]
 
 FROM python:3.12-alpine AS test
 WORKDIR /app
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py ./app.py
 COPY tests ./tests
 CMD ["python", "-m", "unittest", "discover", "-s", "tests", "-v"]

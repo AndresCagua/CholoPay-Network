@@ -10,7 +10,7 @@ docker compose -f compose.yaml up --build transit
 docker compose -f compose.yaml down
 ```
 
-De forma predeterminada no se expone ningún puerto al host. Los datos son locales al proceso y desaparecen cuando se detiene el contenedor. Para conectarte desde otro contenedor de la misma red Compose, usa `http://transit:8082`.
+De forma predeterminada no se expone ningún puerto al host. En Compose de infraestructura, `DB_URL` apunta únicamente a `transit-db`, un PostgreSQL sintético con volumen aislado; fuera de ese Compose, sin `DB_URL`, los datos son locales al proceso y desaparecen cuando se detiene el contenedor. Para conectarte desde otro contenedor de la misma red Compose, usa `http://transit:8082`.
 
 ## Superficie HTTP
 
@@ -30,4 +30,4 @@ De forma predeterminada no se expone ningún puerto al host. Los datos son local
 - `POST /v1/payment-intents` — requiere `Idempotency-Key`; solo crea una intención pendiente.
 - `GET /v1/payment-intents/{id}`
 
-Las intenciones de pago son un límite explícito de integración. Repetir la misma clave y carga devuelve la misma intención; una discrepancia de carga devuelve `409`. El servicio nunca accede a cuentas ni escribe un ledger. Solo un evento interno firmado de confirmación final cambia una obligación a `paid`; si la aplicación no está disponible se conserva `SETTLED_AWAITING_APPLICATION` para reintento. Todo el estado está en memoria y los valores usan moneda sintética `SYN`.
+Las intenciones de pago son un límite explícito de integración. Repetir la misma clave y carga devuelve la misma intención; una discrepancia de carga devuelve `409`. El servicio nunca accede a cuentas ni escribe un ledger. Solo un evento interno firmado de confirmación final cambia una obligación a `paid`; si la aplicación no está disponible se conserva `SETTLED_AWAITING_APPLICATION` para reintento. Todo el estado usa moneda sintética `SYN`; la ejecución Docker de infraestructura lo persiste en PostgreSQL aislado. El servicio nunca accede a cuentas ni escribe un ledger.

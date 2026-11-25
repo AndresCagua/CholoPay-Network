@@ -44,6 +44,15 @@ services:
     volumes: [redis-data:/data]
     healthcheck: {test: [CMD, redis-cli, ping], interval: 5s, timeout: 3s, retries: 10}
 
+  transit-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${TRANSIT_DB_USER:-transit}
+      POSTGRES_PASSWORD: ${TRANSIT_DB_PASSWORD:-transit_local_only}
+      POSTGRES_DB: ${TRANSIT_DB_NAME:-transit}
+    volumes: [transit-db-data:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
+
   utilities-db:
     image: postgres:17-alpine
     environment:
@@ -71,9 +80,12 @@ services:
       target: runtime
     environment:
       PORT: 8082
+      DB_URL: postgresql://${TRANSIT_DB_USER:-transit}:${TRANSIT_DB_PASSWORD:-transit_local_only}@transit-db:5432/${TRANSIT_DB_NAME:-transit}
       TRANSIT_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:-local-test-only}
     expose: ["8082"]
     healthcheck: {test: [CMD-SHELL, "wget -qO- http://127.0.0.1:8082/health/live >/dev/null && wget -qO- http://127.0.0.1:8082/health/ready >/dev/null"], interval: 5s, timeout: 3s, retries: 10}
+    depends_on:
+      transit-db: {condition: service_healthy}
     networks: [internal_services, default]
 
   gateway:
@@ -355,6 +367,20 @@ services:
     command: ["python", "/tests/p8_health_acceptance.py"]
     networks: [internal_services, default]
 
+  p6-transit-recovery:
+    image: python:3.13-alpine
+    profiles: [p6]
+    environment:
+      TRANSIT_URL: http://transit:8082
+      TRANSIT_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:-local-test-only}
+    volumes:
+      - ./tests/p6_transit_recovery.py:/tests/p6_transit_recovery.py:ro
+      - p6-transit-state:/tmp
+    command: ["python", "/tests/p6_transit_recovery.py"]
+    depends_on:
+      transit: {condition: service_healthy}
+    networks: [internal_services, default]
+
   p6-utilities-recovery:
     image: python:3.13-alpine
     profiles: [p6]
@@ -494,3 +520,5 @@ volumes:
   oriente-db-data:
   redis-data:
   utilities-db-data:
+  transit-db-data:
+  p6-transit-state:
