@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.sql.Timestamp;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,7 +34,7 @@ public class OutboxRepository {
                 RETURNING o.event_id, o.serialized_envelope, o.attempt_count, o.lease_token, o.lease_until
                 """, (rs, row) -> new OutboxRecord(rs.getObject("event_id", UUID.class), rs.getString("serialized_envelope"),
                         rs.getInt("attempt_count"), rs.getObject("lease_token", UUID.class), rs.getTimestamp("lease_until").toInstant()),
-                now, now, token, now.plus(leaseDuration), now).stream().findFirst();
+                Timestamp.from(now), Timestamp.from(now), token, Timestamp.from(now.plus(leaseDuration)), Timestamp.from(now)).stream().findFirst();
     }
 
     public boolean markPublished(UUID eventId, UUID leaseToken) {
@@ -45,6 +46,6 @@ public class OutboxRepository {
     }
 
     public boolean markRetry(UUID eventId, UUID leaseToken, Instant nextAttempt, String error) {
-        return jdbc.update("UPDATE inter_network_outbox SET state='PENDING', lease_token=NULL, lease_until=NULL, next_attempt_at=?, last_error=? WHERE event_id=? AND state='IN_FLIGHT' AND lease_token=?", nextAttempt, error, eventId, leaseToken) == 1;
+        return jdbc.update("UPDATE inter_network_outbox SET state='PENDING', lease_token=NULL, lease_until=NULL, next_attempt_at=?, last_error=? WHERE event_id=? AND state='IN_FLIGHT' AND lease_token=?", Timestamp.from(nextAttempt), error, eventId, leaseToken) == 1;
     }
 }

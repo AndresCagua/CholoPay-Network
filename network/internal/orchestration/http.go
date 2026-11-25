@@ -62,6 +62,7 @@ func (r *intakeRequest) normalize() {
 type intakeEnvelope struct {
 	Payload        json.RawMessage `json:"payload"`
 	IdempotencyKey string          `json:"idempotency_key"`
+	CorrelationID   uuid.UUID       `json:"correlation_id"`
 }
 type intakeResponse struct {
 	TransferID           uuid.UUID         `json:"transfer_id"`
@@ -89,6 +90,9 @@ func (h *Handler) intake(w http.ResponseWriter, r *http.Request) {
 		}
 		if request.IdempotencyKey == "" {
 			request.IdempotencyKey = envelope.IdempotencyKey
+		}
+		if request.CorrelationID == uuid.Nil {
+			request.CorrelationID = envelope.CorrelationID
 		}
 	} else if err := json.Unmarshal(body, &request); err != nil {
 		http.Error(w, "transferencia entre redes inválida", http.StatusBadRequest)

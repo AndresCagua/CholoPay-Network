@@ -22,8 +22,24 @@ compose() {
 restart_broker() { compose start kafka >/dev/null 2>&1 || true; }
 trap restart_broker EXIT
 
-# Start the events profile explicitly, while retaining the phase20 seed dependency.
-compose up -d network-db network bank-core kafka
+# Start Kafka first so the eager producer can resolve its broker during bank-core startup.
+compose up -d network-db kafka
+wait_for_kafka() {
+  kafka_ready=false
+  for _ in $(seq 1 60); do
+    if compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then
+      kafka_ready=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "$kafka_ready" != true ]; then
+    echo "Kafka broker did not become ready" >&2
+    exit 1
+  fi
+}
+wait_for_kafka
+compose up -d network bank-core
 compose run --rm phase18-seed >/dev/null
 
 # The broker is down before the outbox event is created and therefore cannot publish it.
@@ -47,6 +63,7 @@ fi
 
 # Restart Kafka externally, then let the consumer deliver and replay the stable event.
 compose start kafka >/dev/null
+wait_for_kafka
 CONSUMER_JSON=$(compose run --rm --no-deps phase20-kafka-consumer)
 
 python3 - "$ORDER_JSON" "$CONSUMER_JSON" <<'PY'

@@ -1,5 +1,5 @@
 """Minimal test consumer: commit Kafka only after the PostgreSQL HTTP boundary accepts."""
-import hashlib, hmac, json, os, time, urllib.request
+import hashlib, hmac, json, os, time, urllib.error, urllib.request
 import psycopg
 from kafka import KafkaConsumer
 
@@ -16,8 +16,12 @@ def deliver(body):
         "Content-Type": "application/json", "X-CholoPay-Timestamp": timestamp,
         "X-CholoPay-Request-Id": request_id, "X-CholoPay-Signature": signature,
     })
-    with urllib.request.urlopen(request, timeout=10) as response:
-        return response.status
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode(errors="replace")
+        raise RuntimeError(f"boundary returned HTTP {error.code}: {detail}") from error
 
 def main():
     consumer = KafkaConsumer(TOPIC, bootstrap_servers=BOOTSTRAP, group_id="cholonet-network-boundary",

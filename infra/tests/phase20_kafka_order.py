@@ -3,7 +3,7 @@ import json, os, urllib.request, uuid
 
 body = {
     "sourceAccountId": "00000000-0000-4000-8000-000000000001",
-    "destinationAccountId": "00000000-0000-4000-8000-000000000013",
+    "destinationAccountId": "00000000-0000-4000-8000-000000000002",
     "sourceParticipantId": "00000000-0000-4000-8000-000000000101",
     "destinationParticipantId": "00000000-0000-4000-8000-000000000102",
     "sourceNetworkId": "00000000-0000-4000-8000-000000000201",
