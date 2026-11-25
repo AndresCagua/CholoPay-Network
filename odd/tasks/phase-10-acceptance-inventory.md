@@ -13,7 +13,7 @@ Alcance: documentar runners existentes y sus límites, sin agregar runtime ni nu
 
 - T1 [S1-S3] Documentar inventario de runners, perfiles y prerrequisitos. Ruta: infra/tests/README.md. Commit: `c65fef2`.
 - T2 [S2-S4] Corregir estado stale de T3 en reconciliación P10 y registrar límites. Ruta: odd/docs. Commit: `c65fef2`.
-- T3 [S1-S4] Ejecutar checks, crear work unit y evaluar RDD. Ruta: Docker + Git. Commit: pendiente (review RDD pendiente).
+- T3 [S1-S4] Ejecutar checks, crear work unit y evaluar RDD. Ruta: Docker + Git. Commit: `ecea193`; `job-46` pasó y review `review-d4fdc29ea58c826a` fue aprobada y burned.
 
 ## Log
 
