@@ -13,9 +13,9 @@ Alcance: consolidar evidencia documental de P1-P9; no implementar OpenTelemetry 
 
 ## Tasks
 
-- T1 [S1-S4] Crear matriz, índice ADR y enlaces documentales. Ruta: docs/README/adr. Commit: pendiente.
-- T2 [S5-S6] Crear validador Docker-only de trazabilidad y documentación de ejecución/límites. Ruta: infra/tests/docs. Commit: pendiente.
-- T3 [S1-S6] Ejecutar checks, crear work unit y evaluar RDD si corresponde. Ruta: Docker + Git. Commit: pendiente.
+- T1 [S1-S4] Crear matriz, índice ADR y enlaces documentales. Ruta: docs/README/adr. Commit: `a98284a`.
+- T2 [S5-S6] Crear validador Docker-only de trazabilidad y documentación de ejecución/límites. Ruta: infra/tests/docs. Commit: `a98284a`.
+- T3 [S1-S6] Ejecutar checks, crear work unit y evaluar RDD si corresponde. Ruta: Docker + Git. Commit: `a98284a`.
 
 ## Log
 
@@ -23,3 +23,4 @@ Alcance: consolidar evidencia documental de P1-P9; no implementar OpenTelemetry 
 - L2. La exploración confirmó que P10 requiere una matriz central de trazabilidad documental y que no existe evidencia de tracing distribuido real.
 - L3. T1-T2 implementaron `docs/traceability-matrix.md` para P1-P9, `adr/README.md`, enlaces documentales en `README.md` y la actualización de P10 en `docs/spec-pending-work.md`. La matriz conserva commits como `pendiente` cuando no existe un hash verificable y registra los límites de cada punto.
 - L4. El validador Docker-only `infra/tests/p10_traceability_check.sh` ejecuta `p10_traceability_check.py` y valida cobertura P1-P9, enlaces existentes, los tres OpenAPI, los 14 ADR existentes, la exclusión explícita de OpenTelemetry/tracing y la configuración Compose predeterminada sin puertos publicados. No modifica runtime ni crea commits.
+- L5. La ejecución Docker del validador pasó con `P10 TRACEABILITY PASS: P1-P9, 14 ADRs, 3 OpenAPI, límites de tracing y Compose privado verificados`. El commit del slice es `a98284a` y la review RDD `review-dde11eef11f9ea1d` fue aprobada, acknowledged y burned.

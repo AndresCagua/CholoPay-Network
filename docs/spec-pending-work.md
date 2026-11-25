@@ -102,7 +102,7 @@ Los cinco servicios exponen `/health/live` y `/health/ready`, Compose tiene heal
 
 **Límites explícitos:** este slice no implementa OpenTelemetry, W3C `traceparent`, collectors, Jaeger, SLO/SLI, monitoreo productivo ni evidencia de rendimiento no medida. Los commits de filas sin un hash existente permanecen como `Pendiente`; no se inventan commits ni pruebas.
 
-**Evidencia pendiente:** reconciliación futura de la matriz cuando cambien P1-P9 y ejecución Docker en un entorno con Docker Engine/Compose disponible.
+**Evidencia pendiente:** reconciliación futura de la matriz cuando cambien P1-P9. La ejecución Docker del validador ya fue observada y pasó; no convierte P1-P9 en cumplimiento total ni implementa tracing distribuido.
 
 ## Orden de ejecución
 
@@ -124,6 +124,7 @@ Cada punto se marcará como `Pendiente`, `En progreso`, `Parcial`, `Bloqueado` o
 ## Registro de progreso
 
 - 2026-11-17: se registran los diez bloques pendientes después de cerrar Phase 15. La repetición T7 posterior a `cdc1fce` queda como evidencia no disponible debido al agotamiento del pool de redes Docker; la T7 previa y la suite `bank-core` permanecen documentadas por separado.
+- 2026-11-25: P10 T3 cerró el slice documental: `infra/tests/p10_traceability_check.sh` pasó en Docker verificando P1-P9, 14 ADRs, 3 OpenAPI, límites de tracing y Compose privado. Commit `a98284a`; review `review-dde11eef11f9ea1d` aprobada y burned. P10 sigue parcial porque la matriz debe reconciliarse cuando cambien P1-P9 y no implementa OpenTelemetry.
 - 2026-11-17: Usuario: "Los 10 puntos que me marcaste me parecen importantes, anótalos en la parte donde documentas que esos son los puntos pendientes y vamos resolviendo uno por uno". Se crea este registro como fuente de seguimiento y se selecciona P1 como siguiente slice.
 - 2026-11-17: La exploración de P1 confirma que existen `costa-db`, `sierra-db` y `oriente-db`, pero `infra/compose.yaml` solo ejecuta una instancia `bank-core` conectada a Costa. El siguiente slice debe añadir las tres instancias parametrizadas, identidades y secretos independientes, routing de receiver credits por participante, fixtures diferenciados y una prueba Docker de aislamiento. Las webs quedan fuera de P1 porque sus proyecciones reales pertenecen a la brecha de APIs/web.
 - 2026-11-17: Phase 16 añadió las instancias Sierra y Oriente, fixtures V9 y una identidad interna protegida por token. La aceptación `job-2` pasó con tres identidades correctas y rechazo de todos los tokens cruzados. La suite completa `bank-core-test` pasó en Docker como `job-3`. ASSESS clasificó el candidato como riesgo medio con `reviewDue=false`, por lo que no se inició review nativa adicional. El routing completo por participante y la transferencia interbancaria permanecen en P2.
