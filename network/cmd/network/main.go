@@ -200,12 +200,25 @@ func main() {
 	settlementStore := settlement.NewStore(db)
 	settlement.NewHandler(settlementStore).Register(mux)
 	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			if _, settleErr := settlementStore.SettleReadyOnce(context.Background()); settleErr != nil {
+		retryDelay := time.Second
+		timer := time.NewTimer(retryDelay)
+		defer timer.Stop()
+		for range timer.C {
+			processed, settleErr := settlementStore.SettleReadyOnce(context.Background())
+			if settleErr != nil {
 				slog.Error("falló la liquidación automática de una transferencia lista", "error", settleErr)
+				if retryDelay < time.Minute {
+					retryDelay *= 2
+					if retryDelay > time.Minute {
+						retryDelay = time.Minute
+					}
+				}
+			} else if processed {
+				retryDelay = time.Second
+			} else {
+				retryDelay = time.Second
 			}
+			timer.Reset(retryDelay)
 		}
 	}()
 	if receiverURL := os.Getenv("BANK_RECEIVER_CREDIT_URL"); receiverURL != "" {
