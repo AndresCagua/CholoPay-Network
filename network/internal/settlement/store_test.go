@@ -31,10 +31,30 @@ func testStore(t *testing.T) (*sql.DB, *Store) {
 	if err := Migrate(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, "TRUNCATE reconciliation_difference, reconciliation_run, settlement_delivery, settlement_entry, settlement_journal, settlement_account, transfer_instruction"); err != nil {
+	if _, err := db.ExecContext(ctx, "TRUNCATE reconciliation_difference, reconciliation_run, settlement_delivery, settlement_entry, settlement_journal, settlement_account, transfer_instruction CASCADE"); err != nil {
 		t.Fatal(err)
 	}
 	return db, NewStore(db)
+}
+
+func readyInstruction(t *testing.T, db *sql.DB, transferID, source, destination uuid.UUID, amount int64, correlation uuid.UUID, deliveryAccounts ...uuid.UUID) {
+	t.Helper()
+	var destinationAccount, clearingAccount any
+	if len(deliveryAccounts) == 2 {
+		destinationAccount, clearingAccount = deliveryAccounts[0], deliveryAccounts[1]
+	}
+	_, err := db.ExecContext(context.Background(), `INSERT INTO transfer_instruction (transfer_id,idempotency_key,request_hash,source_participant_id,destination_participant_id,destination_account_id,clearing_account_id,amount_minor,currency,state,schema_version,correlation_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'USD','READY_FOR_SETTLEMENT',1,$9)`, transferID, "test-"+transferID.String(), instruction.RequestHashWithAccounts(source, &destination, deliveryUUID(deliveryAccounts, 0), deliveryUUID(deliveryAccounts, 1), amount, "USD"), source, destination, destinationAccount, clearingAccount, amount, correlation)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func deliveryUUID(values []uuid.UUID, index int) *uuid.UUID {
+	if len(values) != 2 {
+		return nil
+	}
+	value := values[index]
+	return &value
 }
 
 func TestSettlementIsBalancedAndIdempotent(t *testing.T) {
@@ -50,6 +70,7 @@ func TestSettlementIsBalancedAndIdempotent(t *testing.T) {
 	}
 	transferID, correlation := uuid.New(), uuid.New()
 	destinationAccount, clearingAccount := uuid.New(), uuid.New()
+	readyInstruction(t, db, transferID, source, destination, 250, correlation, destinationAccount, clearingAccount)
 	first, err := store.Settle(ctx, transferID, source, destination, 250, "settle-key", correlation, destinationAccount, clearingAccount)
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +119,9 @@ func TestConcurrentSettlementsCannotOverdraw(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			_, err := store.Settle(ctx, uuid.New(), source, destination, 100, "concurrent-"+uuid.NewString(), uuid.New())
+			transferID, correlation := uuid.New(), uuid.New()
+			readyInstruction(t, db, transferID, source, destination, 100, correlation)
+			_, err := store.Settle(ctx, transferID, source, destination, 100, "concurrent-"+uuid.NewString(), correlation)
 			if err == nil {
 				mu.Lock()
 				successful++

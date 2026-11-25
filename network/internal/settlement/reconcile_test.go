@@ -107,6 +107,7 @@ func TestReconciliationCanScopeToOneTransferWithoutChangingUnscopedResults(t *te
 		if err := store.CreateAccount(ctx, receiver, 0); err != nil {
 			t.Fatal(err)
 		}
+		readyInstruction(t, db, transferID, source, receiver, 25, uuid.New())
 		if _, err := store.Settle(ctx, transferID, source, receiver, 25, "scoped-"+transferID.String(), uuid.New()); err != nil {
 			t.Fatal(err)
 		}
