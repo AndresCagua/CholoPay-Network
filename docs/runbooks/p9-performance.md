@@ -8,7 +8,13 @@ Este slice ejecuta una carga pequeña, fija y Docker-only contra `bank-core`. El
 infra/tests/p9_performance_acceptance.sh
 ```
 
-La configuración predeterminada es 20 requests, concurrencia 4, seed lógico `p9-financial-read-v1` y ningún puerto publicado. Se pueden cambiar `P9_REQUESTS`, `P9_CONCURRENCY`, `P9_LOGICAL_SEED` y `GIT_COMMIT` para una ejecución explícita; conservar esos valores junto con la salida JSON.
+La configuración predeterminada es el perfil `p9-financial-read-v1`: 1000 requests, concurrencia 20, seed lógico `p9-financial-read-v1` y ningún puerto publicado. Existe además el perfil explícito `p9-financial-read-v2-2k`, con 2000 requests, concurrencia 20 y seed lógico `p9-financial-read-v2-2k`:
+
+```sh
+P9_PROFILE=p9-financial-read-v2-2k infra/tests/p9_performance_acceptance.sh
+```
+
+El runner fija los parámetros de cada perfil y rechaza perfiles desconocidos. `GIT_COMMIT` sigue siendo registrable; no se agregan umbrales de throughput o latencia.
 
 ## Evidencia y aceptación
 

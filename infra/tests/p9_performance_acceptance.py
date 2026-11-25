@@ -35,12 +35,18 @@ def require(condition, message):
 def main():
     base = os.getenv("BANK_URL", "http://bank-core:8080")
     bank_token = os.getenv("BANK_API_TOKEN", "bank-local-test-only")
-    seed = os.getenv("LOGICAL_SEED", "p9-financial-read-v1")
+    profile = os.getenv("P9_PROFILE", "p9-financial-read-v1")
     commit = os.getenv("GIT_COMMIT", "unknown")
-    requests = int(os.getenv("REQUESTS", "1000"))
-    concurrency = int(os.getenv("CONCURRENCY", "20"))
-    require(requests == 1000, f"P9 baseline requires REQUESTS=1000, got {requests}")
-    require(concurrency == 20, f"P9 baseline requires CONCURRENCY=20, got {concurrency}")
+    profiles = {
+        "p9-financial-read-v1": (1000, 20, "p9-financial-read-v1"),
+        "p9-financial-read-v2-2k": (2000, 20, "p9-financial-read-v2-2k"),
+    }
+    require(profile in profiles, f"P9 profile desconocido: {profile}")
+    requests, concurrency, expected_seed = profiles[profile]
+    requested_seed = os.getenv("LOGICAL_SEED") or None
+    if profile == "p9-financial-read-v2-2k":
+        require(requested_seed in (None, expected_seed), f"{profile} fija LOGICAL_SEED={expected_seed}")
+    seed = requested_seed or expected_seed
     target = f"{base}/v1/accounts/{{account_id}}/balance"
     for _ in range(60):
         try:

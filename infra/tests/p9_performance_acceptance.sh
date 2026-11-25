@@ -7,6 +7,7 @@ export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cholopay_p9_performance}"
 export OPERATOR_CONSOLE_TOKEN="${OPERATOR_CONSOLE_TOKEN:-phase20-p9-operator}"
 export CHOLONET_HMAC_SECRET="${CHOLONET_HMAC_SECRET:-phase20-p9-secret}"
 export GIT_COMMIT="${GIT_COMMIT:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
+export P9_PROFILE="${P9_PROFILE:-p9-financial-read-v1}"
 compose() { docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" --profile p9 "$@"; }
 cleanup() { compose down -v --remove-orphans >/dev/null 2>&1 || true; }
 trap cleanup EXIT
