@@ -38,6 +38,21 @@ func TestDeliveryLeaseFromEnvValidatesBounds(t *testing.T) {
 	}
 }
 
+func TestAuthorizedBearerRequiresStrictSchemeAndToken(t *testing.T) {
+	for _, header := range []string{"", "expected-token", "Basic expected-token", "Bearer", "Bearer ", "Bearer expected-token ", " Bearer expected-token", "Bearer expected-token extra"} {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Authorization", header)
+		if authorizedBearer(req, "expected-token") {
+			t.Fatalf("se aceptó un header bearer inválido %q", header)
+		}
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer expected-token")
+	if !authorizedBearer(req, "expected-token") {
+		t.Fatal("se rechazó el bearer válido")
+	}
+}
+
 func TestOperatorOverviewRequiresAuthorization(t *testing.T) {
 	t.Setenv("OPERATOR_CONSOLE_TOKEN", "expected-token")
 	req := httptest.NewRequest(http.MethodGet, "/internal/v1/operator/overview", nil)

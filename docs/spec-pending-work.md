@@ -58,7 +58,9 @@ Existe creación pública participant/customer-scoped, bloqueo, suspensión, baj
 
 El gateway limita `POST /v1/payment-intents` por API key, en memoria, después de auth/scope y antes de la mutación. Los defaults locales explícitos son 2 solicitudes por 60 segundos (`RATE_LIMIT_MAX_REQUESTS`, `RATE_LIMIT_WINDOW_SECONDS`); son configurables, reinician con el proceso y no son globales ni distribuidos. La aceptación Docker-only verifica `201,201,429`, `Retry-After`, ausencia de mutación, `403` read-only, health y red sin puertos host ni Redis/Kafka.
 
-Siguen pendientes OIDC/OAuth 2.1, PKCE, MFA/step-up, JWT completo, mTLS operativo, TLS, rotación y hash de secretos, CORS/CSRF y autorización exhaustiva por cuenta y participante.
+Siguen pendientes OIDC/OAuth 2.1, PKCE, MFA/step-up, JWT completo, mTLS operativo, TLS, rotación y hash de secretos, CORS/CSRF y autorización exhaustiva por cuenta y participante. Este slice agrega únicamente parsing fail-closed del esquema bearer en endpoints internos de network.
+
+**Evidencia:** `network-test` Docker pasó con casos de headers vacíos, token crudo, esquema alternativo, bearer vacío, whitespace y tokens con contenido adicional; `bank-openapi-test` y la aceptación P5 existente también pasaron. El cambio preserva cuerpos `http.Error` y no afirma autenticación productiva.
 
 **Límite:** Las implementaciones seguirán siendo educativas y no se presentarán como certificación de cumplimiento normativo. Este slice no afirma protección productiva, precisión global/distribuida ni modifica el runtime ledger.
 

@@ -191,8 +191,12 @@ func (h *Handler) port(w http.ResponseWriter, r *http.Request) {
 }
 
 func authorizedParticipant(r *http.Request, participantID uuid.UUID) bool {
-	value := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
-	if value == "" {
+	header := r.Header.Get("Authorization")
+	if !strings.HasPrefix(header, "Bearer ") {
+		return false
+	}
+	value := strings.TrimPrefix(header, "Bearer ")
+	if value == "" || strings.ContainsAny(value, " \t\r\n") {
 		return false
 	}
 	for _, binding := range strings.Split(os.Getenv("DIRECTORY_PARTICIPANT_TOKENS"), ",") {
@@ -208,7 +212,14 @@ func authorizedBearer(r *http.Request, expected string) bool {
 	if expected == "" {
 		return false
 	}
-	value := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	header := r.Header.Get("Authorization")
+	if !strings.HasPrefix(header, "Bearer ") {
+		return false
+	}
+	value := strings.TrimPrefix(header, "Bearer ")
+	if value == "" || strings.ContainsAny(value, " \t\r\n") {
+		return false
+	}
 	return len(value) == len(expected) && subtle.ConstantTimeCompare([]byte(value), []byte(expected)) == 1
 }
 

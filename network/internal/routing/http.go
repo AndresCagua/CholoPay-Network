@@ -77,6 +77,9 @@ func (h *operatorHandler) authorized(r *http.Request) bool {
 		return false
 	}
 	provided := strings.TrimPrefix(value, "Bearer ")
+	if provided == "" || strings.ContainsAny(provided, " \t\r\n") {
+		return false
+	}
 	return len(provided) == len(h.token) && subtle.ConstantTimeCompare([]byte(provided), []byte(h.token)) == 1
 }
 
