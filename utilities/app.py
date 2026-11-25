@@ -36,7 +36,7 @@ _INTERNAL_EVENT_SECRET = os.getenv("INTERNAL_EVENT_SECRET", "local-test-only")
 
 
 class DurableStore:
-    """Small PostgreSQL repository for the electricity and water synthetic slices."""
+    """Small PostgreSQL repository for durable electricity, water, and mobile slices."""
     def __init__(self) -> None:
         self.url = os.getenv("DB_URL", "")
         self.connection = None
@@ -61,7 +61,7 @@ class DurableStore:
                       payment_intent_id TEXT NOT NULL, receipt JSONB NOT NULL
                     );
                 """)
-                for seed_id in ("invoice-elec-2025-001", "invoice-water-2025-001"):
+                for seed_id in ("invoice-elec-2025-001", "invoice-water-2025-001", "bill-mobile-2025-001"):
                     seed = INVOICES[seed_id]
                     cur.execute("""INSERT INTO utilities_invoice
                         (id, contract_id, service, amount, currency, due_date, status, settlement_state)
@@ -73,7 +73,7 @@ class DurableStore:
         return self.connection is not None
 
     def invoice(self, invoice_id: str) -> dict | None:
-        if not self.durable or invoice_id not in {"invoice-elec-2025-001", "invoice-water-2025-001"}:
+        if not self.durable or invoice_id not in {"invoice-elec-2025-001", "invoice-water-2025-001", "bill-mobile-2025-001"}:
             return INVOICES.get(invoice_id)
         with self.connection.cursor() as cur:
             cur.execute("SELECT id,contract_id,service,amount,currency,due_date,status,payment_intent_id,settlement_state FROM utilities_invoice WHERE id=%s", (invoice_id,))

@@ -23,4 +23,4 @@ compose rm -f utilities >/dev/null
 compose up -d utilities >/dev/null
 compose run --rm p6-utilities-recovery
 
-echo "P6 UTILITIES RECOVERY PASS: water and electricity invoices, intents, signed events and idempotent replays survived utilities recreation with isolated PostgreSQL volume"
+echo "P6 UTILITIES RECOVERY PASS: mobile and water invoices, intents, signed events and idempotent replays survived utilities recreation; electricity and internet remained visible with isolated PostgreSQL volume"
