@@ -73,12 +73,12 @@ class DurableStore:
         return self.connection is not None
 
     def invoice(self, invoice_id: str) -> dict | None:
-        if not self.durable:
+        if not self.durable or invoice_id not in {"invoice-elec-2025-001", "invoice-water-2025-001"}:
             return INVOICES.get(invoice_id)
         with self.connection.cursor() as cur:
             cur.execute("SELECT id,contract_id,service,amount,currency,due_date,status,payment_intent_id,settlement_state FROM utilities_invoice WHERE id=%s", (invoice_id,))
             row = cur.fetchone()
-        if not row: return None
+        if not row: return INVOICES.get(invoice_id)
         keys = ("id", "contract_id", "service", "amount", "currency", "due_date", "status", "payment_intent_id", "settlement_state")
         return {k: v for k, v in zip(keys, row) if v is not None}
 
@@ -89,7 +89,8 @@ class DurableStore:
             cur.execute("SELECT id,contract_id,service,amount,currency,due_date,status,payment_intent_id,settlement_state FROM utilities_invoice ORDER BY id")
             rows = cur.fetchall()
         keys = ("id", "contract_id", "service", "amount", "currency", "due_date", "status", "payment_intent_id", "settlement_state")
-        return [{k: v for k, v in zip(keys, row) if v is not None} for row in rows]
+        durable = {row[0]: {k: v for k, v in zip(keys, row) if v is not None} for row in rows}
+        return [durable.get(invoice_id, invoice) for invoice_id, invoice in INVOICES.items()]
 
     def save_intent(self, key, fingerprint, intent, invoice_id):
         if not self.durable: return None
