@@ -16,9 +16,7 @@ Este documento registra los diez bloques que todavía no están completamente im
 
 **Estado:** Completado en el alcance P1 — Phase 16 (`odd/tasks/phase-16-three-independent-banks.md`). La aceptación específica de tres instancias pasó en `job-2`, la suite completa de `bank-core` pasó en `job-3` y el commit es `1b42e9d`. ASSESS clasificó el candidato como riesgo medio pero `reviewDue=false`; no se inició review nativa adicional según la política configurada.
 
-Existen bases PostgreSQL, frontends y configuración para Costa, Sierra y Oriente, pero falta demostrar tres instancias autónomas de `bank-core` ejecutándose simultáneamente con sus propias bases, identidades criptográficas, cuentas, secretos, configuración y ledgers.
-
-**Evidencia pendiente:** Compose aislado, fixtures por banco, aislamiento entre bases y pruebas públicas contra las tres instancias.
+Existen bases PostgreSQL, frontends y configuración para Costa, Sierra y Oriente. La evidencia de Phase 16 registra tres instancias autónomas de `bank-core`, configuración y fixtures por banco, identidades propias, aislamiento entre bases y pruebas públicas de identidad y rechazo cross-token. Routing y transferencia interbancaria permanecen en P2; las APIs bancarias públicas y sus proyecciones permanecen en P3.
 
 ### P2. Transferencia interbancaria completa
 
