@@ -20,9 +20,9 @@ Existen bases PostgreSQL, frontends y configuración para Costa, Sierra y Orient
 
 ### P2. Transferencia interbancaria completa
 
-**Estado:** Parcial completado en Phase 18 y Phase 20 slice 1 (`odd/tasks/phase-18-interbank-e2e-acceptance.md`, `odd/tasks/phase-20-receiver-outage-recovery.md`). La aceptación Costa→Sierra/Oriente, entrega, replay e idempotencia pasaron; Phase 20 slice 1 demostró caída breve real del receptor, retry/backoff y recuperación. El slice 2 queda definido para cerrar la recuperación tras agotamiento de retries.
+**Estado:** Parcial completado en Phase 18 y Phase 20 (`odd/tasks/phase-18-interbank-e2e-acceptance.md`, `odd/tasks/phase-20-receiver-outage-recovery.md`). La aceptación Costa→Sierra/Oriente, entrega, replay e idempotencia pasaron; Phase 20 demostró caída breve y prolongada del receptor, retry/backoff, agotamiento de retries, DLQ y recuperación. Permanecen fuera del alcance demostrado la consulta desde UI y cualquier evidencia de ledger receptor no exportada por el banco.
 
-Falta cerrar y demostrar el recorrido completo `Banco Costa → CholoNet → Banco Sierra/Oriente → receiver inbox → ledger receptor → consulta desde UI` bajo una outage prolongada, con DLQ observable, replay individual autenticado y reconciliación posterior.
+El recorrido bajo outage prolongada —DLQ observable, replay individual autenticado e idempotente, recuperación y reconciliación posterior— quedó demostrado para las transferencias objetivo en Phase 20. La evidencia no afirma garantías globales de ordering, causalidad, exactly-once ni completitud de la consulta desde UI.
 
 **Evidencia:** Phase 20 slice 2 (`job-4`) demostró outage prolongada, agotamiento en 5 intentos, `FAILED/DELIVERY_DLQ`, replay autenticado e idempotente conservando `delivery_id/event_id`, recuperación `APPLIED`/`COMPLETED`, inbox/journal únicos, balance `125/125` y reconciliación limpia para la transferencia objetivo.
 
