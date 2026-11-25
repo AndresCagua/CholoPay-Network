@@ -361,8 +361,8 @@ services:
     environment:
       BANK_URL: http://bank-core:8080
       BANK_API_TOKEN: ${BANK_API_TOKEN:-bank-local-test-only}
-      REQUESTS: ${P9_REQUESTS:-20}
-      CONCURRENCY: ${P9_CONCURRENCY:-4}
+      REQUESTS: ${P9_REQUESTS:-1000}
+      CONCURRENCY: ${P9_CONCURRENCY:-20}
       LOGICAL_SEED: ${P9_LOGICAL_SEED:-p9-financial-read-v1}
       GIT_COMMIT: ${GIT_COMMIT:-unknown}
     volumes:

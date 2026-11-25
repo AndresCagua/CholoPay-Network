@@ -36,9 +36,9 @@ Alcance: laboratorio exclusivo de Docker para escenarios sintéticos; no publica
 - T2 (S1, S3): Implementar un escenario mínimo de carga y fault injection contra interfaces públicas, sin escribir directamente en ledgers. Ruta: delegada solo si surge una unidad pesada independiente. Commit: `4908f08`.
 - T3 (S2, S3): Añadir métricas/logs estructurados y runbook de ejecución/interpretación, sin prometer resultados universales. Ruta: worker. Commit: `19c9165`.
 - T4 (S1-S5): Ejecutar checks Docker, validar `docker compose config`, registrar metodología, resultados y límites. Ruta: inline. Commit: `19c9165`.
-- T5 (S6-S8): Añadir percentiles y metadatos reproducibles al runner, fixture/runner de lectura financiera y aceptación Docker. Ruta: CholoLab + `infra/tests`. Commit: pendiente.
-- T6 (S6-S8): Documentar el perfil, evidencia, interpretación y límites del slice P9. Ruta: docs. Commit: pendiente.
-- T7 (S6-S8): Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
+- T5 (S6-S8): Añadir percentiles y metadatos reproducibles al runner, fixture/runner de lectura financiera y aceptación Docker. Ruta: CholoLab + `infra/tests`. Commit: previo `7182985`; baseline 1000/20 en `infra/compose.yaml` y `infra/tests/p9_performance_acceptance.py`, commit `87defc2`.
+- T6 (S6-S8): Documentar el perfil, evidencia, interpretación y límites del slice P9. Ruta: docs. Commit: pendiente; se pospone la documentación ampliada hasta completar los niveles funcionales de carga.
+- T7 (S6-S8): Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: `87defc2`; baseline Docker `job-56`, suite CholoLab `job-57` (5/5) y configuración `job-59`.
 
 ## Log
 

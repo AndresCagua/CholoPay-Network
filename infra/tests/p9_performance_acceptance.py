@@ -37,6 +37,10 @@ def main():
     bank_token = os.getenv("BANK_API_TOKEN", "bank-local-test-only")
     seed = os.getenv("LOGICAL_SEED", "p9-financial-read-v1")
     commit = os.getenv("GIT_COMMIT", "unknown")
+    requests = int(os.getenv("REQUESTS", "1000"))
+    concurrency = int(os.getenv("CONCURRENCY", "20"))
+    require(requests == 1000, f"P9 baseline requires REQUESTS=1000, got {requests}")
+    require(concurrency == 20, f"P9 baseline requires CONCURRENCY=20, got {concurrency}")
     target = f"{base}/v1/accounts/{{account_id}}/balance"
     for _ in range(60):
         try:
@@ -61,7 +65,7 @@ def main():
     require(before_status == 200, f"fixture read status={before_status}")
 
     summary = run(
-        read_url, int(os.getenv("REQUESTS", "20")), int(os.getenv("CONCURRENCY", "4")), 0,
+        read_url, requests, concurrency, 0,
         expected_status=200, headers={"Authorization": f"Bearer {customer_token}"},
         logical_seed=seed, commit=commit, scenario="p9_financial_read_fixture",
     )
