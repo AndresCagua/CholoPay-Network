@@ -196,7 +196,7 @@ func main() {
 	mux := http.NewServeMux()
 	serviceMetrics := newMetrics()
 	mux.HandleFunc("GET /metrics", serviceMetrics.handler)
-	instruction.NewHandler(instruction.NewStore(db)).Register(mux)
+	instruction.NewHandler(instruction.NewStore(db), os.Getenv("CHOLONET_HMAC_SECRET")).Register(mux)
 	settlementStore := settlement.NewStore(db)
 	settlement.NewHandler(settlementStore).Register(mux)
 	go func() {

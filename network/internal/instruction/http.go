@@ -1,15 +1,30 @@
 package instruction
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"github.com/cholopay/network/internal/transfer"
 	"github.com/google/uuid"
+	"io"
 	"net/http"
+	"strconv"
+	"time"
 )
 
-type Handler struct{ store *Store }
+type Handler struct {
+	store      *Store
+	hmacSecret string
+}
 
-func NewHandler(store *Store) *Handler { return &Handler{store: store} }
+func NewHandler(store *Store, secret ...string) *Handler {
+	configured := ""
+	if len(secret) > 0 {
+		configured = secret[0]
+	}
+	return &Handler{store: store, hmacSecret: configured}
+}
 
 type createRequest struct {
 	TransferID               uuid.UUID  `json:"transfer_id"`
@@ -68,6 +83,11 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) fundsReserved(w http.ResponseWriter, r *http.Request) {
+	body, readErr := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if readErr != nil || !h.validSignature(r, body) {
+		http.Error(w, "solicitud HMAC inválida", http.StatusUnauthorized)
+		return
+	}
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		http.Error(w, "identificador de transferencia no válido", http.StatusBadRequest)
@@ -76,7 +96,7 @@ func (h *Handler) fundsReserved(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		CausationID uuid.UUID `json:"causation_id"`
 	}
-	if json.NewDecoder(r.Body).Decode(&req) != nil || req.CausationID == uuid.Nil {
+	if json.Unmarshal(body, &req) != nil || req.CausationID == uuid.Nil {
 		http.Error(w, "causation_id inválido", http.StatusBadRequest)
 		return
 	}
@@ -105,6 +125,27 @@ func (h *Handler) readyForSettlement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) validSignature(r *http.Request, body []byte) bool {
+	if h.hmacSecret == "" {
+		return false
+	}
+	ts, err := strconv.ParseInt(r.Header.Get("X-CholoPay-Timestamp"), 10, 64)
+	if err != nil || time.Since(time.Unix(ts, 0)) > 5*time.Minute || time.Until(time.Unix(ts, 0)) > 5*time.Minute {
+		return false
+	}
+	requestID, err := uuid.Parse(r.Header.Get("X-CholoPay-Request-Id"))
+	if err != nil {
+		return false
+	}
+	provided, err := hex.DecodeString(r.Header.Get("X-CholoPay-Signature"))
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(h.hmacSecret))
+	_, _ = mac.Write([]byte(strconv.FormatInt(ts, 10) + "." + requestID.String() + "." + string(body)))
+	return hmac.Equal(provided, mac.Sum(nil))
 }
 
 func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
