@@ -86,13 +86,15 @@ Existe outbox bancario durable, retries y DLQ HTTP. El slice Kafka demostró en 
 
 ### P8. Observabilidad
 
-**Estado:** Parcial; P8.1 health/readiness operacional local y P8.2 observabilidad local implementados y demostrados en Docker (`odd/tasks/phase-20-receiver-outage-recovery.md`, T24-T30, S18-S24).
+**Estado:** Parcial; P8.1 health/readiness operacional local y P8.2 observabilidad local implementados y demostrados en Docker (`odd/tasks/phase-20-receiver-outage-recovery.md`, T24-T30, S18-S24). La aceptación P8.2 extendida queda especificada en `odd/tasks/phase-8-observability-resilience.md`, T1-T2, S1-S4.
 
 Los cinco servicios exponen `/health/live` y `/health/ready`, Compose tiene healthchecks HTTP y `infra/tests/p8_health_acceptance.sh` verifica estado sano, caída externa de `network-db` (`network ready=503` con live activo), recuperación (`ready=200`) y la extensión P8.1 de caída externa de `costa-db` (`bank-core live=200`, `ready=503`) con recuperación posterior (`ready=200`), sin puertos publicados. `network` y `bank-core` comprueban PostgreSQL; gateway, transit y utilities no tienen una base propia en este Compose sintético. P8.2 añade `/metrics` acotado en `network` y `bank-core`, y un profile Compose explícito `observability` con Prometheus/Grafana, scrape y provisioning verificables mediante `infra/tests/p8_observability_acceptance.sh`. El runbook está en `docs/runbooks/p8-observability.md` y `docs/runbooks/p8-metrics.md`. Siguen fuera de alcance OpenTelemetry, Jaeger, métricas de negocio/ledger/settlement/outbox/DLQ, correlación distribuida y runbooks productivos basados en métricas.
 
-**Límite:** La extensión `costa-db` es evidencia local Docker-only del banco Costa sintético: no afirma HA, SLO/SLI, RPO/RTO, disponibilidad productiva ni recuperación de otros servicios. No se afirmarán SLO/SLI ni disponibilidad productiva a partir de healthchecks locales.
+**Límite:** La extensión `costa-db` es evidencia local Docker-only del banco Costa sintético: no afirma HA, SLO/SLI, RPO/RTO, disponibilidad productiva ni recuperación de otros servicios. No se afirmarán SLO/SLI ni disponibilidad productiva a partir de healthchecks locales. La correlación P8.2 solo observa que `bank-core live=200`, `ready=503` y el scrape Prometheus permanece consultable durante la detención externa de `costa-db`, y que vuelve a `ready=200` tras reiniciarla; no afirma que Prometheus detecte la salud de la base ni añade métricas de negocio.
 
 **Evidencia P2 histórica:** Phase 20 T32-T33 conserva y vuelve a consultar el primer run `DELIVERY_DLQ` después de replay, recuperación y reconciliación unscoped limpia; el test de settlement verifica persistencia append-only de `run_id`, `difference_id`, transfer y delivery. La identidad `event_id` y los conteos delivery/inbox/journal se comprueban desde PostgreSQL. No se agregaron garantías de orden o evidencia de ledger receptor fuera del contrato existente.
+
+**Evidencia P8.2 extendida:** `infra/tests/p8_observability_acceptance.sh` conserva el baseline de targets, métrica sintética, datasource y dashboard; detiene únicamente `costa-db`, verifica live/readiness de `bank-core`, target `up` y consultas de métricas de proceso/aceptación, y repite scrape/métricas tras recovery. El contenedor no accede al socket Docker y no se publican puertos.
 
 ### P9. Pruebas de carga
 
