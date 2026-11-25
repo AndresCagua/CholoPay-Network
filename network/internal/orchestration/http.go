@@ -60,9 +60,11 @@ func (r *intakeRequest) normalize() {
 }
 
 type intakeEnvelope struct {
+	EventName      string          `json:"event_name"`
 	Payload        json.RawMessage `json:"payload"`
 	IdempotencyKey string          `json:"idempotency_key"`
-	CorrelationID   uuid.UUID       `json:"correlation_id"`
+	CorrelationID  uuid.UUID       `json:"correlation_id"`
+	CausationID    uuid.UUID       `json:"causation_id"`
 }
 type intakeResponse struct {
 	TransferID           uuid.UUID         `json:"transfer_id"`
@@ -84,6 +86,21 @@ func (h *Handler) intake(w http.ResponseWriter, r *http.Request) {
 	var request intakeRequest
 	var envelope intakeEnvelope
 	if json.Unmarshal(body, &envelope) == nil && len(envelope.Payload) > 0 {
+		if envelope.EventName == "FUNDS_RESERVED" {
+			var reservation struct {
+				TransferID uuid.UUID `json:"transfer_id"`
+			}
+			if json.Unmarshal(envelope.Payload, &reservation) != nil || reservation.TransferID == uuid.Nil || envelope.CausationID == uuid.Nil {
+				http.Error(w, "acknowledgement de reserva inválido", http.StatusBadRequest)
+				return
+			}
+			if err := h.service.AcknowledgeReservation(r.Context(), reservation.TransferID, envelope.CausationID); err != nil {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		if err := json.Unmarshal(envelope.Payload, &request); err != nil {
 			http.Error(w, "transferencia entre redes inválida", http.StatusBadRequest)
 			return

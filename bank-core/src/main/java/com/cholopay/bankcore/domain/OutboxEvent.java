@@ -22,9 +22,9 @@ public record OutboxEvent(UUID eventId, String aggregateType, UUID aggregateId,
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
 
     public OutboxEvent {
-        if (!"TRANSFER".equals(aggregateType) || !"TRANSFER_REQUESTED".equals(eventName)
+        if (!"TRANSFER".equals(aggregateType) || !("TRANSFER_REQUESTED".equals(eventName) || "FUNDS_RESERVED".equals(eventName))
                 || !"1.0".equals(schemaVersion) || version != 1) {
-            throw new IllegalArgumentException("envelope TRANSFER_REQUESTED 1.0 inválido");
+            throw new IllegalArgumentException("envelope inter-network 1.0 inválido");
         }
         if (payload == null) throw new IllegalArgumentException("payload requerido");
         if (payloadHash == null || payloadHash.isBlank()) {

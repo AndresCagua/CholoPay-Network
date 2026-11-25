@@ -36,6 +36,10 @@ func NewService(instructions *instruction.Store, routes *routing.Store, messages
 	return &Service{instructions: instructions, routes: routes, messages: messages}
 }
 
+func (s *Service) AcknowledgeReservation(ctx context.Context, transferID, causationID uuid.UUID) error {
+	return s.instructions.MarkFundsReserved(ctx, transferID, causationID)
+}
+
 func (s *Service) Intake(ctx context.Context, request Intake) (Result, error) {
 	route, err := s.routes.Route(ctx, request.SourceParticipantID, request.DestinationParticipantID)
 	if err != nil {

@@ -85,6 +85,15 @@ public class JdbcInternalTransferService {
         jdbc.update("INSERT INTO balance_reservation(id, account_id, transfer_id, amount_minor, status, request_hash, currency) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)", reservationId, request.sourceAccountId(), request.transferId(), request.amountMinor(), requestHash, request.currency());
         int reserved = jdbc.update("UPDATE ledger_account SET reserved_balance_minor = reserved_balance_minor + ? WHERE id = ? AND posted_balance_minor - reserved_balance_minor >= ?", request.amountMinor(), request.sourceAccountId(), request.amountMinor());
         if (reserved != 1) throw new IllegalStateException("fondos disponibles insuficientes");
+        OutboxEvent event = new OutboxEvent(UUID.randomUUID(), "TRANSFER", request.transferId(), "FUNDS_RESERVED", "1.0", 1,
+                Instant.now(), request.correlationId(), request.causationId(), "reservation:" + request.idempotencyKey(),
+                "synthetic-" + request.transferId(), new OutboxEvent.Payload(request.transferId(), request.sourceParticipantId(),
+                request.destinationParticipantId(), request.amountMinor(), request.currency(), "INTER_NETWORK",
+                request.sourceNetworkId(), request.destinationNetworkId()), "");
+        jdbc.update("INSERT INTO inter_network_outbox(event_id, aggregate_type, aggregate_id, event_name, schema_version, event_version, occurred_at, correlation_id, causation_id, idempotency_key, trace_id, payload, serialized_envelope, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)",
+                event.eventId(), event.aggregateType(), event.aggregateId(), event.eventName(), event.schemaVersion(), event.version(),
+                Timestamp.from(event.occurredAt()), event.correlationId(), event.causationId(), event.idempotencyKey(), event.traceId(),
+                event.canonicalJson(), event.canonicalJson(), event.payloadHash());
         return new InterNetworkTransferService.ReservationResult(request.transferId(), reservationId, "FUNDS_RESERVED", false);
     }
 
