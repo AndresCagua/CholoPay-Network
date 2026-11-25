@@ -121,7 +121,11 @@ func (s *Store) ClaimTransferRequest(ctx context.Context, messageID, causationID
 		if processedCausation == nil || *processedCausation != causationID {
 			return ClaimedMessage{}, ErrClaimConflict
 		}
-		return ClaimedMessage{MessageID: messageID, TransferID: payload.TransferID, MessageStatus: status, InstructionState: "VALIDATING", Replayed: true}, nil
+		var instructionState string
+		if err := tx.QueryRowContext(ctx, `SELECT state FROM transfer_instruction WHERE transfer_id=$1`, payload.TransferID).Scan(&instructionState); err != nil {
+			return ClaimedMessage{}, ErrClaimConflict
+		}
+		return ClaimedMessage{MessageID: messageID, TransferID: payload.TransferID, MessageStatus: status, InstructionState: instructionState, Replayed: true}, nil
 	}
 	if status != "ACCEPTED" {
 		return ClaimedMessage{}, ErrClaimConflict
