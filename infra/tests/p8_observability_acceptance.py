@@ -51,11 +51,11 @@ def wait_status(url, expected, label, timeout=5):
     raise SystemExit(f"P8.2 ERROR: {label} esperaba HTTP {expected}; último estado: {last}")
 
 
-def query(metric, label):
+def query(metric, label, minimum_results=1):
     encoded = urllib.parse.quote(metric, safe="")
     return wait(
         prometheus + "/api/v1/query?query=" + encoded,
-        lambda body: body.get("status") == "success" and len(body["data"]["result"]) >= 1,
+        lambda body: body.get("status") == "success" and len(body["data"]["result"]) >= minimum_results,
         label,
     )
 
@@ -64,10 +64,10 @@ def assert_targets(label):
     def ready(body):
         targets = body["data"]["activeTargets"]
         by_job = {t["labels"].get("job"): t for t in targets}
-        return all(
-            by_job.get(job, {}).get("health") == "up"
-            and by_job.get(job, {}).get("lastError", "") == ""
-            for job in ("cholonet-network", "cholonet-bank-core")
+        expected_jobs = {"cholonet-network", "cholonet-bank-core"}
+        return expected_jobs.issubset(by_job) and all(
+            target.get("health") == "up" and target.get("lastError", "") == ""
+            for target in targets
         )
 
     return wait(prometheus + "/api/v1/targets", ready, label)
@@ -85,7 +85,7 @@ if mode not in {"baseline", "bank-db-down", "recovered"}:
 
 if mode == "baseline":
     assert_targets("baseline Prometheus")
-    query("cholonet_synthetic_acceptance_info", "baseline métrica scrapeada")
+    query("cholonet_synthetic_acceptance_info", "baseline métrica scrapeada", minimum_results=2)
     datasources = wait(
         grafana + "/api/datasources",
         lambda body: any(d["name"] == "Prometheus" and d["type"] == "prometheus" for d in body),
