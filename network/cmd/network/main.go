@@ -184,6 +184,8 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+	serviceMetrics := newMetrics()
+	mux.HandleFunc("GET /metrics", serviceMetrics.handler)
 	instruction.NewHandler(instruction.NewStore(db)).Register(mux)
 	settlementStore := settlement.NewStore(db)
 	settlement.NewHandler(settlementStore).Register(mux)
@@ -243,7 +245,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	server := &http.Server{Addr: ":" + port, Handler: mux}
+	server := &http.Server{Addr: ":" + port, Handler: serviceMetrics.middleware(mux)}
 	slog.Info("esqueleto de cholonet escuchando", "port", port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("el servidor se detuvo", "error", err)

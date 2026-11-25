@@ -320,6 +320,53 @@ services:
     command: ["python", "/tests/p8_health_acceptance.py"]
     networks: [internal_services, default]
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: [observability]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    tmpfs:
+      - /prometheus:mode=1777
+    expose: ["9090"]
+    depends_on:
+      network: {condition: service_started}
+      bank-core: {condition: service_started}
+    networks: [internal_services, default]
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    profiles: [observability]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: local-only-observability
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    tmpfs:
+      - /var/lib/grafana:mode=1777
+    expose: ["3000"]
+    depends_on:
+      prometheus: {condition: service_started}
+    networks: [internal_services, default]
+
+  p8-observability:
+    image: python:3.13-alpine
+    profiles: [observability]
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      GRAFANA_URL: http://grafana:3000
+    volumes:
+      - ./tests/p8_observability_acceptance.py:/tests/p8_observability_acceptance.py:ro
+    command: ["python", "/tests/p8_observability_acceptance.py"]
+    depends_on:
+      prometheus: {condition: service_started}
+      grafana: {condition: service_started}
+    networks: [internal_services, default]
+
   phase20-kafka-order:
     image: python:3.13-alpine
     profiles: [events]

@@ -74,9 +74,9 @@ Existe outbox bancario durable, retries y DLQ HTTP. El slice Kafka demostró en 
 
 ### P8. Observabilidad
 
-**Estado:** Parcial; P8.1 health/readiness operacional local implementado y demostrado en Docker (`odd/tasks/phase-20-receiver-outage-recovery.md`, T24-T27, S18-S20).
+**Estado:** Parcial; P8.1 health/readiness operacional local y P8.2 observabilidad local implementados y demostrados en Docker (`odd/tasks/phase-20-receiver-outage-recovery.md`, T24-T30, S18-S24).
 
-Los cinco servicios exponen `/health/live` y `/health/ready`, Compose tiene healthchecks HTTP y `infra/tests/p8_health_acceptance.sh` verifica estado sano, caída externa de `network-db` (`network ready=503` con live activo) y recuperación (`ready=200`), sin puertos publicados. `network` y `bank-core` comprueban PostgreSQL; gateway, transit y utilities no tienen una base propia en este Compose sintético. El runbook está en `docs/runbooks/p8-observability.md`. El slice no incluye métricas, dashboards, alertas ni tracing. Siguen pendientes OpenTelemetry, Prometheus, Grafana, Jaeger, métricas por banco/settlement/outbox/DLQ, correlación distribuida y runbooks basados en métricas.
+Los cinco servicios exponen `/health/live` y `/health/ready`, Compose tiene healthchecks HTTP y `infra/tests/p8_health_acceptance.sh` verifica estado sano, caída externa de `network-db` (`network ready=503` con live activo) y recuperación (`ready=200`), sin puertos publicados. `network` y `bank-core` comprueban PostgreSQL; gateway, transit y utilities no tienen una base propia en este Compose sintético. P8.2 añade `/metrics` acotado en `network` y `bank-core`, y un profile Compose explícito `observability` con Prometheus/Grafana, scrape y provisioning verificables mediante `infra/tests/p8_observability_acceptance.sh`. El runbook está en `docs/runbooks/p8-observability.md` y `docs/runbooks/p8-metrics.md`. Siguen fuera de alcance OpenTelemetry, Jaeger, métricas de negocio/ledger/settlement/outbox/DLQ, correlación distribuida y runbooks productivos basados en métricas.
 
 **Límite:** No se afirmarán SLO/SLI ni disponibilidad productiva a partir de healthchecks locales.
 

@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: CholoNet local
+    orgId: 1
+    folder: CholoNet
+    type: file
+    disableDeletion: true
+    editable: false
+    options:
+      path: /var/lib/grafana/dashboards

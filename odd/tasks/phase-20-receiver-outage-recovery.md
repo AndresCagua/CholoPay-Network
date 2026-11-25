@@ -50,6 +50,14 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 
 20. **S20 — Límites P8.1:** No afirmar OpenTelemetry, Prometheus, Grafana, alertas, SLO/SLI, tracing distribuido, retención histórica, disponibilidad productiva ni métricas estables de negocio.
 
+21. **S21 — P8.2 aprobado:** Agregar un stack opcional de Prometheus/Grafana para observabilidad local reproducible, activado únicamente mediante un profile explícito de Compose y sin puertos publicados por defecto.
+
+22. **S22 — Métricas P8.2:** Exponer métricas Prometheus mínimas de proceso/HTTP y una métrica sintética de aceptación en los servicios instrumentados, sin convertirlas en contrato de negocio, settlement, ledger, outbox o DLQ.
+
+23. **S23 — Evidencia P8.2:** La aceptación Docker debe comprobar que Prometheus descubre y scrapea los targets configurados, que Grafana carga el datasource/dashboard provisionado y que la configuración por defecto no publica puertos.
+
+24. **S24 — Límites P8.2:** No afirmar SLO/SLI, alertas productivas, retención durable, capacidad, tracing distribuido, seguridad productiva, alta disponibilidad ni monitoreo remoto. La retención es efímera y el stack es educativo/sintético.
+
 ## Tasks
 
 - T1 [S1-S4] Crear runner/escenario de outage breve con stop/start externo de `bank-core-sierra` y observación de retry/backoff. Ruta: `infra/tests` + Compose. Commit: pendiente.
@@ -79,6 +87,10 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - T25 [S18-S20] Crear aceptación Docker de live/ready sano, caída de una base sintética y recuperación, sin puertos publicados. Ruta: `infra/tests` + scripts. Commit: pendiente.
 - T26 [S18-S20] Documentar comandos, interpretación y límites de P8.1. Ruta: docs. Commit: pendiente.
 - T27 [S18-S20] Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
+- T28 [S21-S24] Añadir métricas Prometheus mínimas y composición opcional Prometheus/Grafana con provisioning reproducible. Ruta: servicios, `infra/compose.yaml`, `infra/observability`. Commit: pendiente.
+- T29 [S21-S24] Crear aceptación Docker de scrape, targets, datasource/dashboard y configuración privada por defecto. Ruta: `infra/tests`. Commit: pendiente.
+- T30 [S21-S24] Documentar ejecución, consultas y límites educativos/efímeros del stack. Ruta: docs. Commit: pendiente.
+- T31 [S21-S24] Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
 
 ## Log
 
@@ -99,4 +111,6 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - L15. Se aprueba el siguiente slice: backup/restore lógico de un solo `network-db` sintético, con baseline y restore verificable. Quedan fuera consistencia entre bases, RPO/RTO, PITR/WAL, cifrado, retención, rotación, backup de Kafka y garantías productivas.
 - L16. La aceptación Docker `phase20_backup_restore.sh` pasó: creó un registro sintético, obtuvo backup `network-db`, eliminó el objetivo, restauró con `psql` y verificó identidad, payload hash, idempotencia, constraint y readiness.
 - L17. El usuario aprobó P8.1 health/readiness operacional local: endpoints live/ready uniformes, healthchecks HTTP Compose y aceptación Docker de caída/recuperación de una base sintética. Quedan fuera métricas, dashboards, tracing y SLO/SLI.
-- L18. P8.1 implementó T24-T27: live/ready en network, bank-core, gateway, transit y utilities; Compose verifica HTTP sin publicar puertos; `p8_health_acceptance.sh` detiene externamente `network-db`, observa `network ready=503` con live activo y confirma `ready=200` al recuperar. Ver `docs/runbooks/p8-observability.md`; no implica monitoreo ni disponibilidad productiva.
+- L18. El usuario eligió P8.2 stack Prometheus/Grafana. El alcance aprobado es opcional bajo profile explícito, sin puertos publicados por defecto, con métricas y dashboard reproducibles y sin afirmaciones productivas.
+- L19. P8.1 implementó T24-T27: live/ready en network, bank-core, gateway, transit y utilities; Compose verifica HTTP sin publicar puertos; `p8_health_acceptance.sh` detiene externamente `network-db`, observa `network ready=503` con live activo y confirma `ready=200` al recuperar. Ver `docs/runbooks/p8-observability.md`; no implica monitoreo ni disponibilidad productiva.
+- L20. P8.2 implementó T28-T30: `/metrics` bounded en network y bank-core, profile Compose explícito `observability`, Prometheus/Grafana privados sin puertos publicados, almacenamiento efímero, scrape config y provisioning reproducibles. `p8_observability_acceptance.sh` verificó targets up, métrica scrapeada, datasource/dashboard y emitió PASS. No implica métricas de negocio, SLO/SLI, alertas, tracing, HA, retención durable, seguridad productiva ni monitoreo remoto.

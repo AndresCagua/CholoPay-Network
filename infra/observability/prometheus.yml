@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: cholonet-network
+    metrics_path: /metrics
+    static_configs:
+      - targets: [network:8080]
+  - job_name: cholonet-bank-core
+    metrics_path: /metrics
+    static_configs:
+      - targets: [bank-core:8080]

@@ -1,4 +1,6 @@
-# Runbook P8.1 — health/readiness local
+# Runbook P8 — health/readiness y observabilidad local
+
+P8.1 health/readiness se documenta abajo. Para el profile opcional de métricas P8.2, consultar `docs/runbooks/p8-metrics.md`.
 
 P8.1 verifica únicamente el estado operacional local de los servicios sintéticos dentro de Docker. No es monitoreo de producción.
 

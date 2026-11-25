@@ -1,0 +1,23 @@
+{
+  "uid": "cholonet-local",
+  "title": "CholoNet local synthetic overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Scraped process uptime (synthetic)",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "targets": [{"refId": "A", "expr": "cholonet_process_uptime_seconds", "legendFormat": "{{service}}"}]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Synthetic acceptance marker",
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 8},
+      "targets": [{"refId": "A", "expr": "cholonet_synthetic_acceptance_info", "legendFormat": "{{scope}}"}]
+    }
+  ]
+}
