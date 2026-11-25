@@ -310,6 +310,25 @@ services:
       network-db: {condition: service_healthy}
     networks: [internal_services, default]
 
+  p9-performance:
+    build:
+      context: ../chololab
+    profiles: [p9]
+    environment:
+      BANK_URL: http://bank-core:8080
+      BANK_API_TOKEN: ${BANK_API_TOKEN:-bank-local-test-only}
+      REQUESTS: ${P9_REQUESTS:-20}
+      CONCURRENCY: ${P9_CONCURRENCY:-4}
+      LOGICAL_SEED: ${P9_LOGICAL_SEED:-p9-financial-read-v1}
+      GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    volumes:
+      - ./tests/p9_performance_acceptance.py:/tests/p9_performance_acceptance.py:ro
+      - ../chololab/runner.py:/chololab/runner.py:ro
+    command: ["python", "/tests/p9_performance_acceptance.py"]
+    depends_on:
+      bank-core: {condition: service_started}
+    networks: [internal_services, default]
+
   p8-health:
     image: python:3.13-alpine
     profiles: [p8]

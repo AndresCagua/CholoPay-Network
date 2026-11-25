@@ -28,6 +28,36 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(summary["injected_failures"], 2)
         self.assertEqual(summary["failed"], 2)
 
+    def test_summary_contains_percentiles_and_reproducibility_metadata(self):
+        class Response:
+            status = 200
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def read(self): return b"ok"
+
+        with patch("runner.urllib.request.urlopen", return_value=Response()):
+            summary = run("http://synthetic.local/read", 4, 2, 0,
+                          expected_status=200, logical_seed="p9-seed", commit="abc123")
+
+        self.assertEqual(summary["latency_ms"]["p95"], summary["latency_ms"]["max"])
+        self.assertEqual(summary["latency_ms"]["p99"], summary["latency_ms"]["max"])
+        self.assertEqual(summary["metadata"]["expected_status"], 200)
+        self.assertEqual(summary["metadata"]["errors"], 0)
+        self.assertEqual(summary["metadata"]["logical_seed"], "p9-seed")
+        self.assertEqual(summary["metadata"]["commit"], "abc123")
+
+    def test_expected_status_is_part_of_success_count(self):
+        class Response:
+            status = 201
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def read(self): return b"ok"
+
+        with patch("runner.urllib.request.urlopen", return_value=Response()):
+            summary = run("http://synthetic.local/read", 2, 1, 0, expected_status=200)
+        self.assertEqual(summary["successful"], 0)
+        self.assertEqual(summary["red"]["errors"], 2)
+
     def test_summary_contains_reproducible_red_fields(self):
         class Response:
             status = 200

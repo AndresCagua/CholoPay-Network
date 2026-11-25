@@ -82,13 +82,11 @@ Los cinco servicios exponen `/health/live` y `/health/ready`, Compose tiene heal
 
 ### P9. Pruebas de carga
 
-**Estado:** Parcial.
+**Estado:** Parcial — primer slice P9 (T5-T6, S6-S8) implementado como lectura financiera sintética Docker-only.
 
-CholoLab existe como laboratorio, pero todavía no existe evidencia reproducible del sistema financiero completo para los perfiles de carga definidos por `spec.md`.
+`infra/tests/p9_performance_acceptance.sh` crea previamente un cliente/cuenta mediante la interfaz pública `POST /v1/customers`, carga `GET /v1/accounts/{account_id}/balance` con el token emitido y no escribe directamente en ledgers. CholoLab registra target, requests, concurrencia, duración, commit, seed lógico, estado esperado, errores y latencias min/mediana/p95/p99/max. La aceptación verifica puertos privados, identidad del fixture antes/después, respuestas esperadas, `errors=0`, readiness posterior y emite PASS.
 
-**Evidencia pendiente:** TPS, latencia, locks, contención, outbox, DLQ, reconciliación, recuperación, CPU/memoria y metodología con hardware, seed y commit identificados.
-
-**Límite:** No se afirmará capacidad productiva de 1M TPS sin evidencia específica.
+**Evidencia pendiente:** capacidad/TPS de producción, locks, contención, outbox, DLQ, reconciliación, recuperación, CPU/memoria y metodología con hardware. Este slice no mide ni afirma 1M TPS, SLO/SLI ni garantías no observadas.
 
 ### P10. Trazabilidad documental completa
 

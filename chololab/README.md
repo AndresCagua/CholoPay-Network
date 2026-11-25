@@ -22,7 +22,7 @@ docker compose -f compose.yaml run --rm \
 docker compose -f compose.yaml down
 ```
 
-El ejecutor emite un registro JSON `run_started` y otro `run_summary`. El resumen conserva el número de solicitudes, los fallos inyectados, las respuestas exitosas, el tiempo transcurrido, el rendimiento y la latencia mínima/mediana/máxima, además de los campos de estilo RED:
+El ejecutor emite un registro JSON `run_started` y otro `run_summary`. El resumen conserva el número de solicitudes, los fallos inyectados, las respuestas exitosas, el tiempo transcurrido, el rendimiento y la latencia mínima/mediana/p95/p99/máxima, además de metadatos reproducibles (`target`, requests, concurrencia, duración, commit, seed lógico y estado esperado) y los campos de estilo RED:
 
 - `red.rate_requests_per_second`: tasa de solicitudes completadas para esta ejecución.
 - `red.errors` and `red.error_rate`: fallos no-2xx, de transporte e inyectados.
@@ -37,4 +37,8 @@ Estas son mediciones sintéticas deterministas para los parámetros seleccionado
 3. Inspecciona las dos líneas JSON. Confirma que el registro inicial coincide con los parámetros solicitados y usa después `run_summary.red` para la tasa, los errores y la duración. `injected_failures` debe coincidir con la programación determinista `FAILURE_EVERY` schedule cuando el objetivo está sano; otros fallos son evidencia del comportamiento del transporte o del objetivo.
 4. Detén el objetivo sintético: `docker compose -f compose.yaml down`.
 
-Este procedimiento usa únicamente tráfico sintético, no accede a diarios y no establece preparación ni capacidad para producción.
+## Slice P9: lectura financiera
+
+`infra/tests/p9_performance_acceptance.sh` crea previamente un cliente/cuenta sintéticos usando la API pública de `bank-core`, y después carga únicamente `GET /v1/accounts/{account_id}/balance` con el token emitido. Comprueba identidad antes/después, respuestas esperadas, `errors=0` y readiness posterior. No hay escrituras directas al ledger ni puertos publicados.
+
+Este procedimiento usa únicamente tráfico sintético, no accede a diarios y no establece preparación ni capacidad para producción. En particular, no mide ni afirma 1M TPS, SLO/SLI, locks/contención, CPU/memoria, outbox/DLQ, reconciliación bajo carga ni garantías de rendimiento no medidas.
