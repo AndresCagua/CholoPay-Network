@@ -153,7 +153,7 @@ func (h *operatorHandler) createNetwork(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "la red ya existe o no pudo registrarse", http.StatusConflict)
 		return
 	}
-	writeJSON(w, http.StatusCreated, network)
+	writeJSON(w, http.StatusCreated, networkResponse{NetworkID: network.ID, Code: network.Code, Kind: network.Kind, Status: network.Status})
 }
 
 func (h *operatorHandler) createParticipant(w http.ResponseWriter, r *http.Request) {
@@ -177,7 +177,14 @@ func (h *operatorHandler) createParticipant(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "el participante ya existe o la red no existe", http.StatusConflict)
 		return
 	}
-	writeJSON(w, http.StatusCreated, participant)
+	writeJSON(w, http.StatusCreated, participantCreatedResponse{ParticipantID: participant.ID, NetworkID: participant.NetworkID, Code: participant.Code, Status: participant.Status})
+}
+
+type participantCreatedResponse struct {
+	ParticipantID uuid.UUID `json:"participant_id"`
+	NetworkID     uuid.UUID `json:"network_id"`
+	Code          string    `json:"code"`
+	Status        string    `json:"status"`
 }
 
 type participantResponse struct {
