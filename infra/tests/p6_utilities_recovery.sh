@@ -16,11 +16,11 @@ if compose config | grep -E '^[[:space:]]+published:' >/dev/null; then
   echo "P6 FAIL: host ports are published" >&2
   exit 1
 fi
-compose up -d utilities-db utilities >/dev/null
+compose up -d --build utilities-db utilities >/dev/null
 compose run --rm p6-utilities-recovery
 compose stop utilities >/dev/null
 compose rm -f utilities >/dev/null
 compose up -d utilities >/dev/null
 compose run --rm p6-utilities-recovery
 
-echo "P6 UTILITIES RECOVERY PASS: electricity invoice, intent, signed event and idempotent replay survived utilities recreation with isolated PostgreSQL volume"
+echo "P6 UTILITIES RECOVERY PASS: water and electricity invoices, intents, signed events and idempotent replays survived utilities recreation with isolated PostgreSQL volume"

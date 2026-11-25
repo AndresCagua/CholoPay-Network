@@ -1,4 +1,4 @@
-"""API sintética de facturación; electricidad persistida en PostgreSQL aislado."""
+"""API sintética de facturación; electricidad y agua persistidas en PostgreSQL aislado."""
 from __future__ import annotations
 
 import hashlib
@@ -36,7 +36,7 @@ _INTERNAL_EVENT_SECRET = os.getenv("INTERNAL_EVENT_SECRET", "local-test-only")
 
 
 class DurableStore:
-    """Small PostgreSQL repository; only the electricity synthetic slice uses it."""
+    """Small PostgreSQL repository for the electricity and water synthetic slices."""
     def __init__(self) -> None:
         self.url = os.getenv("DB_URL", "")
         self.connection = None
@@ -61,18 +61,19 @@ class DurableStore:
                       payment_intent_id TEXT NOT NULL, receipt JSONB NOT NULL
                     );
                 """)
-                seed = INVOICES["invoice-elec-2025-001"]
-                cur.execute("""INSERT INTO utilities_invoice
-                    (id, contract_id, service, amount, currency, due_date, status, settlement_state)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (id) DO NOTHING""",
-                    (seed["id"], seed["contract_id"], seed["service"], seed["amount"], seed["currency"], seed["due_date"], seed["status"], "NOT_SETTLED"))
+                for seed_id in ("invoice-elec-2025-001", "invoice-water-2025-001"):
+                    seed = INVOICES[seed_id]
+                    cur.execute("""INSERT INTO utilities_invoice
+                        (id, contract_id, service, amount, currency, due_date, status, settlement_state)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (id) DO NOTHING""",
+                        (seed["id"], seed["contract_id"], seed["service"], seed["amount"], seed["currency"], seed["due_date"], seed["status"], "NOT_SETTLED"))
 
     @property
     def durable(self) -> bool:
         return self.connection is not None
 
     def invoice(self, invoice_id: str) -> dict | None:
-        if not self.durable or invoice_id != "invoice-elec-2025-001":
+        if not self.durable:
             return INVOICES.get(invoice_id)
         with self.connection.cursor() as cur:
             cur.execute("SELECT id,contract_id,service,amount,currency,due_date,status,payment_intent_id,settlement_state FROM utilities_invoice WHERE id=%s", (invoice_id,))
@@ -82,7 +83,13 @@ class DurableStore:
         return {k: v for k, v in zip(keys, row) if v is not None}
 
     def invoices(self) -> list[dict]:
-        return [self.invoice("invoice-elec-2025-001")] if self.durable else list(INVOICES.values())
+        if not self.durable:
+            return list(INVOICES.values())
+        with self.connection.cursor() as cur:
+            cur.execute("SELECT id,contract_id,service,amount,currency,due_date,status,payment_intent_id,settlement_state FROM utilities_invoice ORDER BY id")
+            rows = cur.fetchall()
+        keys = ("id", "contract_id", "service", "amount", "currency", "due_date", "status", "payment_intent_id", "settlement_state")
+        return [{k: v for k, v in zip(keys, row) if v is not None} for row in rows]
 
     def save_intent(self, key, fingerprint, intent, invoice_id):
         if not self.durable: return None

@@ -64,17 +64,15 @@ Siguen pendientes OIDC/OAuth 2.1, PKCE, MFA/step-up, JWT completo, mTLS operativ
 
 ### P6. Facturadores persistentemente respaldados
 
-**Estado:** Parcial — slice P6 (T1-T2, S1-S5) implementado para electricidad sintética.
+**Estado:** Parcial — slice P6 (T1-T2, S1-S5) implementado para electricidad y agua sintéticas.
 
-`utilities` persiste factura, payment intent/idempotencia y evento aplicado en el PostgreSQL aislado `utilities-db`, con volumen propio y aceptación Docker `p6`. Se conservan rutas, payloads, estados, firma HMAC y semántica sintética existentes. Agua, internet, móvil y settlement/ledgers bancarios siguen fuera del alcance. Tránsito sintético ahora tiene su slice P6 propio documentado en `docs/runbooks/p6-transit-recovery.md`.
+`utilities` persiste las facturas `invoice-elec-2025-001` e `invoice-water-2025-001`, payment intents/idempotencia y eventos aplicados en el PostgreSQL aislado `utilities-db`, con volumen propio y aceptación Docker `p6`. Se conservan rutas, payloads, estados, firma HMAC y semántica sintética existentes. Internet, móvil y settlement/ledgers bancarios siguen fuera del alcance. Tránsito sintético ahora tiene su slice P6 propio documentado en `docs/runbooks/p6-transit-recovery.md`.
 
-**Evidencia:** `docs/runbooks/p6-utilities-recovery.md`, `infra/tests/p6_utilities_recovery.py` y Compose con `utilities-db` sin puertos host y dependencia `service_healthy`.
+**Evidencia:** `docs/runbooks/p6-utilities-recovery.md`, `infra/tests/p6_utilities_recovery.py` y Compose con `utilities-db` sin puertos host y dependencia `service_healthy`. La aceptación recrea solo `utilities`, conserva el volumen y verifica agua durable junto con electricidad.
 
 **Tránsito sintético (T1-T2, S1-S5):** `transit` persiste registros, multas, obligaciones, intents, fingerprints, eventos firmados, receipts y constancias en `transit-db`, con transacciones para creación de pares, reserva de intent y aplicación de eventos. `infra/tests/p6_transit_recovery.sh` recrea solo `transit` y verifica identidad, estados, replay y receipts sobre el volumen PostgreSQL.
 
-**Límites:** esta evidencia no afirma durabilidad de producto, gateway/bank/global settlement, dinero real ni certificados oficiales.
-
-**Límites:** la aceptación demuestra solo el flujo eléctrico sintético; no afirma recuperación del gateway, de todas las bases, settlement global, dinero real ni garantías productivas.
+**Límites:** esta evidencia no afirma durabilidad de producto, gateway/bank/global settlement, dinero real ni certificados oficiales. La aceptación no demuestra recuperación del gateway, de todas las bases, settlement global ni garantías productivas.
 
 ### P7. Outbox, Kafka y recuperación completa
 
@@ -137,7 +135,7 @@ Cada punto se marcará como `Pendiente`, `En progreso`, `Parcial`, `Bloqueado` o
 
 ## Registro de progreso
 
-- 2026-11-25: Phase 6 T1-T2 implementó persistencia PostgreSQL aislada para electricidad sintética, intents/idempotencia y eventos HMAC deduplicados; agregó volumen, healthcheck, dependencia saludable, profile `p6`, aceptación y runbook. T3 (checks, work unit y RDD) queda pendiente.
+- 2026-11-25: Phase 6 T1-T2 implementó persistencia PostgreSQL aislada para electricidad y agua sintéticas, intents/idempotencia y eventos HMAC deduplicados; el probe verifica recreación de utilities con agua durable y electricidad presente. Se conservan volumen, healthcheck, dependencia saludable, profile `p6`, aceptación y runbook. T3 (checks, work unit y RDD) queda pendiente.
 - 2026-11-25: Phase 6 tránsito (T1-T2, S1-S5) agregó `transit-db`, repositorio PostgreSQL transaccional para el aggregate sintético, aceptación de recreación/replay y runbook. T3 (checks, work unit y RDD) queda pendiente; no se agregan conexiones a bancos/utilities ni claims productivos.
 
 - 2026-11-25: Phase 5 T1-T2 implementó el rate limiting local por API key del gateway y la aceptación Docker-only `p5`; la documentación queda en `docs/runbooks/p5-rate-limiting.md`. Defaults explícitos: 2 solicitudes por ventana de 60 segundos, configurables solo para ejecución local; no se agregan Redis/Kafka ni puertos host y el runtime ledger permanece intacto.

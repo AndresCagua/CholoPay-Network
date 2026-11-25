@@ -1,6 +1,6 @@
 # P6 — Recuperación de utilities sintético
 
-Alcance: únicamente la factura sintética de electricidad `invoice-elec-2025-001`. No cubre agua, internet, móvil, tránsito, gateway, ledgers bancarios, settlement global ni dinero real.
+Alcance: las facturas sintéticas `invoice-elec-2025-001` y `invoice-water-2025-001`. No cubre internet, móvil, tránsito, gateway, ledgers bancarios, settlement global ni dinero real.
 
 ## Compose
 
@@ -11,18 +11,9 @@ Alcance: únicamente la factura sintética de electricidad `invoice-elec-2025-00
 Desde la raíz:
 
 ```sh
-docker compose -f infra/compose.yaml --profile p6 up --build --abort-on-container-exit p6-utilities-recovery
+sh infra/tests/p6_utilities_recovery.sh
 ```
 
-La prueba lee la factura, crea y repite una intención fija, firma y repite un evento fijo, y verifica `paid`, `APPLIED` y la identidad del intent. Para demostrar recuperación del contenedor, ejecutar el probe antes y después de recrear solo utilities, sin borrar el volumen:
+El wrapper ejecuta el probe antes y después de recrear solo `utilities`, conservando el volumen de `utilities-db`. El probe lee ambas facturas, crea y repite intents fijos, firma y repite eventos fijos, y verifica para agua `paid`, `APPLIED`, identidad del intent y exactamente un intent/evento durable. También verifica que electricidad permanece presente y compatible.
 
-```sh
-docker compose -f infra/compose.yaml up -d --build utilities-db utilities
-docker compose -f infra/compose.yaml run --rm p6-utilities-recovery
-docker compose -f infra/compose.yaml stop utilities
-docker compose -f infra/compose.yaml rm -f utilities
-docker compose -f infra/compose.yaml up -d utilities
-docker compose -f infra/compose.yaml run --rm p6-utilities-recovery
-```
-
-No usar `down -v`: el volumen `utilities-db-data` es la autoridad durable. La prueba es sintética y no demuestra garantías productivas.
+No usar `down -v` durante la comprobación de recuperación: el volumen `utilities-db-data` es la autoridad durable. El cleanup final del wrapper elimina recursos de la ejecución de prueba. La prueba es sintética y no demuestra garantías productivas.
