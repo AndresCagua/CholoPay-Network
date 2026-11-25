@@ -44,11 +44,25 @@ services:
     volumes: [redis-data:/data]
     healthcheck: {test: [CMD, redis-cli, ping], interval: 5s, timeout: 3s, retries: 10}
 
+  utilities-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${UTILITIES_DB_USER:-utilities}
+      POSTGRES_PASSWORD: ${UTILITIES_DB_PASSWORD:-utilities_local_only}
+      POSTGRES_DB: ${UTILITIES_DB_NAME:-utilities}
+    volumes: [utilities-db-data:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
+
   utilities:
     build:
       context: ../utilities
+    environment:
+      DB_URL: postgresql://${UTILITIES_DB_USER:-utilities}:${UTILITIES_DB_PASSWORD:-utilities_local_only}@utilities-db:5432/${UTILITIES_DB_NAME:-utilities}
+      INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:-local-test-only}
     expose: ["8080"]
     healthcheck: {test: [CMD-SHELL, "wget -qO- http://127.0.0.1:8080/health/live >/dev/null && wget -qO- http://127.0.0.1:8080/health/ready >/dev/null"], interval: 5s, timeout: 3s, retries: 10}
+    depends_on:
+      utilities-db: {condition: service_healthy}
     networks: [internal_services, default]
 
   transit:
@@ -341,6 +355,20 @@ services:
     command: ["python", "/tests/p8_health_acceptance.py"]
     networks: [internal_services, default]
 
+  p6-utilities-recovery:
+    image: python:3.13-alpine
+    profiles: [p6]
+    environment:
+      UTILITIES_URL: http://utilities:8080
+      INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:-local-test-only}
+      UTILITIES_DB_URL: postgresql://${UTILITIES_DB_USER:-utilities}:${UTILITIES_DB_PASSWORD:-utilities_local_only}@utilities-db:5432/${UTILITIES_DB_NAME:-utilities}
+    volumes:
+      - ./tests/p6_utilities_recovery.py:/tests/p6_utilities_recovery.py:ro
+    command: ["sh", "-c", "pip install --no-cache-dir 'psycopg[binary]' >/dev/null && python /tests/p6_utilities_recovery.py"]
+    depends_on:
+      utilities: {condition: service_healthy}
+    networks: [internal_services, default]
+
   p5-rate-limit:
     image: python:3.13-alpine
     profiles: [p5]
@@ -465,3 +493,4 @@ volumes:
   sierra-db-data:
   oriente-db-data:
   redis-data:
+  utilities-db-data:

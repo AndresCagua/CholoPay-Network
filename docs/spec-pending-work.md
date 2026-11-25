@@ -64,11 +64,13 @@ Siguen pendientes OIDC/OAuth 2.1, PKCE, MFA/step-up, JWT completo, mTLS operativ
 
 ### P6. Facturadores persistentemente respaldados
 
-**Estado:** Parcial.
+**Estado:** Parcial — slice P6 (T1-T2, S1-S5) implementado para electricidad sintética.
 
-Utilities y tránsito son servicios sintéticos; electricidad cuenta con aplicación persistente en `bank-core`, mientras agua, internet, móvil, matrícula y multas conservan el flujo legacy sintético.
+`utilities` persiste factura, payment intent/idempotencia y evento aplicado en el PostgreSQL aislado `utilities-db`, con volumen propio y aceptación Docker `p6`. Se conservan rutas, payloads, estados, firma HMAC y semántica sintética existentes. Agua, internet, móvil, tránsito y settlement/ledgers bancarios siguen fuera del alcance.
 
-**Evidencia pendiente:** persistencia durable de estados, recuperación tras reinicio, replay, aplicación idempotente y PostgreSQL como fuente de verdad de cada facturador cuando el requisito lo exija.
+**Evidencia:** `docs/runbooks/p6-utilities-recovery.md`, `infra/tests/p6_utilities_recovery.py` y Compose con `utilities-db` sin puertos host y dependencia `service_healthy`.
+
+**Límites:** la aceptación demuestra solo el flujo eléctrico sintético; no afirma recuperación del gateway, de todas las bases, settlement global, dinero real ni garantías productivas.
 
 ### P7. Outbox, Kafka y recuperación completa
 
@@ -130,6 +132,8 @@ Se resolverán en este orden, salvo que una dependencia técnica obligue a reord
 Cada punto se marcará como `Pendiente`, `En progreso`, `Parcial`, `Bloqueado` o `Completado`, con referencias a sus tareas, commits y pruebas. `Completado` solo significa que existe evidencia suficiente para el alcance sintético definido; no implica liquidación real, cumplimiento normativo ni despliegue productivo.
 
 ## Registro de progreso
+
+- 2026-11-25: Phase 6 T1-T2 implementó persistencia PostgreSQL aislada para electricidad sintética, intents/idempotencia y eventos HMAC deduplicados; agregó volumen, healthcheck, dependencia saludable, profile `p6`, aceptación y runbook. T3 (checks, work unit y RDD) queda pendiente.
 
 - 2026-11-25: Phase 5 T1-T2 implementó el rate limiting local por API key del gateway y la aceptación Docker-only `p5`; la documentación queda en `docs/runbooks/p5-rate-limiting.md`. Defaults explícitos: 2 solicitudes por ventana de 60 segundos, configurables solo para ejecución local; no se agregan Redis/Kafka ni puertos host y el runtime ledger permanece intacto.
 - 2026-11-17: se registran los diez bloques pendientes después de cerrar Phase 15. La repetición T7 posterior a `cdc1fce` queda como evidencia no disponible debido al agotamiento del pool de redes Docker; la T7 previa y la suite `bank-core` permanecen documentadas por separado.
