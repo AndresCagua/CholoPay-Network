@@ -75,6 +75,15 @@ def main() -> None:
     if sorted(rows) != list("123456789"):
         fail(f"cobertura P1-P9 incompleta: {rows}")
     check_links(matrix)
+    required_current_evidence = {
+        "P7": ["odd/tasks/phase-7-http-outbox-recovery.md", "infra/tests/p7_http_outbox_recovery.sh", "runbooks/p7-http-outbox-recovery.md"],
+        "P8": ["odd/tasks/phase-8-bank-core-readiness-recovery.md", "odd/tasks/phase-8-observability-resilience.md", "odd/tasks/phase-8-health-contract.md", "infra/tests/p8_health_acceptance.sh", "infra/tests/p8_observability_acceptance.sh", "runbooks/p8-observability.md", "runbooks/p8-metrics.md"],
+    }
+    for point, references in required_current_evidence.items():
+        row = next((line for line in matrix.splitlines() if line.startswith(f"| **{point}**")), "")
+        for reference in references:
+            if reference not in row:
+                fail(f"{point} no referencia evidencia actual: {reference}")
 
     actual_adrs = {p.name for p in ADR_DIR.glob("[0-9][0-9][0-9][0-9]-*.md")}
     index = (ADR_DIR / "README.md").read_text(encoding="utf-8")

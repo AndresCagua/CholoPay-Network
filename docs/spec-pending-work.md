@@ -113,12 +113,12 @@ Los cinco servicios exponen `/health/live` y `/health/ready`, Compose tiene heal
 - [`docs/traceability-matrix.md`](traceability-matrix.md) cubre P1-P9 con requisito, tarea ODD, ADR, código, prueba, evidencia Docker, commit, estado y limitación.
 - [`adr/README.md`](../adr/README.md) indexa los 14 ADR existentes.
 - [`README.md`](../README.md) enlaza la matriz, el índice ADR, los tres contratos OpenAPI (`api/bank.openapi.yaml`, `api/network.openapi.yaml`, `api/gateway.openapi.yaml`) y runbooks relevantes.
-- [`infra/tests/p10_traceability_check.sh`](../infra/tests/p10_traceability_check.sh) ejecuta el checker dentro de Docker; [`p10_traceability_check.py`](../infra/tests/p10_traceability_check.py) verifica cobertura P1-P9, referencias, ADRs, OpenAPI, exclusión de tracing/OpenTelemetry y Compose sin puertos publicados por defecto.
+- [`infra/tests/p10_traceability_check.sh`](../infra/tests/p10_traceability_check.sh) ejecuta el checker dentro de Docker; [`p10_traceability_check.py`](../infra/tests/p10_traceability_check.py) verifica cobertura P1-P9, referencias actuales P7/P8, ADRs, OpenAPI, exclusión de tracing/OpenTelemetry y Compose sin puertos publicados por defecto.
 - La matriz documenta como metadatos contractuales sintéticos `event_id`, `transfer_id`, `correlation_id`, `causation_id` y `trace_id`; no los presenta como spans ni tracing distribuido.
 
 **Límites explícitos:** este slice no implementa OpenTelemetry, W3C `traceparent`, collectors, Jaeger, SLO/SLI, monitoreo productivo ni evidencia de rendimiento no medida. Los commits de filas sin un hash existente permanecen como `Pendiente`; no se inventan commits ni pruebas.
 
-**Evidencia pendiente:** reconciliación futura de la matriz cuando cambien P1-P9. La ejecución Docker del validador ya fue observada y pasó; no convierte P1-P9 en cumplimiento total ni implementa tracing distribuido.
+**Evidencia de reconciliación:** la matriz y el checker fueron actualizados para incluir los slices actuales P6, P7 HTTP y P8 readiness/observabilidad/health-contract. La ejecución Docker del validador debe volver a observarse para este candidato; no convierte P1-P9 en cumplimiento total ni implementa tracing distribuido.
 
 ## Orden de ejecución
 
