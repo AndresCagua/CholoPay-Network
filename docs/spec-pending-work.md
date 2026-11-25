@@ -64,11 +64,11 @@ Siguen pendientes OIDC/OAuth 2.1, PKCE, MFA/step-up, JWT completo, mTLS operativ
 
 ### P6. Facturadores persistentemente respaldados
 
-**Estado:** Parcial — slice P6 (T1-T2, S1-S5) implementado para electricidad, agua y mobile sintéticos.
+**Estado:** Parcial — slice P6 (T1-T2, S1-S5) implementado para las cuatro facturas sintéticas.
 
-`utilities` persiste las facturas `invoice-elec-2025-001`, `invoice-water-2025-001` y `bill-mobile-2025-001`, payment intents/idempotencia y eventos aplicados en el PostgreSQL aislado `utilities-db`, con volumen propio y aceptación Docker `p6`. Se conservan rutas, payloads, estados, firma HMAC y semántica sintética existentes. Internet continúa legacy/en memoria y settlement/ledgers bancarios siguen fuera del alcance. Tránsito sintético ahora tiene su slice P6 propio documentado en `docs/runbooks/p6-transit-recovery.md`.
+`utilities` persiste las facturas `invoice-elec-2025-001`, `invoice-water-2025-001`, `bill-internet-2025-001` y `bill-mobile-2025-001`, payment intents/idempotencia y eventos aplicados en el PostgreSQL aislado `utilities-db`, con volumen propio y aceptación Docker `p6`. Se conservan rutas, payloads, estados, firma HMAC y semántica sintética existentes; settlement/ledgers bancarios siguen fuera del alcance. Tránsito sintético tiene su slice P6 propio documentado en `docs/runbooks/p6-transit-recovery.md`.
 
-**Evidencia:** `docs/runbooks/p6-utilities-recovery.md`, `infra/tests/p6_utilities_recovery.py` y Compose con `utilities-db` sin puertos host y dependencia `service_healthy`. La aceptación recrea solo `utilities`, conserva el volumen y verifica mobile y agua durables junto con electricidad e internet visibles.
+**Evidencia:** `docs/runbooks/p6-utilities-recovery.md`, `infra/tests/p6_utilities_recovery.py` y Compose con `utilities-db` sin puertos host y dependencia `service_healthy`. La aceptación recrea solo `utilities`, conserva el volumen y verifica internet, mobile y agua durables junto con electricidad y los cuatro billers visibles.
 
 **Tránsito sintético (T1-T2, S1-S5):** `transit` persiste registros, multas, obligaciones, intents, fingerprints, eventos firmados, receipts y constancias en `transit-db`, con transacciones para creación de pares, reserva de intent y aplicación de eventos. `infra/tests/p6_transit_recovery.sh` recrea solo `transit` y verifica identidad, estados, replay y receipts sobre el volumen PostgreSQL.
 
@@ -135,7 +135,7 @@ Cada punto se marcará como `Pendiente`, `En progreso`, `Parcial`, `Bloqueado` o
 
 ## Registro de progreso
 
-- 2026-11-25: Phase 6 T1-T2 implementó persistencia PostgreSQL aislada para electricidad, agua y mobile sintéticos, intents/idempotencia y eventos HMAC deduplicados; el probe verifica recreación de utilities con mobile/agua durables, identidad post-reinicio, catálogo completo y electricidad/internet visibles. Internet permanece legacy/en memoria. Se conservan volumen, healthcheck, dependencia saludable, profile `p6`, aceptación y runbook. T3 (checks, work unit y RDD) queda pendiente.
+- 2026-11-25: Phase 6 T1-T2 (T1-T2, S1-S5) extendió la persistencia PostgreSQL aislada a `bill-internet-2025-001` junto con electricidad, agua y mobile; intents/idempotencia y eventos HMAC deduplicados sobreviven la recreación de `utilities`. El probe verifica identidad post-reinicio, estado `paid/APPLIED`, unicidad durable, catálogo completo y los cuatro billers visibles. Settlement/ledgers bancarios, gateway y dinero real siguen fuera del alcance. T3 (checks, work unit y RDD) queda pendiente.
 - 2026-11-25: Phase 6 tránsito (T1-T2, S1-S5) agregó `transit-db`, repositorio PostgreSQL transaccional para el aggregate sintético, aceptación de recreación/replay y runbook. T3 (checks, work unit y RDD) queda pendiente; no se agregan conexiones a bancos/utilities ni claims productivos.
 
 - 2026-11-25: Phase 5 T1-T2 implementó el rate limiting local por API key del gateway y la aceptación Docker-only `p5`; la documentación queda en `docs/runbooks/p5-rate-limiting.md`. Defaults explícitos: 2 solicitudes por ventana de 60 segundos, configurables solo para ejecución local; no se agregan Redis/Kafka ni puertos host y el runtime ledger permanece intacto.

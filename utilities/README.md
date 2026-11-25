@@ -1,6 +1,6 @@
 # CholoPay synthetic utilities biller
 
-API sintética exclusiva para Docker de la empresa ficticia de servicios públicos múltiples (electricidad, agua, internet y telefonía móvil). Usa la biblioteca estándar de Python para el servicio y PostgreSQL aislado para persistir las facturas sintéticas de electricidad, agua y telefonía móvil, sus intents y eventos aplicados; internet permanece legacy/en memoria.
+API sintética exclusiva para Docker de la empresa ficticia de servicios públicos múltiples (electricidad, agua, internet y telefonía móvil). Usa la biblioteca estándar de Python para el servicio y PostgreSQL aislado para persistir las cuatro facturas sintéticas objetivo, sus intents y eventos aplicados.
 
 ## Boundary
 

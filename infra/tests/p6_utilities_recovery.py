@@ -50,6 +50,7 @@ def exercise_invoice(invoice_id, key, event_id, use_bill_route=False):
     return first["id"]
 
 
+internet_intent = exercise_invoice("bill-internet-2025-001", "p6-internet-intent-001", "p6-internet-event-001", use_bill_route=True)
 mobile_intent = exercise_invoice("bill-mobile-2025-001", "p6-mobile-intent-001", "p6-mobile-event-001", use_bill_route=True)
 water_intent = exercise_invoice("invoice-water-2025-001", "p6-water-intent-001", "p6-water-event-001")
 status, catalog = call("GET", "/api/v1/services/catalog")
@@ -58,15 +59,17 @@ status, electricity = call("GET", "/api/v1/invoices/invoice-elec-2025-001")
 require(status == 200 and electricity["service"] == "electricity", f"electricity invoice unavailable: {status} {electricity}")
 status, internet = call("GET", "/api/v1/invoices/bill-internet-2025-001")
 require(status == 200 and internet["service"] == "internet", f"internet legacy invoice unavailable: {status} {internet}")
+status, internet_state = call("GET", "/v1/bills/bill-internet-2025-001/payment-status")
+require(status == 200 and internet_state["payment_intent_id"] == internet_intent and internet_state["status"] == "paid" and internet_state["settlement_state"] == "APPLIED", f"internet identity/state unavailable: {status} {internet_state}")
 status, mobile = call("GET", "/v1/bills/bill-mobile-2025-001/payment-status")
 require(status == 200 and mobile["payment_intent_id"] == mobile_intent and mobile["status"] == "paid" and mobile["settlement_state"] == "APPLIED", f"mobile identity/state unavailable: {status} {mobile}")
 status, water = call("GET", "/api/v1/invoices/invoice-water-2025-001/payment-status")
 require(status == 200 and water["payment_intent_id"] == water_intent, f"water identity/state unavailable: {status} {water}")
 with psycopg.connect(os.environ["UTILITIES_DB_URL"]) as db:
     with db.cursor() as cur:
-        for key, event_id, label in (("p6-mobile-intent-001", "p6-mobile-event-001", "mobile"), ("p6-water-intent-001", "p6-water-event-001", "water")):
+        for key, event_id, label in (("p6-internet-intent-001", "p6-internet-event-001", "internet"), ("p6-mobile-intent-001", "p6-mobile-event-001", "mobile"), ("p6-water-intent-001", "p6-water-event-001", "water")):
             cur.execute("SELECT count(*) FROM utilities_payment_intent WHERE idempotency_key=%s", (key,))
             require(cur.fetchone()[0] == 1, f"{label} durable intent count is not one")
             cur.execute("SELECT count(*) FROM utilities_payment_event WHERE event_id=%s", (event_id,))
             require(cur.fetchone()[0] == 1, f"{label} durable event count is not one")
-print("P6 utilities recovery acceptance: PASS (mobile and water durable slices; electricity and internet legacy visible)")
+print("P6 utilities recovery acceptance: PASS (internet, mobile and water durable slices; electricity and all four catalog billers visible)")
