@@ -90,21 +90,19 @@ Los cinco servicios exponen `/health/live` y `/health/ready`, Compose tiene heal
 
 ### P10. Trazabilidad documental completa
 
-**Estado:** Parcial.
+**Estado:** Parcial — documentación y validador P10 agregados en el alcance `Spec: odd/tasks/phase-10-documentation-traceability.md, T1-T2, S1-S6`.
 
-Falta consolidar la matriz completa:
+**Evidencia del slice:**
 
-```text
-requisito de spec.md
-→ tarea ODD
-→ commit
-→ código
-→ prueba
-→ evidencia Docker
-→ limitación conocida
-```
+- [`docs/traceability-matrix.md`](traceability-matrix.md) cubre P1-P9 con requisito, tarea ODD, ADR, código, prueba, evidencia Docker, commit, estado y limitación.
+- [`adr/README.md`](../adr/README.md) indexa los 14 ADR existentes.
+- [`README.md`](../README.md) enlaza la matriz, el índice ADR, los tres contratos OpenAPI (`api/bank.openapi.yaml`, `api/network.openapi.yaml`, `api/gateway.openapi.yaml`) y runbooks relevantes.
+- [`infra/tests/p10_traceability_check.sh`](../infra/tests/p10_traceability_check.sh) ejecuta el checker dentro de Docker; [`p10_traceability_check.py`](../infra/tests/p10_traceability_check.py) verifica cobertura P1-P9, referencias, ADRs, OpenAPI, exclusión de tracing/OpenTelemetry y Compose sin puertos publicados por defecto.
+- La matriz documenta como metadatos contractuales sintéticos `event_id`, `transfer_id`, `correlation_id`, `causation_id` y `trace_id`; no los presenta como spans ni tracing distribuido.
 
-**Evidencia pendiente:** matriz actualizada y reconciliada después de cada slice.
+**Límites explícitos:** este slice no implementa OpenTelemetry, W3C `traceparent`, collectors, Jaeger, SLO/SLI, monitoreo productivo ni evidencia de rendimiento no medida. Los commits de filas sin un hash existente permanecen como `Pendiente`; no se inventan commits ni pruebas.
+
+**Evidencia pendiente:** reconciliación futura de la matriz cuando cambien P1-P9 y ejecución Docker en un entorno con Docker Engine/Compose disponible.
 
 ## Orden de ejecución
 
