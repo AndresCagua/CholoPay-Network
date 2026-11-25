@@ -7,6 +7,7 @@ import uuid
 
 import psycopg
 import urllib.error
+import urllib.parse
 import urllib.request
 import json
 
@@ -293,21 +294,38 @@ def public_receiver_evidence(transfer_id):
     assert status == 200 and balance.get("account_id") == str(DESTINATION), (status, balance)
     assert balance.get("balance_minor", 0) >= 125, balance
 
-    status, journals = http_json(
-        "GET", f"{SIERRA_PUBLIC_URL}/v1/accounts/{DESTINATION}/journals?limit=100", token=SIERRA_PUBLIC_TOKEN
-    )
-    assert status == 200 and isinstance(journals.get("data"), list), (status, journals)
-    matches = [journal for journal in journals["data"] if journal.get("transaction_id") == str(transfer_id)]
+    def read_all_journals():
+        pages = []
+        cursor = None
+        for _ in range(100):
+            suffix = "&cursor=" + urllib.parse.quote(cursor) if cursor else ""
+            page_status, page = http_json(
+                "GET", f"{SIERRA_PUBLIC_URL}/v1/accounts/{DESTINATION}/journals?limit=100{suffix}", token=SIERRA_PUBLIC_TOKEN
+            )
+            assert page_status == 200 and isinstance(page.get("data"), list), (page_status, page)
+            pages.extend(page["data"])
+            cursor = page.get("next_cursor")
+            if not cursor:
+                return pages
+        raise AssertionError("la paginación pública excedió el límite sintético")
+
+    journals = read_all_journals()
+    matches = [journal for journal in journals if journal.get("transaction_id") == str(transfer_id)]
     assert len(matches) == 1, (transfer_id, matches)
     entries = matches[0].get("entries", [])
     assert len(entries) == 1, entries
     assert entries[0].get("direction") == "CREDIT" and entries[0].get("amount_minor") == 125, entries
-
-    repeat_status, repeat_journals = http_json(
-        "GET", f"{SIERRA_PUBLIC_URL}/v1/accounts/{DESTINATION}/journals?limit=100", token=SIERRA_PUBLIC_TOKEN
+    total_credits = sum(
+        entry.get("amount_minor", 0)
+        for journal in journals
+        for entry in journal.get("entries", [])
+        if entry.get("direction") == "CREDIT"
     )
-    assert repeat_status == 200 and repeat_journals == journals, (repeat_status, repeat_journals)
-    print(f"PHASE20 PUBLIC RECEIVER PASS: transfer_id={transfer_id} account_id={DESTINATION} journal_entries=1 credit=125 repeat_stable=true")
+    assert balance.get("balance_minor") == total_credits, (balance, total_credits)
+
+    repeat_journals = read_all_journals()
+    assert repeat_journals == journals, (len(repeat_journals), len(journals))
+    print(f"PHASE20 PUBLIC RECEIVER PASS: transfer_id={transfer_id} account_id={DESTINATION} journal_entries=1 credit=125 balance_matches_public_credits=true pagination_stable=true")
 
 
 def complete():
