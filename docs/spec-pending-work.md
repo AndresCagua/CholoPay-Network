@@ -76,11 +76,13 @@ Siguen pendientes OIDC/OAuth 2.1, PKCE, MFA/step-up, JWT completo, mTLS operativ
 
 ### P7. Outbox, Kafka y recuperación completa
 
-**Estado:** Parcial; Kafka recovery ya tiene evidencia acotada y el siguiente slice trabaja backup/restore lógico de PostgreSQL.
+**Estado:** Parcial; el slice HTTP del outbox (T1-T2, S1-S5) ya tiene wrapper externo y probe Docker-only para interrupción de network, reinicio de `bank-core`, reclaim/publicación y deduplicación durable de la frontera; Kafka recovery y backup/restore mantienen su evidencia acotada.
 
 Existe outbox bancario durable, retries y DLQ HTTP. El slice Kafka demostró en Docker un evento versionado, key `event_id`, recuperación tras reinicio, replay at-least-once y deduplicación en el boundary PostgreSQL sin sustituir el ledger. El slice actual verifica backup/restore de un solo `network-db` sintético con `pg_dump`/`psql`, baseline, mutación controlada e invariantes restauradas. La aceptación `phase20_backup_restore.sh` pasó con identidad, payload hash, idempotencia, constraint y readiness restaurados. No certifica consistencia entre bases, RPO/RTO, PITR/WAL, cifrado, retención, rotación, backup de Kafka ni garantías productivas.
 
-**Límite:** Kafka no sustituirá a los ledgers PostgreSQL como fuente de verdad.
+**Evidencia:** `infra/tests/p7_http_outbox_recovery.sh` fuerza `OUTBOX_ENABLED=true` y `OUTBOX_TRANSPORT=http`, interrumpe `network` antes de publicar, reinicia externamente `bank-core` con el outbox `PENDING`/`IN_FLIGHT`, restaura la red y verifica `event_id`, `aggregate_id`, `payload_hash`, envelope, `PUBLISHED`, readiness y exactamente un mensaje durable de frontera/idempotencia para la ejecución sintética. No usa socket Docker dentro del contenedor.
+
+**Límite:** La ejecución demuestra deduplicación durable local bajo reintento, no exactly-once universal; Kafka no sustituirá a los ledgers PostgreSQL como fuente de verdad. No cubre RPO/RTO, disponibilidad productiva, orden global, consistencia cross-database ni otros bancos.
 
 ### P8. Observabilidad
 

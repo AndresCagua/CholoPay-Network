@@ -214,7 +214,7 @@ services:
 
   phase18-seed:
     image: postgres:17-alpine
-    profiles: [phase18, phase20]
+    profiles: [phase18, phase20, p7]
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
     command:
@@ -245,6 +245,22 @@ services:
       network: {condition: service_started}
       bank-core-sierra: {condition: service_started}
       bank-core-oriente: {condition: service_started}
+    networks: [internal_services, default]
+
+  phase7-http-outbox:
+    image: python:3.13-alpine
+    profiles: [p7]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cholopay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cholopay_local_only}
+      P7_MODE: ${P7_MODE:-prepare}
+      P7_IDEMPOTENCY_PREFIX: ${P7_IDEMPOTENCY_PREFIX:-p7-http-recovery-}
+    volumes:
+      - ./tests/p7_http_outbox_recovery.py:/tests/p7_http_outbox_recovery.py:ro
+    command: ["sh", "-c", "pip install --no-cache-dir 'psycopg[binary]' >/dev/null && python /tests/p7_http_outbox_recovery.py"]
+    depends_on:
+      bank-core: {condition: service_started}
+      network: {condition: service_started}
     networks: [internal_services, default]
 
   phase20-e2e:
