@@ -57,6 +57,13 @@ func TestReconciliationDetectsAndClearsDeliveryDifferences(t *testing.T) {
 	if err != nil || !hasCode(dlq, "DELIVERY_DLQ") {
 		t.Fatalf("se esperaba DELIVERY_DLQ, se obtuvo %+v error=%v", dlq, err)
 	}
+	if dlq.DifferenceCount != 1 || len(dlq.Differences) != 1 {
+		t.Fatalf("la ejecución DLQ debe conservar una sola diferencia: %+v", dlq)
+	}
+	original := dlq.Differences[0]
+	if original.TransferID == nil || *original.TransferID != transferID || original.DeliveryID == nil || *original.DeliveryID != delivery.DeliveryID {
+		t.Fatalf("la diferencia histórica perdió identidad: %+v", original)
+	}
 	if _, err := store.ReplayDelivery(ctx, delivery.DeliveryID); err != nil {
 		t.Fatal(err)
 	}
@@ -73,6 +80,17 @@ func TestReconciliationDetectsAndClearsDeliveryDifferences(t *testing.T) {
 	}
 	if clean.DifferenceCount != 0 {
 		t.Fatalf("se esperaba una reconciliación limpia, se obtuvo %+v", clean)
+	}
+	historical, err := store.ReconciliationRun(ctx, dlq.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if historical.RunID != dlq.RunID || historical.DifferenceCount != 1 || len(historical.Differences) != 1 {
+		t.Fatalf("la ejecución histórica dejó de ser consultable: %+v", historical)
+	}
+	got := historical.Differences[0]
+	if got.DifferenceID != original.DifferenceID || got.RunID != original.RunID || got.Code != original.Code || got.Detail != original.Detail || got.TransferID == nil || got.DeliveryID == nil || *got.TransferID != *original.TransferID || *got.DeliveryID != *original.DeliveryID {
+		t.Fatalf("la diferencia histórica fue mutada: original=%+v got=%+v", original, got)
 	}
 }
 

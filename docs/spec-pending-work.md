@@ -30,7 +30,11 @@ Falta cerrar y demostrar el recorrido completo `Banco Costa → CholoNet → Ban
 
 **Evidencia:** Phase 20 slice 3 (`job-2`) demostró dos transferencias independientes liquidadas en orden inverso, recuperación tras reinicio, 2 deliveries, 2 receiver inboxes, 2 journals únicos y totales balanceados `325/325`; los balances observados fueron clearing `998225` y destino `1775`.
 
-**Evidencia pendiente:** reordenamiento causal dentro de un mismo stream, si el protocolo futuro lo define, saldos y journals completos de emisor y receptor, además de una reconciliación global sin diferencias históricas preexistentes. Phase 20 slice 4 agrega una ejecución interna opcionalmente acotada por `transfer_id`; no cambia la semántica del endpoint sin alcance y la aceptación Docker verifica settlement CholoNet y receiver Sierra exactos para el target.
+**Evidencia:** Phase 20 slice 4 agrega una ejecución interna opcionalmente acotada por `transfer_id`; no cambia la semántica del endpoint sin alcance y la aceptación Docker verifica settlement CholoNet y receiver Sierra exactos para el target.
+
+**Evidencia:** Phase 20 P2 histórico (T32-T33, S25-S27) conserva el `run_id` y `difference_id` de una reconciliación `DELIVERY_DLQ`, recupera el mismo delivery y ejecuta una reconciliación posterior sin alcance limpia; el endpoint GET vuelve a consultar la diferencia original sin mutación. La aceptación compara `transfer_id`, `delivery_id`, `event_id`, conteos de delivery/inbox/journal y PostgreSQL es la fuente autoritativa.
+
+**Límites:** No se implementan sequence de stream, orden global, causalidad entre transferencias independientes, orden por timestamp/Kafka offset ni exportación de evidencia de ledger receptor no disponible.
 
 ### P3. APIs bancarias completas
 
@@ -79,6 +83,8 @@ Existe outbox bancario durable, retries y DLQ HTTP. El slice Kafka demostró en 
 Los cinco servicios exponen `/health/live` y `/health/ready`, Compose tiene healthchecks HTTP y `infra/tests/p8_health_acceptance.sh` verifica estado sano, caída externa de `network-db` (`network ready=503` con live activo) y recuperación (`ready=200`), sin puertos publicados. `network` y `bank-core` comprueban PostgreSQL; gateway, transit y utilities no tienen una base propia en este Compose sintético. P8.2 añade `/metrics` acotado en `network` y `bank-core`, y un profile Compose explícito `observability` con Prometheus/Grafana, scrape y provisioning verificables mediante `infra/tests/p8_observability_acceptance.sh`. El runbook está en `docs/runbooks/p8-observability.md` y `docs/runbooks/p8-metrics.md`. Siguen fuera de alcance OpenTelemetry, Jaeger, métricas de negocio/ledger/settlement/outbox/DLQ, correlación distribuida y runbooks productivos basados en métricas.
 
 **Límite:** No se afirmarán SLO/SLI ni disponibilidad productiva a partir de healthchecks locales.
+
+**Evidencia P2 histórica:** Phase 20 T32-T33 conserva y vuelve a consultar el primer run `DELIVERY_DLQ` después de replay, recuperación y reconciliación unscoped limpia; el test de settlement verifica persistencia append-only de `run_id`, `difference_id`, transfer y delivery. La identidad `event_id` y los conteos delivery/inbox/journal se comprueban desde PostgreSQL. No se agregaron garantías de orden o evidencia de ledger receptor fuera del contrato existente.
 
 ### P9. Pruebas de carga
 

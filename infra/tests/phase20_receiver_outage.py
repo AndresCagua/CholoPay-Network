@@ -223,11 +223,12 @@ def replay():
     print(f"PHASE20 REPLAY PASS: delivery_id={delivery_id} event_id={event_id} attempts={attempts}")
 
 
-def reconcile(expected_code=None):
+def reconcile(expected_code=None, scoped=True):
     transfer_id, _ = transfer()
-    status, body = http_json("POST", f"{NETWORK_URL}/internal/v1/reconciliation/runs?transfer_id={transfer_id}")
+    query = f"?transfer_id={transfer_id}" if scoped else ""
+    status, body = http_json("POST", f"{NETWORK_URL}/internal/v1/reconciliation/runs{query}")
     assert status == 201, (status, body)
-    differences = body.get("Differences", body.get("differences", []))
+    differences = body.get("Differences", body.get("differences", [])) or []
     target_differences = [
         item for item in differences
         if (item.get("TransferID") or item.get("transfer_id")) == str(transfer_id)
@@ -235,9 +236,52 @@ def reconcile(expected_code=None):
     codes = [item["Code"] if "Code" in item else item.get("code") for item in target_differences]
     if expected_code:
         assert expected_code in codes, (expected_code, transfer_id, target_differences)
+    elif not scoped:
+        assert not differences, (transfer_id, differences)
     else:
         assert not codes, (transfer_id, target_differences)
-    print(f"PHASE20 RECONCILIATION PASS: transfer_id={transfer_id} expected={expected_code or 'clean'}")
+    run_id = body.get("RunID", body.get("run_id"))
+    print(f"PHASE20 RECONCILIATION PASS: run_id={run_id} scoped={scoped} transfer_id={transfer_id} expected={expected_code or 'clean'}")
+
+
+def historical_reconciliation():
+    transfer_id, _ = transfer()
+    first = db_query(
+        "network-db", "cholopay_network",
+        "SELECT r.run_id,d.difference_id,d.transfer_id,d.delivery_id,d.code,d.detail "
+        "FROM reconciliation_run r JOIN reconciliation_difference d ON d.run_id=r.run_id "
+        "WHERE d.transfer_id=%s AND d.code='DELIVERY_DLQ' ORDER BY r.started_at DESC LIMIT 1",
+        (transfer_id,),
+    )
+    assert len(first) == 1, first
+    first_run_id, first_difference_id, first_transfer_id, first_delivery_id, first_code, first_detail = first[0]
+    delivery_row = db_query(
+        "network-db", "cholopay_network",
+        "SELECT delivery_id,event_id FROM settlement_delivery WHERE transfer_id=%s", (transfer_id,),
+    )
+    assert len(delivery_row) == 1 and delivery_row[0][0] == first_delivery_id
+    delivery_id, event_id = delivery_row[0]
+    status, body = http_json("GET", f"{NETWORK_URL}/internal/v1/reconciliation/runs/{first_run_id}")
+    assert status == 200, (status, body)
+    differences = body.get("Differences", body.get("differences", [])) or []
+    assert body.get("RunID", body.get("run_id")) == str(first_run_id)
+    assert body.get("DifferenceCount", body.get("difference_count")) == 1 and len(differences) == 1, body
+    observed = differences[0]
+    assert (observed.get("DifferenceID") or observed.get("difference_id")) == str(first_difference_id)
+    assert (observed.get("TransferID") or observed.get("transfer_id")) == str(first_transfer_id)
+    assert (observed.get("DeliveryID") or observed.get("delivery_id")) == str(first_delivery_id)
+    assert (observed.get("Code") or observed.get("code")) == first_code
+    assert (observed.get("Detail") or observed.get("detail")) == first_detail
+    clean_runs = db_query(
+        "network-db", "cholopay_network",
+        "SELECT run_id,difference_count FROM reconciliation_run WHERE run_id<>%s ORDER BY started_at DESC LIMIT 1",
+        (first_run_id,),
+    )
+    assert len(clean_runs) == 1 and clean_runs[0][1] == 0, clean_runs
+    assert delivery_id == delivery_row[0][0] and event_id == db_query(
+        "network-db", "cholopay_network", "SELECT event_id FROM settlement_delivery WHERE delivery_id=%s", (delivery_id,)
+    )[0][0]
+    print(f"PHASE20 HISTORICAL RECONCILIATION PASS: first_run_id={first_run_id} difference_id={first_difference_id} transfer_id={transfer_id} delivery_id={delivery_id} event_id={event_id} original=DELIVERY_DLQ unchanged_after_clean_run={clean_runs[0][0]}")
 
 
 def complete():
@@ -301,10 +345,10 @@ def complete():
 
 
 def main():
-    modes = {"prepare": prepare, "settle": settle, "observe": observe, "exhaust": exhaust, "replay": replay, "reconcile-dlq": lambda: reconcile("DELIVERY_DLQ"), "complete": complete, "reconcile-clean": reconcile, "prepare-reverse": prepare_reverse, "settle-reverse": reverse_transfers, "complete-reverse": complete_reverse}
+    modes = {"prepare": prepare, "settle": settle, "observe": observe, "exhaust": exhaust, "replay": replay, "reconcile-dlq": lambda: reconcile("DELIVERY_DLQ"), "complete": complete, "reconcile-clean": lambda: reconcile(scoped=False), "historical-reconciliation": historical_reconciliation, "prepare-reverse": prepare_reverse, "settle-reverse": reverse_transfers, "complete-reverse": complete_reverse}
     mode = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("PHASE20_MODE", "prepare")
     if mode not in modes:
-        raise SystemExit(f"Modo inválido: {mode}; use prepare|settle|observe|exhaust|replay|reconcile-dlq|complete|reconcile-clean|prepare-reverse|settle-reverse|complete-reverse")
+        raise SystemExit(f"Modo inválido: {mode}; use prepare|settle|observe|exhaust|replay|reconcile-dlq|complete|reconcile-clean|historical-reconciliation|prepare-reverse|settle-reverse|complete-reverse")
     modes[mode]()
 
 

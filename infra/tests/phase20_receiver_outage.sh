@@ -21,6 +21,7 @@ trap - EXIT
 compose run --rm --no-deps -e PHASE20_MODE=replay phase20-e2e
 compose run --rm --no-deps -e PHASE20_MODE=complete phase20-e2e
 compose run --rm --no-deps -e PHASE20_MODE=reconcile-clean phase20-e2e
+compose run --rm --no-deps -e PHASE20_MODE=historical-reconciliation phase20-e2e
 
 # Slice 3: prepare two independent transfers, settle the second first while Sierra is down,
 # then verify reverse arrival, exactly-once receiver effects, and final balances.
@@ -32,4 +33,4 @@ compose start bank-core-sierra
 trap - EXIT
 compose run --rm --no-deps -e PHASE20_MODE=complete-reverse phase20-e2e
 
-echo "PHASE20 PASS: outage prolongada, DLQ, replay autenticado, recuperación y reverse-arrival idempotente verificadas"
+echo "PHASE20 PASS: outage prolongada, DLQ, replay autenticado, recuperación, reconciliación histórica append-only y reverse-arrival idempotente verificadas"

@@ -58,6 +58,12 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 
 24. **S24 — Límites P8.2:** No afirmar SLO/SLI, alertas productivas, retención durable, capacidad, tracing distribuido, seguridad productiva, alta disponibilidad ni monitoreo remoto. La retención es efímera y el stack es educativo/sintético.
 
+25. **S25 — P2 histórico aprobado:** Verificar que una reconciliación con diferencia `DELIVERY_DLQ` permanezca consultable e inmutable después de recuperar el mismo delivery y ejecutar una reconciliación posterior limpia.
+
+26. **S26 — Evidencia histórica P2:** Conservar y comparar `transfer_id`, `delivery_id`, `event_id`, conteos de journal/inbox/delivery y resultados de runs antes y después de recovery; PostgreSQL sigue siendo la fuente de verdad.
+
+27. **S27 — Límites históricos P2:** No implementar ni inferir orden global, causalidad entre transferencias independientes, sequence de stream, ordering por timestamp/Kafka offset ni evidencia histórica de ledger receptor no exportada por el banco.
+
 ## Tasks
 
 - T1 [S1-S4] Crear runner/escenario de outage breve con stop/start externo de `bank-core-sierra` y observación de retry/backoff. Ruta: `infra/tests` + Compose. Commit: pendiente.
@@ -91,6 +97,9 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - T29 [S21-S24] Crear aceptación Docker de scrape, targets, datasource/dashboard y configuración privada por defecto. Ruta: `infra/tests`. Commit: pendiente.
 - T30 [S21-S24] Documentar ejecución, consultas y límites educativos/efímeros del stack. Ruta: docs. Commit: pendiente.
 - T31 [S21-S24] Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
+- T32 [S25-S27] Ampliar aceptación de outage/replay para conservar y verificar runs históricos de reconciliación. Ruta: `infra/tests/phase20_receiver_outage.py`. Commit: pendiente.
+- T33 [S25-S27] Añadir tests de persistencia histórica de reconciliación y documentación de límites. Ruta: `network/internal/settlement`, docs. Commit: pendiente.
+- T34 [S25-S27] Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
 
 ## Log
 
@@ -114,3 +123,5 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - L18. El usuario eligió P8.2 stack Prometheus/Grafana. El alcance aprobado es opcional bajo profile explícito, sin puertos publicados por defecto, con métricas y dashboard reproducibles y sin afirmaciones productivas.
 - L19. P8.1 implementó T24-T27: live/ready en network, bank-core, gateway, transit y utilities; Compose verifica HTTP sin publicar puertos; `p8_health_acceptance.sh` detiene externamente `network-db`, observa `network ready=503` con live activo y confirma `ready=200` al recuperar. Ver `docs/runbooks/p8-observability.md`; no implica monitoreo ni disponibilidad productiva.
 - L20. P8.2 implementó T28-T30: `/metrics` bounded en network y bank-core, profile Compose explícito `observability`, Prometheus/Grafana privados sin puertos publicados, almacenamiento efímero, scrape config y provisioning reproducibles. `p8_observability_acceptance.sh` verificó targets up, métrica scrapeada, datasource/dashboard y emitió PASS. No implica métricas de negocio, SLO/SLI, alertas, tracing, HA, retención durable, seguridad productiva ni monitoreo remoto.
+- L21. El usuario eligió P2 como siguiente brecha; la exploración determinó que el primer slice verificable debe ser reconciliación histórica append-only, no causalidad de stream, porque todavía no existe un contrato de sequence/order para transferencias.
+- L22. T32-T33 amplían la aceptación Docker para ejecutar una reconciliación `DELIVERY_DLQ`, conservar su `run_id`/`difference_id`, recuperar el mismo delivery, ejecutar una reconciliación posterior sin alcance limpia y consultar nuevamente el primer run; el test de settlement verifica que la diferencia histórica conserva identidad y detalle. `CHOLONET_HMAC_SECRET=local-test-hmac SIERRA_CHOLONET_HMAC_SECRET=sierra-test-hmac ORIENTE_CHOLONET_HMAC_SECRET=oriente-test-hmac sh infra/tests/phase20_receiver_outage.sh` pasó: `DELIVERY_DLQ`, replay idempotente, `APPLIED`/`COMPLETED`, delivery/inbox/journal `1/1/1`, `125/125`, run histórico consultable sin mutación y reverse-arrival `2/2/2` con `325/325`. El límite sigue siendo S25-S27: no se implementan garantías de ordering, sequence o exportación adicional de ledger receptor.
