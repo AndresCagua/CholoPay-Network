@@ -48,6 +48,7 @@ services:
     build:
       context: ../utilities
     expose: ["8080"]
+    healthcheck: {test: [CMD-SHELL, "wget -qO- http://127.0.0.1:8080/health/live >/dev/null && wget -qO- http://127.0.0.1:8080/health/ready >/dev/null"], interval: 5s, timeout: 3s, retries: 10}
     networks: [internal_services, default]
 
   transit:
@@ -58,6 +59,7 @@ services:
       PORT: 8082
       TRANSIT_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:-local-test-only}
     expose: ["8082"]
+    healthcheck: {test: [CMD-SHELL, "wget -qO- http://127.0.0.1:8082/health/live >/dev/null && wget -qO- http://127.0.0.1:8082/health/ready >/dev/null"], interval: 5s, timeout: 3s, retries: 10}
     networks: [internal_services, default]
 
   gateway:
@@ -69,6 +71,7 @@ services:
       TRANSIT_URL: http://transit:8082
       INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:-local-test-only}
     expose: ["8090"]
+    healthcheck: {test: [CMD-SHELL, "wget -qO- http://127.0.0.1:8090/health/live >/dev/null && wget -qO- http://127.0.0.1:8090/health/ready >/dev/null"], interval: 5s, timeout: 3s, retries: 10}
     depends_on:
       utilities: {condition: service_started}
       transit: {condition: service_started}
@@ -102,6 +105,7 @@ services:
       KAFKA_TOPIC: ${KAFKA_TOPIC:-cholonet.inter-network.v1}
       KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-bank-core-outbox}
     expose: ["8080"]
+    healthcheck: {test: [CMD-SHELL, "wget -qO- http://127.0.0.1:8080/health/live >/dev/null && wget -qO- http://127.0.0.1:8080/health/ready >/dev/null"], interval: 5s, timeout: 3s, retries: 10}
     depends_on:
       costa-db: {condition: service_healthy}
       gateway: {condition: service_started}
@@ -130,6 +134,7 @@ services:
       CHOLONET_HMAC_SECRET: ${SIERRA_CHOLONET_HMAC_SECRET:-}
       OUTBOX_ENABLED: ${SIERRA_OUTBOX_ENABLED:-false}
     expose: ["8080"]
+    healthcheck: {test: [CMD-SHELL, "wget -qO- http://127.0.0.1:8080/health/live >/dev/null && wget -qO- http://127.0.0.1:8080/health/ready >/dev/null"], interval: 5s, timeout: 3s, retries: 10}
     depends_on:
       sierra-db: {condition: service_healthy}
       gateway: {condition: service_started}
@@ -158,6 +163,7 @@ services:
       CHOLONET_HMAC_SECRET: ${ORIENTE_CHOLONET_HMAC_SECRET:-}
       OUTBOX_ENABLED: ${ORIENTE_OUTBOX_ENABLED:-false}
     expose: ["8080"]
+    healthcheck: {test: [CMD-SHELL, "wget -qO- http://127.0.0.1:8080/health/live >/dev/null && wget -qO- http://127.0.0.1:8080/health/ready >/dev/null"], interval: 5s, timeout: 3s, retries: 10}
     depends_on:
       oriente-db: {condition: service_healthy}
       gateway: {condition: service_started}
@@ -299,8 +305,19 @@ services:
       BANK_RECEIVER_ROUTES: ${BANK_RECEIVER_ROUTES:-00000000-0000-4000-8000-000000000101=http://bank-core:8080/internal/v1/receiver-credits|local-test-only,00000000-0000-4000-8000-000000000102=http://bank-core-sierra:8080/internal/v1/receiver-credits|sierra-local-test-only,00000000-0000-4000-8000-000000000103=http://bank-core-oriente:8080/internal/v1/receiver-credits|oriente-local-test-only}
       DELIVERY_LEASE_SECONDS: ${DELIVERY_LEASE_SECONDS:-60}
     expose: ["8080"]
+    healthcheck: {test: [CMD, /busybox, wget, -qO-, http://127.0.0.1:8080/health/live], interval: 5s, timeout: 3s, retries: 10}
     depends_on:
       network-db: {condition: service_healthy}
+    networks: [internal_services, default]
+
+  p8-health:
+    image: python:3.13-alpine
+    profiles: [p8]
+    environment:
+      P8_MODE: ${P8_MODE:-healthy}
+    volumes:
+      - ./tests/p8_health_acceptance.py:/tests/p8_health_acceptance.py:ro
+    command: ["python", "/tests/p8_health_acceptance.py"]
     networks: [internal_services, default]
 
   phase20-kafka-order:

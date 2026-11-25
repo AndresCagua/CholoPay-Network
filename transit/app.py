@@ -194,6 +194,8 @@ class TransitHandler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/") or "/"
         if path == "/health/live":
             return self._json(HTTPStatus.OK, {"status": "ok", "service": "transit-synthetic", "real_authority": False})
+        if path == "/health/ready":
+            return self._json(HTTPStatus.OK, {"status": "ok", "service": "transit-synthetic", "real_authority": False})
         parts = path.split("/")
         if len(parts) == 5 and parts[1:3] == ["v1", "vehicles"] and parts[4] == "obligations":
             status, result = STORE.obligations_for_plate(parts[3])

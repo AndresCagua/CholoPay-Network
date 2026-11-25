@@ -65,6 +65,8 @@ class UtilitiesHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/health":
             return response_payload(self, 200, {"status": "ok", "synthetic": True})
+        if parsed.path == "/health/live" or parsed.path == "/health/ready":
+            return response_payload(self, 200, {"status": "ok", "synthetic": True})
         if route == ["v1", "services", "catalog"]:
             return response_payload(self, 200, {"services": SERVICES, "provider": "synthetic-multiservice-company"})
         if route == ["v1", "contracts"]:

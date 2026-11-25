@@ -230,8 +230,13 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(healthResponse{Status: "UP"})
 	})
-	mux.HandleFunc("GET /health/ready", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET /health/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if err := db.PingContext(r.Context()); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(healthResponse{Status: "DOWN"})
+			return
+		}
 		_ = json.NewEncoder(w).Encode(healthResponse{Status: "UP"})
 	})
 	port := os.Getenv("SERVER_PORT")

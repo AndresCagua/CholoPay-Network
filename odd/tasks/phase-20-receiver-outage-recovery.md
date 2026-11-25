@@ -44,6 +44,12 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 
 17. **S17 — Límites del slice de backup/restore:** No afirmar consistencia entre las cuatro bases, RPO/RTO, PITR/WAL, cifrado, retención, rotación, backup de Kafka ni garantías productivas.
 
+18. **S18 — P8.1 aprobado:** Agregar health/readiness operacional local: endpoints `live`/`ready` uniformes, healthchecks HTTP Compose y aceptación Docker de estado sano, caída de una base sintética y recuperación. No incluye métricas, dashboards ni tracing.
+
+19. **S19 — Contrato P8.1:** `live` demuestra proceso activo; `ready` demuestra dependencias PostgreSQL disponibles y devuelve `503` cuando la dependencia está caída. Los datos son sintéticos y el flujo permanece privado dentro de Docker.
+
+20. **S20 — Límites P8.1:** No afirmar OpenTelemetry, Prometheus, Grafana, alertas, SLO/SLI, tracing distribuido, retención histórica, disponibilidad productiva ni métricas estables de negocio.
+
 ## Tasks
 
 - T1 [S1-S4] Crear runner/escenario de outage breve con stop/start externo de `bank-core-sierra` y observación de retry/backoff. Ruta: `infra/tests` + Compose. Commit: pendiente.
@@ -69,6 +75,10 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - T21 [S15-S17] Verificar identidad, hash, idempotencia, constraints y readiness después del restore; sin afirmar consistencia cross-database o RPO/RTO. Ruta: `infra/tests` + SQL/HTTP. Commit: pendiente.
 - T22 [S15-S17] Documentar evidencia y límites del slice en P7/runbook. Ruta: docs. Commit: pendiente.
 - T23 [S15-S17] Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
+- T24 [S18-S20] Añadir endpoints live/ready y healthchecks HTTP para los servicios incluidos, preservando respuestas compatibles. Ruta: `network`, `bank-core`, `gateway`, `transit`, `utilities`, Compose. Commit: pendiente.
+- T25 [S18-S20] Crear aceptación Docker de live/ready sano, caída de una base sintética y recuperación, sin puertos publicados. Ruta: `infra/tests` + scripts. Commit: pendiente.
+- T26 [S18-S20] Documentar comandos, interpretación y límites de P8.1. Ruta: docs. Commit: pendiente.
+- T27 [S18-S20] Ejecutar checks, crear work unit y evaluar RDD del nuevo target. Ruta: Docker + Git. Commit: pendiente.
 
 ## Log
 
@@ -88,3 +98,5 @@ Alcance: demostrar dentro de Docker una caída real de un banco receptor durante
 - L14. La aceptación P7 Kafka pasó en Docker: identidad estable `event_id`/key, recuperación tras reinicio, replay at-least-once y una sola fila durable en el boundary PostgreSQL.
 - L15. Se aprueba el siguiente slice: backup/restore lógico de un solo `network-db` sintético, con baseline y restore verificable. Quedan fuera consistencia entre bases, RPO/RTO, PITR/WAL, cifrado, retención, rotación, backup de Kafka y garantías productivas.
 - L16. La aceptación Docker `phase20_backup_restore.sh` pasó: creó un registro sintético, obtuvo backup `network-db`, eliminó el objetivo, restauró con `psql` y verificó identidad, payload hash, idempotencia, constraint y readiness.
+- L17. El usuario aprobó P8.1 health/readiness operacional local: endpoints live/ready uniformes, healthchecks HTTP Compose y aceptación Docker de caída/recuperación de una base sintética. Quedan fuera métricas, dashboards, tracing y SLO/SLI.
+- L18. P8.1 implementó T24-T27: live/ready en network, bank-core, gateway, transit y utilities; Compose verifica HTTP sin publicar puertos; `p8_health_acceptance.sh` detiene externamente `network-db`, observa `network ready=503` con live activo y confirma `ready=200` al recuperar. Ver `docs/runbooks/p8-observability.md`; no implica monitoreo ni disponibilidad productiva.

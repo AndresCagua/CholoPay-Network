@@ -11,6 +11,7 @@ FROM test AS build
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o /out/cholonet ./cmd/network
 
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+COPY --from=test /bin/busybox /busybox
 COPY --from=build /out/cholonet /cholonet
 EXPOSE 8080
 ENTRYPOINT ["/cholonet"]

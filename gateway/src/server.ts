@@ -157,6 +157,10 @@ export function createServer(options: GatewayOptions = {}): Server {
       sendJson(response, 200, { status: 'ok', service: 'cholopay-gateway' });
       return;
     }
+    if (method === 'GET' && pathname === '/health/ready') {
+      sendJson(response, 200, { status: 'ok', service: 'cholopay-gateway' });
+      return;
+    }
 
     const route = placeholderRoutes.find((candidate) => candidate.method === method && candidate.pattern.test(pathname));
     if (!route) {
