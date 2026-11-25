@@ -40,7 +40,7 @@ def percentile(values: list[float], percentile_value: int) -> float:
 
 
 def run(target_url: str, requests: int, concurrency: int, failure_every: int,
-        *, expected_status: int = 200, headers: dict[str, str] | None = None,
+        *, expected_status: int | None = None, headers: dict[str, str] | None = None,
         logical_seed: str = "unspecified", commit: str = "unknown",
         scenario: str = "synthetic_http_load") -> dict[str, object]:
     if requests < 1 or concurrency < 1 or failure_every < 0:
@@ -50,7 +50,11 @@ def run(target_url: str, requests: int, concurrency: int, failure_every: int,
         results = list(pool.map(lambda i: request_once(target_url, i, failure_every, headers), range(requests)))
     elapsed_ms = (time.perf_counter() - started) * 1000
     latencies = [result.latency_ms for result in results]
-    successful = sum(result.status == expected_status for result in results)
+    successful = sum(
+        result.status == expected_status if expected_status is not None
+        else result.status is not None and 200 <= result.status < 300
+        for result in results
+    )
     failed = requests - successful
     injected = sum(result.error == "injected_failure" for result in results)
     elapsed = elapsed_ms / 1000
@@ -80,7 +84,7 @@ def run(target_url: str, requests: int, concurrency: int, failure_every: int,
         "duration_ms": summary["elapsed_ms"],
         "commit": commit,
         "logical_seed": logical_seed,
-        "expected_status": expected_status,
+        "expected_status": expected_status if expected_status is not None else "2xx",
         "errors": failed,
     }
     summary["red"] = {
@@ -88,12 +92,12 @@ def run(target_url: str, requests: int, concurrency: int, failure_every: int,
         "errors": failed,
         "error_rate": round(failed / requests, 3),
         "duration_ms": summary["elapsed_ms"],
-        "expected_status": expected_status,
         "target": target_url,
         "requests": requests,
         "concurrency": concurrency,
         "commit": commit,
         "logical_seed": logical_seed,
+        "expected_status": expected_status if expected_status is not None else "2xx",
     }
     return summary
 
@@ -108,7 +112,8 @@ def main() -> None:
     requests = int(os.getenv("REQUESTS", "100"))
     concurrency = int(os.getenv("CONCURRENCY", "4"))
     failure_every = int(os.getenv("FAILURE_EVERY", "0"))
-    expected_status = int(os.getenv("EXPECTED_STATUS", "200"))
+    expected_status_raw = os.getenv("EXPECTED_STATUS")
+    expected_status = int(expected_status_raw) if expected_status_raw else None
     logical_seed = os.getenv("LOGICAL_SEED", "unspecified")
     commit = os.getenv("GIT_COMMIT", "unknown")
     scenario = os.getenv("SCENARIO", "synthetic_http_load")

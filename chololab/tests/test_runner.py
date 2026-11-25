@@ -46,6 +46,18 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(summary["metadata"]["logical_seed"], "p9-seed")
         self.assertEqual(summary["metadata"]["commit"], "abc123")
 
+    def test_default_success_preserves_any_2xx_response(self):
+        class Response:
+            status = 201
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def read(self): return b"ok"
+
+        with patch("runner.urllib.request.urlopen", return_value=Response()):
+            summary = run("http://synthetic.local/read", 2, 1, 0)
+        self.assertEqual(summary["successful"], 2)
+        self.assertEqual(summary["metadata"]["expected_status"], "2xx")
+
     def test_expected_status_is_part_of_success_count(self):
         class Response:
             status = 201

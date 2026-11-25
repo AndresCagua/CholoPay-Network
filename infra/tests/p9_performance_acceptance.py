@@ -27,6 +27,11 @@ def identity(balance):
     return {key: balance.get(key) for key in ("account_id", "currency", "posted_balance_minor", "available_balance_minor")}
 
 
+def require(condition, message):
+    if not condition:
+        raise AssertionError(message)
+
+
 def main():
     base = os.getenv("BANK_URL", "http://bank-core:8080")
     bank_token = os.getenv("BANK_API_TOKEN", "bank-local-test-only")
@@ -48,12 +53,12 @@ def main():
         f"{base}/v1/customers", method="POST", token=bank_token,
         body={"synthetic_reference": f"chololab-{seed}"},
     )
-    assert status == 201, f"fixture creation status={status}"
+    require(status == 201, f"fixture creation status={status}")
     customer_token = fixture["access_token"]
     account_id = fixture["accounts"][0]["account_id"]
     read_url = target.format(account_id=account_id)
     before_status, before = request_json(read_url, token=customer_token)
-    assert before_status == 200, f"fixture read status={before_status}"
+    require(before_status == 200, f"fixture read status={before_status}")
 
     summary = run(
         read_url, int(os.getenv("REQUESTS", "20")), int(os.getenv("CONCURRENCY", "4")), 0,
@@ -63,9 +68,11 @@ def main():
     after_status, after = request_json(read_url, token=customer_token)
     ready_status, _ = request_json(f"{base}/health/ready")
     before_id, after_id = identity(before), identity(after)
-    assert before_id == after_id, f"fixture changed: before={before_id} after={after_id}"
-    assert after_status == 200 and ready_status == 200
-    assert summary["successful"] == summary["requests"] and summary["red"]["errors"] == 0
+    require(before_id == after_id, f"fixture changed: before={before_id} after={after_id}")
+    require(after_status == 200 and ready_status == 200,
+            f"post-load status={after_status}, readiness={ready_status}")
+    require(summary["successful"] == summary["requests"] and summary["red"]["errors"] == 0,
+            f"load summary did not meet expectations: {summary}")
     print(json.dumps({"event": "p9_acceptance", "fixture_identity": before_id,
                       "summary": summary, "readiness_status": ready_status,
                       "published_ports": False}, sort_keys=True))
